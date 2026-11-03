@@ -30,6 +30,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   with structured output. The model may only reference candidates it was
   shown (enforced after the call). Every model-made change is labeled in the
   UI ("New point · added by the model").
+- Tags (2026-11-02): every point is filed under its organizations AND at
+  least one topic (a kind of problem, never containing an org name, e.g.
+  "Checked bag fees"); every subject has one of the fixed `CATEGORIES`
+  (functions/src/categories.ts, mirrored in src/lib/categories.ts). Points
+  carry denormalized `topicIds` and `categories` for browsing. The model
+  tags; the author can untag or add EXISTING subjects at review ("Filed
+  under"), never invent one. Tags are only ever added to an existing point.
+- Browse: "Most supported" (`supportCount`) and "Rising this week"
+  (`weekSupport`: +1 on support, recounted from support timestamps every 6h
+  by `recountRising`) are shown side by side at >= 760pt wide, one after
+  the other on phones (`PairedLists`). Topics rank by `stats.supporters`.
+  Topic pages are a conversation (paired lists + "Who could fix this");
+  organization pages are a ledger (stats + one sorted list).
 - Intake is two calls: `analyzeComplaint` writes a private draft and shows
   the author everything (matches, new points, PII, rewrite); only
   `submitComplaint` touches the record. Personal data is removed by default;

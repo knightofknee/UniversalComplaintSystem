@@ -6,7 +6,7 @@ import { db, Timestamp } from './common';
 setGlobalOptions({ region: 'us-central1', maxInstances: 20 });
 
 export { analyzeComplaint, searchPoints, submitComplaint } from './intake';
-export { supportPoint, voteFix } from './points';
+export { recountRising, supportPoint, voteFix } from './points';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 
 /** Drafts nobody submitted are deleted after a day; they were never public. */

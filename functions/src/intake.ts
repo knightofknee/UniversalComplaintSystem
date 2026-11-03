@@ -23,10 +23,11 @@ async function nearest<T>(
   collection: 'points' | 'subjects',
   vector: number[],
   limit: number,
+  kind?: 'topic',
 ): Promise<Neighbor<T>[]> {
-  const snap = await store
-    .collection(collection)
-    .where('removed', '==', false)
+  let q = store.collection(collection).where('removed', '==', false);
+  if (kind) q = q.where('kind', '==', kind);
+  const snap = await q
     .findNearest({
       vectorField: 'embedding',
       queryVector: AdminFieldValue.vector(vector),
@@ -48,7 +49,8 @@ type PointDoc = {
   supportCount: number;
   status: string;
 };
-type SubjectDoc = { kind: string; name: string; description: string };
+type SubjectDoc = { kind: string; name: string; description: string; category?: string };
+type ResolvedSubject = { id: string; name: string; kind: string; category: string | null };
 
 /** Live "is this what you mean?" while someone types, or the search box. */
 export const searchPoints = onCall({ cors: true }, async (req) => {
@@ -106,12 +108,15 @@ export const analyzeComplaint = onCall(
     await rateLimit(uid, 'analyze');
 
     const [vector] = await embed([text]);
-    const [points, subjects, photos, hint] = await Promise.all([
+    const [points, nearSubjects, nearTopics, photos, hint] = await Promise.all([
       nearest<PointDoc>(db, 'points', vector, 15),
       nearest<SubjectDoc>(db, 'subjects', vector, 10),
+      // Topics get their own search so existing ones are reused, not re-invented.
+      nearest<SubjectDoc>(db, 'subjects', vector, 10, 'topic'),
       Promise.all(photoPaths.map((p) => readPhoto(uid, p))),
       hintId ? db.doc(`subjects/${hintId}`).get() : null,
     ]);
+    const subjects = [...nearSubjects, ...nearTopics.filter((t) => !nearSubjects.some((s) => s.id === t.id))];
     const candidateSubjects = subjects.map((s) => ({
       id: s.id,
       kind: s.kind,
@@ -142,7 +147,7 @@ export const analyzeComplaint = onCall(
     );
     for (const p of result.points) {
       if (p.matchedPointId && !pointIds.has(p.matchedPointId)) p.matchedPointId = null;
-      p.subjectIndexes = p.subjectIndexes.filter((i) => i >= 0 && i < result.subjects.length);
+      p.subjectIndexes = [...new Set(p.subjectIndexes.filter((i) => i >= 0 && i < result.subjects.length))];
       if (p.subjectIndexes.length === 0 && result.subjects.length > 0) p.subjectIndexes = [0];
     }
 
@@ -158,10 +163,11 @@ export const analyzeComplaint = onCall(
     const byId = new Map(points.map((p) => [p.id, p]));
     const subjectInfo = (s: IntakeResult['subjects'][number]) => {
       if (s.existingId) {
-        const c = candidateSubjects.find((x) => x.id === s.existingId)!;
-        return { id: c.id, name: c.name, kind: c.kind, isNew: false };
+        const c = subjects.find((x) => x.id === s.existingId) ?? { ...hint!.data(), id: hint!.id } as SubjectDoc & { id: string };
+        return { id: c.id, name: c.name, kind: c.kind, category: c.category ?? null, isNew: false };
       }
-      return { id: null, name: s.newSubject!.name, kind: s.newSubject!.kind, isNew: true };
+      const n = s.newSubject!;
+      return { id: null, name: n.name, kind: n.kind, category: n.category, isNew: true };
     };
     return {
       draftId: draft.id,
@@ -176,11 +182,8 @@ export const analyzeComplaint = onCall(
   },
 );
 
-async function resolveSubject(s: IntakeResult['subjects'][number]): Promise<{ id: string; name: string }> {
-  if (s.existingId) {
-    const snap = await db.doc(`subjects/${s.existingId}`).get();
-    return { id: snap.id, name: snap.get('name') };
-  }
+async function resolveSubject(s: IntakeResult['subjects'][number]): Promise<ResolvedSubject> {
+  if (s.existingId) return existingSubject(s.existingId);
   const ns = s.newSubject!;
   const name = ns.name.trim().slice(0, 120);
   const existing = await db
@@ -188,7 +191,7 @@ async function resolveSubject(s: IntakeResult['subjects'][number]): Promise<{ id
     .where('nameLower', '==', name.toLowerCase())
     .limit(1)
     .get();
-  if (!existing.empty) return { id: existing.docs[0].id, name: existing.docs[0].get('name') };
+  if (!existing.empty) return existingSubject(existing.docs[0].id);
   const [vector] = await embed([`${name}: ${ns.description}`]);
   const ref = db.collection('subjects').doc();
   await ref.set({
@@ -197,16 +200,41 @@ async function resolveSubject(s: IntakeResult['subjects'][number]): Promise<{ id
     nameLower: name.toLowerCase(),
     description: ns.description.slice(0, 300),
     website: ns.website,
+    category: ns.category,
     domains: [],
     restrictedTo: null,
     claimed: false,
     createdBy: 'model',
-    stats: { points: 0, seen: 0, responded: 0, fixed: 0 },
+    stats: { points: 0, seen: 0, responded: 0, fixed: 0, supporters: 0 },
     removed: false,
     embedding: AdminFieldValue.vector(vector),
     createdAt: FieldValue.serverTimestamp(),
   });
-  return { id: ref.id, name };
+  return { id: ref.id, name, kind: ns.kind, category: ns.category };
+}
+
+async function existingSubject(id: string): Promise<ResolvedSubject> {
+  const snap = await db.doc(`subjects/${id}`).get();
+  if (!snap.exists || snap.get('removed')) throw new HttpsError('not-found', 'One of the subjects is gone.');
+  return { id, name: snap.get('name'), kind: snap.get('kind'), category: snap.get('category') ?? null };
+}
+
+/** The denormalized filing fields every point carries for browsing. */
+function filing(subjects: ResolvedSubject[]) {
+  return {
+    subjectIds: subjects.map((s) => s.id),
+    subjectNames: subjects.map((s) => s.name),
+    topicIds: subjects.filter((s) => s.kind === 'topic').map((s) => s.id),
+    categories: [...new Set(subjects.flatMap((s) => (s.category ? [s.category] : [])))],
+  };
+}
+
+/** Supporter totals on subjects drive "biggest topics". */
+async function addSupporters(subjectIds: string[], n: number) {
+  if (n === 0) return;
+  await Promise.all(
+    subjectIds.map((id) => db.doc(`subjects/${id}`).update({ 'stats.supporters': FieldValue.increment(n) })),
+  );
 }
 
 /**
@@ -237,8 +265,23 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
   const kept = result.points.filter((_, i) => keep.includes(i));
   if (kept.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one point.');
 
+  // The author's corrections to "Filed under": tags the model picked that they
+  // removed, and existing subjects they added (which apply to every point).
+  const removed = new Set<number>(
+    Array.isArray(req.data?.removeSubjects) ? req.data.removeSubjects.filter(Number.isInteger) : [],
+  );
+  const addIds: string[] = Array.isArray(req.data?.addSubjectIds)
+    ? [...new Set<string>(req.data.addSubjectIds.filter((x: unknown) => typeof x === 'string'))].slice(0, 5)
+    : [];
+
   const { displayName, responderFor } = await ensureUser(uid);
-  const subjects = await Promise.all(result.subjects.map(resolveSubject));
+  const resolved = await Promise.all(
+    result.subjects.map((s, i) => (removed.has(i) ? null : resolveSubject(s))),
+  );
+  const added = await Promise.all(addIds.map(existingSubject));
+  const allSubjects = [...resolved.filter((s): s is ResolvedSubject => !!s), ...added];
+  const unique = (list: ResolvedSubject[]) => list.filter((s, i) => list.findIndex((x) => x.id === s.id) === i);
+  if (allSubjects.length === 0) throw new HttpsError('invalid-argument', 'File it under at least one thing.');
   const submission = db.collection('submissions').doc();
   const isRant = result.tone === 'rant';
 
@@ -258,12 +301,17 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
   const addedPointIds: string[] = [];
 
   for (const p of kept) {
-    const pointSubjects = p.subjectIndexes.map((i) => subjects[i]).filter(Boolean);
+    let pointSubjects = unique([
+      ...p.subjectIndexes.flatMap((i) => (resolved[i] ? [resolved[i]] : [])),
+      ...added,
+    ]);
+    if (pointSubjects.length === 0) pointSubjects = unique(allSubjects);
     if (p.matchedPointId) {
       const ref = db.doc(`points/${p.matchedPointId}`);
       const pointSnap = await ref.get();
       if (!pointSnap.exists || pointSnap.get('removed')) continue;
-      if ((pointSnap.get('subjectIds') as string[]).some((s) => responderFor.includes(s))) continue;
+      const current = pointSnap.get('subjectIds') as string[];
+      if (current.some((s) => responderFor.includes(s))) continue;
       matchedPointIds.push(ref.id);
       const newSupporter = await db
         .doc(`points/${ref.id}/supports/${uid}`)
@@ -272,12 +320,15 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
         .catch(() => false);
       const subCount = (pointSnap.get('submissionCount') as number) + 1;
       const rantCount = (pointSnap.get('rantCount') as number) + (isRant ? 1 : 0);
+      const supportCount = (pointSnap.get('supportCount') as number) + (newSupporter ? 1 : 0);
       const update: Record<string, unknown> = {
         submissionCount: FieldValue.increment(1),
         rantCount: FieldValue.increment(isRant ? 1 : 0),
         hot: rantCount / subCount >= RANT_SHARE,
         lastActivityAt: FieldValue.serverTimestamp(),
-        ...(newSupporter ? { supportCount: FieldValue.increment(1) } : {}),
+        ...(newSupporter
+          ? { supportCount: FieldValue.increment(1), weekSupport: FieldValue.increment(1) }
+          : {}),
       };
       // The clearest wording leads the point, credited to its author.
       if (p.actionability > (pointSnap.get('canonical.actionability') as number)) {
@@ -285,23 +336,30 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
         update.canonical = { submissionId: submission.id, authorName: displayName, actionability: p.actionability };
       }
       // A new subject (another airline with the same problem) joins the point.
-      const extra = pointSubjects.filter((s) => !(pointSnap.get('subjectIds') as string[]).includes(s.id));
+      // Tags only ever get added to an existing point: one author can't
+      // re-file what others already filed.
+      const extra = pointSubjects.filter((s) => !current.includes(s.id));
       if (extra.length) {
-        update.subjectIds = FieldValue.arrayUnion(...extra.map((s) => s.id));
-        update.subjectNames = FieldValue.arrayUnion(...extra.map((s) => s.name));
+        const f = filing(extra);
+        update.subjectIds = FieldValue.arrayUnion(...f.subjectIds);
+        update.subjectNames = FieldValue.arrayUnion(...f.subjectNames);
+        if (f.topicIds.length) update.topicIds = FieldValue.arrayUnion(...f.topicIds);
+        if (f.categories.length) update.categories = FieldValue.arrayUnion(...f.categories);
         for (const s of extra) {
           await db.doc(`subjects/${s.id}`).update({ 'stats.points': FieldValue.increment(1) });
         }
+        await addSupporters(f.subjectIds, supportCount);
       }
+      if (newSupporter) await addSupporters(current, 1);
       await ref.update(update);
     } else {
       const ref = db.collection('points').doc();
       addedPointIds.push(ref.id);
       await ref.set({
         text: p.statement,
-        subjectIds: pointSubjects.map((s) => s.id),
-        subjectNames: pointSubjects.map((s) => s.name),
+        ...filing(pointSubjects),
         supportCount: 1,
+        weekSupport: 1,
         submissionCount: 1,
         rantCount: isRant ? 1 : 0,
         hot: isRant,
@@ -328,6 +386,7 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
       for (const s of pointSubjects) {
         await db.doc(`subjects/${s.id}`).update({ 'stats.points': FieldValue.increment(1) });
       }
+      await addSupporters(pointSubjects.map((s) => s.id), 1);
     }
   }
 
@@ -337,8 +396,8 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
     language: result.language,
     englishText: result.language.startsWith('en') ? null : useRewrite ? null : result.englishText,
     rewritten: useRewrite,
-    subjectIds: subjects.map((s) => s.id),
-    subjectNames: subjects.map((s) => s.name),
+    subjectIds: allSubjects.map((s) => s.id),
+    subjectNames: allSubjects.map((s) => s.name),
     matchedPointIds,
     addedPointIds,
     tone: result.tone,

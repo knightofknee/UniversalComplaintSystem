@@ -1,65 +1,152 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, limit, orderBy, query, where, type QueryConstraint } from 'firebase/firestore';
 import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PairedLists } from '@/components/paired-lists';
 import { PointCard } from '@/components/point-card';
-import { Button, Empty, Screen, T, Tabs } from '@/components/ui';
+import { Button, Card, Empty, Screen, T, Tabs } from '@/components/ui';
+import { useTheme } from '@/hooks/use-theme';
+import { CATEGORIES, type Category } from '@/lib/categories';
 import { db } from '@/lib/firebase';
-import { useCollection } from '@/lib/hooks';
-import type { Point } from '@/lib/types';
+import { count, useCollection } from '@/lib/hooks';
+import type { Point, Subject } from '@/lib/types';
 
-type Board = 'top' | 'new' | 'rants' | 'fixed';
+type More = 'new' | 'rants' | 'fixed';
+const LIST = 30;
 
-const BOARDS: { key: Board; label: string }[] = [
-  { key: 'top', label: 'Top' },
-  { key: 'new', label: 'New' },
-  { key: 'rants', label: 'Rants' },
-  { key: 'fixed', label: 'Fixed' },
-];
-
-function boardQuery(board: Board) {
-  const points = collection(db, 'points');
-  const live = where('removed', '==', false);
-  switch (board) {
-    case 'top':
-      return query(points, live, orderBy('supportCount', 'desc'), limit(50));
-    case 'new':
-      return query(points, live, orderBy('createdAt', 'desc'), limit(50));
-    case 'rants':
-      return query(points, live, where('hot', '==', true), orderBy('supportCount', 'desc'), limit(50));
-    case 'fixed':
-      return query(points, live, where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc'), limit(50));
-  }
-}
-
-/** The world's complaints, across every company and thing. */
-export default function TopScreen() {
+/** For people who just want to read: what's most complained about, and what's rising. */
+export default function BrowseScreen() {
   const router = useRouter();
-  const [board, setBoard] = useState<Board>('top');
-  const { items, loading } = useCollection<Point>(boardQuery(board), `board:${board}`);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [more, setMore] = useState<More>('new');
+  const points = collection(db, 'points');
+  const scope: QueryConstraint[] = [
+    where('removed', '==', false),
+    ...(category ? [where('categories', 'array-contains', category)] : []),
+  ];
+  const k = category ?? 'all';
+
+  const top = useCollection<Point>(query(points, ...scope, orderBy('supportCount', 'desc'), limit(LIST)), `top:${k}`);
+  const rising = useCollection<Point>(query(points, ...scope, orderBy('weekSupport', 'desc'), limit(LIST)), `rising:${k}`);
+  const topics = useCollection<Subject>(
+    query(
+      collection(db, 'subjects'),
+      where('removed', '==', false),
+      where('kind', '==', 'topic'),
+      ...(category ? [where('category', '==', category)] : []),
+      orderBy('stats.supporters', 'desc'),
+      limit(10),
+    ),
+    `topics:${k}`,
+  );
+  const moreList = useCollection<Point>(
+    query(
+      points,
+      ...scope,
+      ...(more === 'new'
+        ? [orderBy('createdAt', 'desc')]
+        : more === 'rants'
+          ? [where('hot', '==', true), orderBy('supportCount', 'desc')]
+          : [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]),
+      limit(LIST),
+    ),
+    `more:${k}:${more}`,
+  );
+
   return (
     <Screen topInset>
       <T variant="title">Universal Complaint System</T>
-      <T color={undefined} variant="body">
+      <T>
         Everything that&apos;s wrong, about anything. Counted, merged with everyone who shares it, and in front of
         whoever can fix it.
       </T>
       <Button label="Complain about something" icon="megaphone" onPress={() => router.push('/complain')} />
-      <Tabs options={BOARDS} value={board} onChange={setBoard} />
-      {items.length === 0 ? (
+
+      <CategoryChips value={category} onChange={setCategory} />
+
+      {topics.items.length > 0 && (
+        <>
+          <T variant="heading">Biggest topics</T>
+          <View style={styles.topics}>
+            {topics.items.map((t) => (
+              <Card key={t.id} onPress={() => router.push(`/subject/${t.id}`)} style={styles.topic}>
+                <T style={{ fontWeight: '700' }} numberOfLines={2}>
+                  {t.name}
+                </T>
+                <T variant="small">
+                  {count(t.stats.supporters ?? 0, 'supporter')} · {count(t.stats.points, 'point')}
+                </T>
+              </Card>
+            ))}
+          </View>
+        </>
+      )}
+
+      <PairedLists
+        first={{
+          title: 'Most supported',
+          items: top.items,
+          loading: top.loading,
+          empty: 'Nothing here yet. Be the first.',
+        }}
+        second={{
+          title: 'Rising this week',
+          hint: 'Most new support in the last 7 days',
+          items: rising.items.filter((p) => (p.weekSupport ?? 0) > 0),
+          loading: rising.loading,
+          empty: 'Nothing new this week.',
+        }}
+      />
+
+      <Tabs
+        options={[
+          { key: 'new', label: 'Newest' },
+          { key: 'rants', label: 'Rants' },
+          { key: 'fixed', label: 'Fixed' },
+        ]}
+        value={more}
+        onChange={setMore}
+      />
+      {moreList.items.length === 0 ? (
         <Empty
-          loading={loading}
-          text={
-            board === 'fixed'
-              ? 'Nothing confirmed fixed yet.'
-              : board === 'rants'
-                ? 'No rants yet.'
-                : 'Nothing here yet. Be the first.'
-          }
+          loading={moreList.loading}
+          text={more === 'fixed' ? 'Nothing confirmed fixed yet.' : more === 'rants' ? 'No rants yet.' : 'Nothing yet.'}
         />
       ) : (
-        items.map((p, i) => <PointCard key={p.id} point={p} rank={board === 'top' ? i + 1 : undefined} />)
+        moreList.items.map((p) => <PointCard key={p.id} point={p} />)
       )}
     </Screen>
   );
 }
+
+function CategoryChips({ value, onChange }: { value: Category | null; onChange: (c: Category | null) => void }) {
+  const theme = useTheme();
+  const options = [{ key: null, label: 'Everything', icon: 'globe-outline' as const }, ...CATEGORIES];
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      {options.map((c) => {
+        const on = c.key === value;
+        const fg = on ? theme.background : theme.text;
+        return (
+          <Pressable
+            key={c.key ?? 'all'}
+            onPress={() => onChange(c.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            style={[styles.chip, { backgroundColor: on ? theme.text : theme.backgroundElement }]}>
+            <Ionicons name={c.icon} size={15} color={fg} />
+            <Text style={{ color: fg, fontWeight: '600' }}>{c.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  topic: { flexGrow: 1, flexBasis: 160, maxWidth: 340 },
+});

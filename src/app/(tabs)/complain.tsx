@@ -7,6 +7,7 @@ import { ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { FiledUnder, type Tag } from '@/components/filed-under';
 import { PointCard, showAlert } from '@/components/point-card';
 import { Button, Card, Chip, Field, Notice, Row, Screen, T } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -41,6 +42,8 @@ export default function ComplainScreen() {
   const [removePII, setRemovePII] = useState(true);
   const [useRewrite, setUseRewrite] = useState(false);
   const [dropped, setDropped] = useState<Set<number>>(new Set());
+  const [untagged, setUntagged] = useState<Set<number>>(new Set());
+  const [addedTags, setAddedTags] = useState<Tag[]>([]);
   const searchSeq = useRef(0);
   const searching = text.trim().length >= SEARCH_AFTER_CHARS;
 
@@ -91,6 +94,8 @@ export default function ComplainScreen() {
       setRemovePII(true);
       setUseRewrite(false);
       setDropped(new Set());
+      setUntagged(new Set());
+      setAddedTags([]);
       setStep({ kind: 'review', analysis });
     } catch (e) {
       showAlert("Couldn't check your complaint", errorText(e));
@@ -107,6 +112,8 @@ export default function ComplainScreen() {
         useRewrite,
         removePII,
         keepPoints: analysis.result.points.map((_, i) => i).filter((i) => !dropped.has(i)),
+        removeSubjects: [...untagged],
+        addSubjectIds: addedTags.map((t) => t.id!),
       });
       setStep({ kind: 'done', analysis, matched: res.matchedPointIds, added: res.addedPointIds });
     } catch (e) {
@@ -188,17 +195,21 @@ export default function ComplainScreen() {
               </Notice>
             )}
 
-            <T variant="label">About</T>
-            <Row style={{ flexWrap: 'wrap' }}>
-              {subjects.map((s, i) => (
-                <Chip
-                  key={i}
-                  label={`${s.name}${s.isNew ? ' · new' : ''}`}
-                  color={s.isNew ? theme.new : theme.text}
-                  bg={s.isNew ? theme.newSoft : theme.backgroundElement}
-                />
-              ))}
-            </Row>
+            <FiledUnder
+              tags={subjects}
+              removed={untagged}
+              onRemove={(i) => setUntagged((u) => new Set(u).add(i))}
+              onRestore={(i) =>
+                setUntagged((u) => {
+                  const n = new Set(u);
+                  n.delete(i);
+                  return n;
+                })
+              }
+              added={addedTags}
+              onAdd={(t) => setAddedTags((a) => [...a, t])}
+              onUnadd={(id) => setAddedTags((a) => a.filter((t) => t.id !== id))}
+            />
 
             <T variant="label">
               {Object.keys(matched).length} existing · {result.points.filter((p) => !p.matchedPointId).length} new
@@ -275,7 +286,7 @@ export default function ComplainScreen() {
               label={`Post to the record (${keptCount} point${keptCount === 1 ? '' : 's'})`}
               onPress={() => post(step.analysis)}
               busy={busy}
-              disabled={keptCount === 0}
+              disabled={keptCount === 0 || untagged.size >= subjects.length && addedTags.length === 0}
             />
             <Button label="Edit what I wrote" kind="quiet" onPress={() => setStep({ kind: 'write' })} />
           </>

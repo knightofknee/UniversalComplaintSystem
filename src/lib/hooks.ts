@@ -57,3 +57,8 @@ export function timeAgo(ms: number | undefined | null): string {
   if (d < 60) return `${d}d ago`;
   return new Date(ms).toLocaleDateString();
 }
+
+/** "1 point", "2 points". */
+export function count(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}

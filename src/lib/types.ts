@@ -14,7 +14,11 @@ export type Point = {
   text: string;
   subjectIds: string[];
   subjectNames: string[];
+  topicIds?: string[];
+  categories?: string[];
   supportCount: number;
+  /** Support gained in the last 7 days ("Rising this week"). */
+  weekSupport?: number;
   submissionCount: number;
   rantCount: number;
   hot: boolean;
@@ -37,10 +41,11 @@ export type Subject = {
   name: string;
   description: string;
   website: string | null;
+  category?: string;
   domains: string[];
   claimed: boolean;
   restrictedTo: string[] | null;
-  stats: { points: number; seen: number; responded: number; fixed: number };
+  stats: { points: number; seen: number; responded: number; fixed: number; supporters?: number };
 };
 
 export type Submission = {
@@ -114,6 +119,12 @@ export type PointHit = {
 export type Analysis = {
   draftId: string;
   result: IntakeResult;
-  subjects: { id: string | null; name: string; kind: 'organization' | 'topic'; isNew: boolean }[];
+  subjects: {
+    id: string | null;
+    name: string;
+    kind: 'organization' | 'topic';
+    category: string | null;
+    isNew: boolean;
+  }[];
   matched: Record<string, PointHit>;
 };

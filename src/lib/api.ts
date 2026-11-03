@@ -19,7 +19,16 @@ export const analyzeComplaint = call<
 >('analyzeComplaint');
 
 export const submitComplaint = call<
-  { draftId: string; useRewrite: boolean; removePII: boolean; keepPoints: number[] },
+  {
+    draftId: string;
+    useRewrite: boolean;
+    removePII: boolean;
+    keepPoints: number[];
+    /** Indexes into the analysis's subjects the author untagged. */
+    removeSubjects: number[];
+    /** Existing subjects the author added; they apply to every point. */
+    addSubjectIds: string[];
+  },
   { submissionId: string; matchedPointIds: string[]; addedPointIds: string[] }
 >('submitComplaint');
 

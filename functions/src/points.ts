@@ -1,7 +1,11 @@
 /** Supporting a point, and supporters confirming whether a fix is real. */
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 
-import { db, ensureUser, FieldValue, notify, rateLimit, uidOf } from './common';
+import { db, ensureUser, FieldValue, notify, rateLimit, Timestamp, uidOf } from './common';
+
+/** "Rising this week" counts support gained in this window. */
+const RISING_WINDOW_MS = 7 * 24 * 3600_000;
 
 /** Fixed is only shown once supporters agree; the organization can't grade itself. */
 export const FIX_CONFIRMATIONS = 3;
@@ -24,12 +28,25 @@ export const supportPoint = onCall({ cors: true }, async (req) => {
     }
     const mine = await tx.get(ref.collection('supports').doc(uid));
     if (support === mine.exists) return;
+    const delta = support ? 1 : -1;
+    // Withdrawing only takes back this week's count if it was given this week.
+    const recent = !support && Date.now() - (mine.get('at') as Timestamp).toMillis() < RISING_WINDOW_MS;
     if (support) {
       tx.set(mine.ref, { at: FieldValue.serverTimestamp(), via: 'direct' });
-      tx.update(ref, { supportCount: FieldValue.increment(1), lastActivityAt: FieldValue.serverTimestamp() });
+      tx.update(ref, {
+        supportCount: FieldValue.increment(1),
+        weekSupport: FieldValue.increment(1),
+        lastActivityAt: FieldValue.serverTimestamp(),
+      });
     } else {
       tx.delete(mine.ref);
-      tx.update(ref, { supportCount: FieldValue.increment(-1) });
+      tx.update(ref, {
+        supportCount: FieldValue.increment(-1),
+        ...(recent ? { weekSupport: FieldValue.increment(-1) } : {}),
+      });
+    }
+    for (const sid of point.get('subjectIds') as string[]) {
+      tx.update(db.doc(`subjects/${sid}`), { 'stats.supporters': FieldValue.increment(delta) });
     }
   });
   return { supported: support };
@@ -81,4 +98,33 @@ export const voteFix = onCall({ cors: true }, async (req) => {
     });
   }
   return { status: outcome.status };
+});
+
+/**
+ * Support is counted into weekSupport the moment it is given; this ages it
+ * out. Every 6 hours each point's weekSupport is recounted from the support
+ * timestamps of the last 7 days.
+ */
+export const recountRising = onSchedule('every 6 hours', async () => {
+  const cutoff = Timestamp.fromMillis(Date.now() - RISING_WINDOW_MS);
+  const recent = await db.collectionGroup('supports').where('at', '>=', cutoff).select().get();
+  const counts = new Map<string, number>();
+  for (const d of recent.docs) {
+    const pointId = d.ref.parent.parent!.id;
+    counts.set(pointId, (counts.get(pointId) ?? 0) + 1);
+  }
+  const current = await db.collection('points').where('weekSupport', '>', 0).select('weekSupport').get();
+  const writes = new Map<string, number>();
+  for (const d of current.docs) {
+    const n = counts.get(d.id) ?? 0;
+    if (n !== d.get('weekSupport')) writes.set(d.id, n);
+    counts.delete(d.id);
+  }
+  for (const [id, n] of counts) writes.set(id, n);
+  const entries = [...writes];
+  for (let i = 0; i < entries.length; i += 400) {
+    const batch = db.batch();
+    for (const [id, n] of entries.slice(i, i + 400)) batch.update(db.doc(`points/${id}`), { weekSupport: n });
+    await batch.commit();
+  }
 });

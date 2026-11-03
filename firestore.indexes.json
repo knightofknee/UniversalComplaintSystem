@@ -4,94 +4,375 @@
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "embedding", "vectorConfig": { "dimension": 768, "flat": {} } }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
       ]
     },
     {
       "collectionGroup": "subjects",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "embedding", "vectorConfig": { "dimension": 768, "flat": {} } }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "supportCount", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "hot", "order": "ASCENDING" },
-        { "fieldPath": "supportCount", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "hot",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "lastActivityAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastActivityAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "subjectIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "supportCount", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "points",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "subjectIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "submissions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "matchedPointIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "matchedPointIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "submissions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "addedPointIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "addedPointIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "subjects",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "removed", "order": "ASCENDING" },
-        { "fieldPath": "nameLower", "order": "ASCENDING" }
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nameLower",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "subjects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weekSupport",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "categories",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "categories",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "weekSupport",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "categories",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "categories",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "hot",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "categories",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastActivityAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "weekSupport",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "subjects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "stats.supporters",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "subjects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "stats.supporters",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
@@ -105,6 +386,24 @@
       "collectionGroup": "subjects",
       "fieldPath": "embedding",
       "indexes": []
+    },
+    {
+      "collectionGroup": "supports",
+      "fieldPath": "at",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
     }
   ]
 }

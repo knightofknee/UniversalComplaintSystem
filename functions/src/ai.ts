@@ -17,6 +17,8 @@ import { defineSecret } from 'firebase-functions/params';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
+import { CATEGORIES } from './categories';
+
 export const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 
 export const CLAUDE_MODEL = 'claude-opus-5-5';
@@ -87,12 +89,13 @@ export const IntakeResult = z.object({
             kind: z.enum(['organization', 'topic']),
             name: z.string(),
             description: z.string().describe('One neutral line saying what this subject is.'),
+            category: z.enum(CATEGORIES).describe('The one category a person browsing would look under.'),
             website: z.string().nullable().describe('Official homepage URL if you are confident, else null.'),
           })
           .nullable(),
       }),
     )
-    .describe('What the complaint is about, most specific first.'),
+    .describe('Every organization and topic the points are filed under: organizations first.'),
   points: z
     .array(
       z.object({
@@ -101,7 +104,9 @@ export const IntakeResult = z.object({
           .string()
           .describe('One atomic thing that is wrong or could be better, in English, kept as close to the author\'s own words as possible.'),
         actionability: z.number().int().describe('0-100: how specific and fixable this statement is.'),
-        subjectIndexes: z.array(z.number().int()).describe('Indexes into `subjects` this point belongs to.'),
+        subjectIndexes: z
+          .array(z.number().int())
+          .describe('Indexes into `subjects` this point is filed under: its organizations and at least one topic.'),
       }),
     ),
   tone: z.enum(['constructive', 'neutral', 'rant']),
@@ -132,9 +137,12 @@ const INTAKE_SYSTEM = `You are the intake desk of the Universal Complaint System
 
 Your job, for one submission:
 
-1. Subjects. Decide what the complaint is about. A subject is an organization (a company, a product line, a government agency, a school: anything with an email domain that could respond) or a topic (a thing nobody owns: "self-checkout machines", "daylight saving time"). Reuse a candidate subject whenever it is the same thing. Create a new one only when no candidate fits, and name it the way the public knows it ("Delta Air Lines", not "delta"). A product gets its own subject only when people would complain about it separately from its maker. Never make a subject out of a private individual.
+1. Subjects. Every point is filed under two kinds of subject:
+   - Organizations it is about: a company, a product line, a government agency, a school (anything with an email domain that could respond). Name them the way the public knows them ("Delta Air Lines", not "delta"). A product gets its own subject only when people would complain about it separately from its maker.
+   - At least one topic: what kind of problem it is, or the thing nobody owns that it is about. Topics are short noun phrases general enough to span organizations, so people can browse them across companies: "Checked bag fees", "Lost luggage", "Customer service hold times", "Self-checkout machines", "Daylight saving time". Never put an organization's name in a topic ("Delta bag fees" is wrong; "Checked bag fees" is right). One or two topics per point is typical; never more than three.
+   Reuse a candidate subject whenever it is the same thing; near-duplicates fragment the record ("Bag fees" vs "Checked bag fees"). Create a new one only when no candidate fits. Every new subject gets one category. Never make a subject out of a private individual.
 
-2. Points. Split the submission into atomic points: each one specific thing that is wrong or could be better. A point matches a candidate point when fixing one would fix the other; matching is the goal, because people supporting the same point is what gives it weight. When the submission adds a new angle to a candidate point (a different cause, place, or consequence), that is a new point. Write each statement in English, as close to the author's own words as possible: you are condensing, not editorializing. A general topic point should also list the organizations that could fix it when they are among the subjects.
+2. Points. Split the submission into atomic points: each one specific thing that is wrong or could be better. A point matches a candidate point when fixing one would fix the other; matching is the goal, because people supporting the same point is what gives it weight. When the submission adds a new angle to a candidate point (a different cause, place, or consequence), that is a new point. Write each statement in English, as close to the author's own words as possible: you are condensing, not editorializing. A topic point about something nobody owns should also list the organizations that could fix it when they are among the subjects.
 
 3. Support tickets. "My order #4471 never arrived" is a private case; "orders to Chicago routinely arrive late" is a complaint. If the text is mainly a private case, say so and where it belongs, but still extract any general pattern in it as a point.
 

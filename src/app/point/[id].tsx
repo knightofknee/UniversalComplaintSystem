@@ -69,6 +69,7 @@ export default function PointScreen() {
 
   return (
     <Screen>
+      <T variant="small">Filed under (tagged automatically)</T>
       <Row style={{ flexWrap: 'wrap' }}>
         {point.subjectIds.map((sid, i) => (
           <Card key={sid} onPress={() => router.push(`/subject/${sid}`)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
