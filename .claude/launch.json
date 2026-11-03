@@ -1,0 +1,45 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "emulators",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "emulators"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "env": {
+        "EXPO_PUBLIC_USE_EMULATORS": "1",
+        "BROWSER": "none"
+      },
+      "port": 8081
+    },
+    {
+      "name": "web-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8083"
+      ],
+      "env": {
+        "BROWSER": "none"
+      },
+      "port": 8083
+    }
+  ]
+}

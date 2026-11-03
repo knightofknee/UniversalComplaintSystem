@@ -1,7 +1,5 @@
 # Universal Complaint System — product spec (draft 1, 2026-11-02)
 
-Private until launch. Do not publish or share.
-
 ## Mission
 
 Every complaint about anything gets recorded, merged with everyone else who
@@ -185,6 +183,16 @@ is public, held private until it passes. No video in v1.
   App Store Connect). Differs from the older `com.briancarlisle.*` apps on
   purpose: it's reverse-DNS of waldgrave.com, which hosts the web app and
   universal links.
+
+## Decisions (2026-11-02)
+
+- No account needed to complain: anonymous account on first open; adding an
+  email keeps everything and is required only to respond for an
+  organization (verified work email).
+- Any language in, English UI: complaints are kept as written with an
+  English translation; points are stored in English; matching is
+  multilingual.
+- AI: Claude for intake, Gemini embeddings (Vertex) for search and matching.
 
 ## v1 scope
 

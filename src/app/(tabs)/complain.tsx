@@ -1,0 +1,367 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ref, uploadBytes } from 'firebase/storage';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
+
+import { PointCard, showAlert } from '@/components/point-card';
+import { Button, Card, Chip, Field, Notice, Row, Screen, T } from '@/components/ui';
+import { useAuth } from '@/hooks/use-auth';
+import { useTheme } from '@/hooks/use-theme';
+import { analyzeComplaint, errorText, searchPoints, submitComplaint } from '@/lib/api';
+import { storage } from '@/lib/firebase';
+import type { Analysis, PointHit } from '@/lib/types';
+
+const MAX_PHOTOS = 4;
+const SEARCH_AFTER_CHARS = 15;
+
+type Photo = { uri: string; path: string | null };
+type Step =
+  | { kind: 'write' }
+  | { kind: 'review'; analysis: Analysis }
+  | { kind: 'done'; analysis: Analysis; matched: string[]; added: string[] };
+
+/**
+ * Complaining, in three steps: write it (while similar points show up live),
+ * see what the model did with it, post it.
+ */
+export default function ComplainScreen() {
+  const theme = useTheme();
+  const router = useRouter();
+  const { user } = useAuth();
+  const params = useLocalSearchParams<{ subjectId?: string; subjectName?: string }>();
+  const [text, setText] = useState('');
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [similar, setSimilar] = useState<PointHit[]>([]);
+  const [step, setStep] = useState<Step>({ kind: 'write' });
+  const [busy, setBusy] = useState(false);
+  const [removePII, setRemovePII] = useState(true);
+  const [useRewrite, setUseRewrite] = useState(false);
+  const [dropped, setDropped] = useState<Set<number>>(new Set());
+  const searchSeq = useRef(0);
+  const searching = text.trim().length >= SEARCH_AFTER_CHARS;
+
+  // "Is this what you mean?" while typing.
+  useEffect(() => {
+    if (step.kind !== 'write' || text.trim().length < SEARCH_AFTER_CHARS) return;
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const { points } = await searchPoints({ query: text.trim() });
+        if (seq === searchSeq.current) setSimilar(points.slice(0, 4));
+      } catch {
+        // Search is a convenience; a failure just shows nothing.
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [text, step.kind]);
+
+  const addPhoto = async () => {
+    if (!user) return;
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (picked.canceled) return;
+    const asset = picked.assets[0];
+    // Re-encoding resizes the photo and drops its metadata (location included).
+    const rendered = await ImageManipulator.manipulate(asset.uri).resize({ width: 1600 }).renderAsync();
+    const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 });
+    const local: Photo = { uri: saved.uri, path: null };
+    setPhotos((p) => [...p, local]);
+    try {
+      const path = `uploads/${user.uid}/${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`;
+      const blob = await (await fetch(saved.uri)).blob();
+      await uploadBytes(ref(storage, path), blob, { contentType: 'image/jpeg' });
+      setPhotos((p) => p.map((x) => (x === local ? { ...x, path } : x)));
+    } catch (e) {
+      setPhotos((p) => p.filter((x) => x !== local));
+      showAlert("Couldn't add that photo", errorText(e));
+    }
+  };
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const analysis = await analyzeComplaint({
+        text: text.trim(),
+        photoPaths: photos.flatMap((p) => (p.path ? [p.path] : [])),
+        ...(params.subjectId ? { subjectId: params.subjectId } : {}),
+      });
+      setRemovePII(true);
+      setUseRewrite(false);
+      setDropped(new Set());
+      setStep({ kind: 'review', analysis });
+    } catch (e) {
+      showAlert("Couldn't check your complaint", errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const post = async (analysis: Analysis) => {
+    setBusy(true);
+    try {
+      const res = await submitComplaint({
+        draftId: analysis.draftId,
+        useRewrite,
+        removePII,
+        keepPoints: analysis.result.points.map((_, i) => i).filter((i) => !dropped.has(i)),
+      });
+      setStep({ kind: 'done', analysis, matched: res.matchedPointIds, added: res.addedPointIds });
+    } catch (e) {
+      showAlert("Couldn't post", errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = () => {
+    setText('');
+    setPhotos([]);
+    setStep({ kind: 'write' });
+    if (params.subjectId) router.setParams({ subjectId: undefined, subjectName: undefined });
+  };
+
+  if (step.kind === 'done') {
+    const total = step.matched.length + step.added.length;
+    return (
+      <Screen topInset>
+        <Ionicons name="checkmark-circle" size={48} color={theme.good} />
+        <T variant="title">It&apos;s on the record.</T>
+        <T>
+          Your complaint is counted and public. You now support {total} point{total === 1 ? '' : 's'}
+          {step.matched.length > 0 &&
+            `, ${step.matched.length} of them shared with people who said it before you`}
+          . We&apos;ll tell you when anything moves on them.
+        </T>
+        {step.added.length > 0 && (
+          <Notice tone="new">
+            <T variant="small" color={theme.new}>
+              {step.added.length} new point{step.added.length === 1 ? ' was' : 's were'} added to the record from
+              what you wrote.
+            </T>
+          </Notice>
+        )}
+        {step.matched.map((id) => (
+          <Card key={id} onPress={() => router.push(`/point/${id}`)}>
+            <T>{step.analysis.matched[id]?.text}</T>
+          </Card>
+        ))}
+        {step.added.map((id, i) => (
+          <Card key={id} onPress={() => router.push(`/point/${id}`)}>
+            <Chip label="New point" color={theme.new} bg={theme.newSoft} />
+            <T>{newStatements(step.analysis, dropped)[i]}</T>
+          </Card>
+        ))}
+        <Button label="Complain about something else" onPress={reset} kind="quiet" />
+      </Screen>
+    );
+  }
+
+  if (step.kind === 'review') {
+    const { result, subjects, matched } = step.analysis;
+    const unpostablePhotos = result.photos.filter((p) => !p.ok || p.containsPersonalData).length;
+    const keptCount = result.points.length - dropped.size;
+    return (
+      <Screen topInset>
+        <T variant="title">Here&apos;s what we found</T>
+        {!result.isComplaint ? (
+          <>
+            <Notice tone="warn">
+              <T>{result.notComplaintReason ?? 'There is nothing here to record as a complaint.'}</T>
+            </Notice>
+            <Button label="Edit" kind="secondary" onPress={() => setStep({ kind: 'write' })} />
+          </>
+        ) : (
+          <>
+            {result.supportTicket.isTicket && (
+              <Notice tone="warn">
+                <T variant="label">This sounds like a private case</T>
+                <T>
+                  {result.supportTicket.advice ??
+                    'Only the organization can fix your own order or account; contact them directly.'}
+                </T>
+                <T variant="small">
+                  The general problem behind it is still worth recording below, so others can join it.
+                </T>
+              </Notice>
+            )}
+
+            <T variant="label">About</T>
+            <Row style={{ flexWrap: 'wrap' }}>
+              {subjects.map((s, i) => (
+                <Chip
+                  key={i}
+                  label={`${s.name}${s.isNew ? ' · new' : ''}`}
+                  color={s.isNew ? theme.new : theme.text}
+                  bg={s.isNew ? theme.newSoft : theme.backgroundElement}
+                />
+              ))}
+            </Row>
+
+            <T variant="label">
+              {Object.keys(matched).length} existing · {result.points.filter((p) => !p.matchedPointId).length} new
+            </T>
+            {result.points.map((p, i) => {
+              const hit = p.matchedPointId ? matched[p.matchedPointId] : null;
+              const kept = !dropped.has(i);
+              return (
+                <Card key={i} style={!kept && { opacity: 0.5 }}>
+                  {hit ? (
+                    <Chip label={`Matches · ${hit.supportCount} already said it`} color={theme.primary} bg={theme.primarySoft} />
+                  ) : (
+                    <Chip label="New point · added by the model" color={theme.new} bg={theme.newSoft} />
+                  )}
+                  <T>{hit ? hit.text : p.statement}</T>
+                  {hit && hit.text !== p.statement && <T variant="small">From yours: “{p.statement}”</T>}
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <T variant="small">{kept ? 'Included' : 'Left out'}</T>
+                    <Switch
+                      value={kept}
+                      onValueChange={(on) =>
+                        setDropped((d) => {
+                          const n = new Set(d);
+                          if (on) n.delete(i);
+                          else n.add(i);
+                          return n;
+                        })
+                      }
+                    />
+                  </Row>
+                </Card>
+              );
+            })}
+
+            {result.pii.found.length > 0 && result.pii.redactedText && (
+              <Card>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <T variant="heading" style={{ flex: 1 }}>
+                    Remove personal details
+                  </T>
+                  <Switch value={removePII} onValueChange={setRemovePII} />
+                </Row>
+                <T variant="small">Found: {result.pii.found.join(', ')}. Your complaint is public.</T>
+                {removePII && <T variant="small">Posts as: “{result.pii.redactedText}”</T>}
+              </Card>
+            )}
+
+            {result.coaching && result.suggestedRewrite && (
+              <Card>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <T variant="heading" style={{ flex: 1 }}>
+                    Post a clearer version?
+                  </T>
+                  <Switch value={useRewrite} onValueChange={setUseRewrite} />
+                </Row>
+                <T variant="small">{result.coaching}</T>
+                <T>“{result.suggestedRewrite}”</T>
+                <T variant="small">
+                  Optional. The clearest wording of a point becomes its headline, credited to whoever wrote it.
+                </T>
+              </Card>
+            )}
+
+            {unpostablePhotos > 0 && (
+              <Notice tone="warn">
+                <T variant="small">
+                  {unpostablePhotos} photo{unpostablePhotos === 1 ? '' : 's'} won&apos;t be posted (personal details
+                  or not suitable).
+                </T>
+              </Notice>
+            )}
+
+            <Button
+              label={`Post to the record (${keptCount} point${keptCount === 1 ? '' : 's'})`}
+              onPress={() => post(step.analysis)}
+              busy={busy}
+              disabled={keptCount === 0}
+            />
+            <Button label="Edit what I wrote" kind="quiet" onPress={() => setStep({ kind: 'write' })} />
+          </>
+        )}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen topInset>
+      <T variant="title">Complain</T>
+      <T>
+        About any company, product, or thing. Say what&apos;s wrong or what could be better. Rants are welcome;
+        specifics get things fixed.
+      </T>
+      {params.subjectName && (
+        <Chip label={`About ${params.subjectName}`} color={theme.primary} bg={theme.primarySoft} />
+      )}
+      <Field
+        multiline
+        value={text}
+        onChangeText={setText}
+        placeholder="What's wrong?"
+        maxLength={4000}
+        accessibilityLabel="Your complaint"
+      />
+      <Row style={{ flexWrap: 'wrap' }}>
+        {photos.map((p, i) => (
+          <View key={i}>
+            <Image source={{ uri: p.uri }} style={styles.thumb} />
+            <Pressable
+              accessibilityLabel="Remove photo"
+              onPress={() => setPhotos((ps) => ps.filter((x) => x !== p))}
+              style={[styles.remove, { backgroundColor: theme.text }]}>
+              <Ionicons name="close" size={14} color={theme.background} />
+            </Pressable>
+          </View>
+        ))}
+        {photos.length < MAX_PHOTOS && (
+          <Pressable
+            onPress={addPhoto}
+            accessibilityLabel="Add a photo"
+            style={[styles.thumb, styles.addPhoto, { borderColor: theme.border }]}>
+            <Ionicons name="camera-outline" size={24} color={theme.textSecondary} />
+          </Pressable>
+        )}
+      </Row>
+
+      {searching && similar.length > 0 && (
+        <>
+          <T variant="label">Already on the record? Tap “Me too”</T>
+          {similar.map((p) => (
+            <PointCard key={p.id} point={p} />
+          ))}
+        </>
+      )}
+
+      <Button
+        label="Check my complaint"
+        onPress={check}
+        busy={busy}
+        disabled={text.trim().length < 8 || photos.some((p) => !p.path)}
+      />
+      <T variant="small">
+        Nothing is posted until you see how it will be recorded. No account needed.
+      </T>
+    </Screen>
+  );
+}
+
+/** The kept new points, in the order the server created them. */
+function newStatements(analysis: Analysis, dropped: Set<number>) {
+  return analysis.result.points.filter((p, i) => !dropped.has(i) && !p.matchedPointId).map((p) => p.statement);
+}
+
+const styles = StyleSheet.create({
+  thumb: { width: 72, height: 72, borderRadius: 10 },
+  addPhoto: { borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  remove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

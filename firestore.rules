@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// The public record is readable by anyone and writable by no client: every
+// change goes through a Cloud Function, so counts, statuses, and the "seen"
+// and "fixed" stats can't be forged. Organizations can respond (through
+// functions) but never edit or remove anything.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /subjects/{subjectId} {
+      allow read: if resource.data.removed == false;
+      // Who responds for an organization is not public.
+      match /responders/{uid} {
+        allow read: if isMe(uid);
+      }
+    }
+
+    match /points/{pointId} {
+      allow read: if resource.data.removed == false;
+      match /responses/{responseId} {
+        allow read: if true;
+      }
+      // Who supports what is private: you can see only your own support.
+      match /supports/{uid} {
+        allow read: if isMe(uid);
+      }
+      match /fixVotes/{uid} {
+        allow read: if isMe(uid);
+      }
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if resource.data.removed == false;
+    }
+
+    // Public log of everything removed, and why.
+    match /removals/{id} {
+      allow read: if true;
+    }
+
+    match /users/{uid} {
+      allow read: if isMe(uid);
+      match /mine/{submissionId} {
+        allow read: if isMe(uid);
+      }
+      match /notifications/{id} {
+        allow read: if isMe(uid);
+        allow update: if isMe(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      }
+    }
+
+    match /claims/{claimId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // drafts, rateLimits: server only.
+  }
+}

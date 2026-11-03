@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Photos someone is about to attach. Private until the intake model
+    // passes them and the complaint is submitted (then copied to public/).
+    match /uploads/{uid}/{file} {
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 6 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow read: if request.auth != null && request.auth.uid == uid;
+    }
+    match /public/{submissionId}/{file} {
+      allow read: if true;
+    }
+  }
+}
