@@ -87,6 +87,28 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `config/ai.dailyBudgetUsd`, default $25; spend in `usage/{date}`), with
   `max_tokens` 6000 and junk text rejected before the model. Past the
   ceiling only complaint checking pauses.
+- App Check (2026-11-05) is ENFORCED on every callable (`CALLABLE` in
+  functions/src/common.ts; skipped in the emulators). Web: reCAPTCHA
+  Enterprise (site key in src/lib/firebase.ts). iOS: App Attest (team
+  R3H7M2M4F5, entitlement in app.json). Android: Play Integrity, which still
+  needs the release SHA-256 on the Firebase Android app and the Play Console
+  app linked to the Cloud project. Development (localhost, simulators)
+  sends the debug token in the gitignored `.env.local`
+  (EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN), registered for all three apps.
+- Exactly ONE copy of the Firebase web SDK, or App Check sends tokens the
+  server can't decode and static web rendering fails ("Component auth has
+  not been registered"): package.json `overrides` gives
+  @react-native-firebase/app the app's own `firebase`, and the app has no
+  firebase-admin dependency (scripts use functions/'s). Check with
+  `npm ls @firebase/app` (one version).
+- React Native Firebase is pinned to 26 (CocoaPods). 27 requires Swift
+  Package Manager and dynamic frameworks. iOS uses static frameworks
+  (expo-build-properties); plugins/with-rnfirebase-no-spm.js is shared with
+  ../direct-democracy. `pod install` needs a UTF-8 locale
+  (`LANG=en_US.UTF-8`) under Ruby 3.4.
+- Testing native builds: use a simulator of our own, never one already
+  booted (that's the developer's), and Metro on port 8095. EAS builds are
+  the developer's.
 - Account deletion (`deleteAccount`, functions/src/account.ts) does exactly
   what src/app/privacy.tsx promises; change both together. The privacy
   policy and terms (src/app/privacy.tsx, terms.tsx) are ours to keep

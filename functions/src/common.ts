@@ -7,6 +7,15 @@ import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 
 initializeApp();
 export const db = getFirestore();
+
+/**
+ * Options for every callable. App Check is enforced everywhere: only the
+ * real app (reCAPTCHA on web, App Attest on iOS, Play Integrity on
+ * Android, or a registered debug token in development) can call in, so a
+ * script with the public Firebase config can't run up AI costs. The
+ * emulators skip it.
+ */
+export const CALLABLE = { cors: true, enforceAppCheck: !process.env.FUNCTIONS_EMULATOR } as const;
 export const bucket = () => getStorage().bucket();
 
 export const NAME_ADJECTIVES = [

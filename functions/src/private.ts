@@ -24,7 +24,7 @@ import { FieldValue as AdminFieldValue, type DocumentReference } from 'firebase-
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 
 import { embed, type IntakeResult } from './ai';
-import { bucket, cleanText, db, ensureUser, FieldValue, notify, rateLimit, uidOf } from './common';
+import { CALLABLE, bucket, cleanText, db, ensureUser, FieldValue, notify, rateLimit, uidOf } from './common';
 
 export const PRIVATE_PREFIX = 'private:';
 
@@ -237,7 +237,7 @@ function ids(req: CallableRequest) {
   return { orgId, threadId };
 }
 
-export const sendMessage = onCall({ cors: true }, async (req) => {
+export const sendMessage = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const { orgId, threadId } = ids(req);
   const text = stripSensitive(cleanText(req.data?.text, 4000, 'Message'));
@@ -281,7 +281,7 @@ export const sendMessage = onCall({ cors: true }, async (req) => {
   return { ok: true };
 });
 
-export const setThreadStatus = onCall({ cors: true }, async (req) => {
+export const setThreadStatus = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const { orgId, threadId } = ids(req);
   const status = req.data?.status === 'resolved' ? 'resolved' : 'open';
@@ -291,7 +291,7 @@ export const setThreadStatus = onCall({ cors: true }, async (req) => {
   return { status };
 });
 
-export const markThreadRead = onCall({ cors: true }, async (req) => {
+export const markThreadRead = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const { orgId, threadId } = ids(req);
   const { ref, owner } = await threadAccess(uid, orgId, threadId);
@@ -309,7 +309,7 @@ export const markThreadRead = onCall({ cors: true }, async (req) => {
  * then show "+N private" and private complainers can confirm fixes. The
  * text of private complaints is never published.
  */
-export const setOrgSettings = onCall({ cors: true }, async (req) => {
+export const setOrgSettings = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const subjectId = typeof req.data?.subjectId === 'string' ? req.data.subjectId : '';
   const responder = await db.doc(`subjects/${subjectId}/responders/${uid}`).get();

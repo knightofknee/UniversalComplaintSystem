@@ -12,7 +12,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { ANTHROPIC_API_KEY, embed, runIntake, type IntakeResult } from './ai';
 // Candidate ids for private-only points carry their path (PRIVATE_PREFIX), so they can't collide with public ids.
 import { PRIVATE_PREFIX, promotePrivatePoint, submitPrivate } from './private';
-import { bucket, cleanText, db, ensureUser, FieldValue, rateLimit, uidOf } from './common';
+import { CALLABLE, bucket, cleanText, db, ensureUser, FieldValue, rateLimit, uidOf } from './common';
 
 const MAX_TEXT = 4000;
 const MAX_PHOTOS = 4;
@@ -82,7 +82,7 @@ async function raisedPrivately(pointId: string) {
 }
 
 /** Live "is this what you mean?" while someone types, or the search box. */
-export const searchPoints = onCall({ cors: true }, async (req) => {
+export const searchPoints = onCall(CALLABLE, async (req) => {
   uidOf(req);
   const query = cleanText(req.data?.query, 1000, 'Search');
   await rateLimit(req, 'search');
@@ -131,7 +131,7 @@ async function readPhoto(uid: string, path: unknown) {
 
 /** Step 1: the model reads the draft. Nothing public is written. */
 export const analyzeComplaint = onCall(
-  { cors: true, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 120, memory: '512MiB' },
+  { ...CALLABLE, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 120, memory: '512MiB' },
   async (req) => {
     const uid = uidOf(req);
     const text = cleanText(req.data?.text, MAX_TEXT, 'Your complaint');
@@ -292,7 +292,7 @@ async function addSupporters(subjectIds: string[], n: number) {
  * Step 2: the author confirms. Matched points gain a supporter; new points
  * are created; the author's words are kept as the submission.
  */
-export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async (req) => {
+export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, async (req) => {
   const uid = uidOf(req);
   const draftId = typeof req.data?.draftId === 'string' ? req.data.draftId : '';
   const draftSnap = draftId ? await db.doc(`drafts/${draftId}`).get() : null;

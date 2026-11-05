@@ -2,7 +2,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
-import { db, ensureUser, FieldValue, notify, rateLimit, Timestamp, uidOf } from './common';
+import { CALLABLE, db, ensureUser, FieldValue, notify, rateLimit, Timestamp, uidOf } from './common';
 
 /** "Rising this week" counts support gained in this window. */
 const RISING_WINDOW_MS = 7 * 24 * 3600_000;
@@ -10,7 +10,7 @@ const RISING_WINDOW_MS = 7 * 24 * 3600_000;
 /** Fixed is only shown once supporters agree; the organization can't grade itself. */
 export const FIX_CONFIRMATIONS = 3;
 
-export const supportPoint = onCall({ cors: true }, async (req) => {
+export const supportPoint = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const pointId = typeof req.data?.pointId === 'string' ? req.data.pointId : '';
   const support = req.data?.support !== false;
@@ -69,7 +69,7 @@ async function followsPrivatelyWhereCountsArePublic(uid: string, pointId: string
   return false;
 }
 
-export const voteFix = onCall({ cors: true }, async (req) => {
+export const voteFix = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const pointId = typeof req.data?.pointId === 'string' ? req.data.pointId : '';
   const fixed = req.data?.fixed === true;

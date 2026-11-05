@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "331431699365",
+    "project_id": "universal-complaint-system",
+    "storage_bucket": "universal-complaint-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331431699365:android:193835af95cc5648e47e4c",
+        "android_client_info": {
+          "package_name": "com.waldgrave.ucs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHqTDpkG9CFjS9mlnHnLVk9Zp5kB0Wg6I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

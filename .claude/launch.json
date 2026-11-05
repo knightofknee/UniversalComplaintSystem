@@ -34,12 +34,12 @@
         "start",
         "--web",
         "--port",
-        "8083"
+        "8093"
       ],
       "env": {
         "BROWSER": "none"
       },
-      "port": 8083
+      "port": 8093
     }
   ]
 }

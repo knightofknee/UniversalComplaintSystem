@@ -12,7 +12,7 @@ import { getAuth } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { bucket, db, FieldValue, Timestamp, uidOf } from './common';
+import { CALLABLE, bucket, db, FieldValue, Timestamp, uidOf } from './common';
 
 const DELETED = 'Deleted account';
 const WEEK_MS = 7 * 24 * 3600_000;
@@ -21,7 +21,7 @@ async function deleteTree(ref: DocumentReference) {
   await db.recursiveDelete(ref);
 }
 
-export const deleteAccount = onCall({ cors: true, timeoutSeconds: 300 }, async (req) => {
+export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async (req) => {
   const uid = uidOf(req);
   if (req.data?.confirm !== true) throw new HttpsError('invalid-argument', 'Confirm first.');
 

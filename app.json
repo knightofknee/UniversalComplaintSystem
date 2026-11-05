@@ -14,6 +14,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Lets you attach photos to a complaint.",
         "NSCameraUsageDescription": "Lets you take a photo to attach to a complaint."
+      },
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
       }
     },
     "android": {
@@ -24,7 +28,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -47,7 +52,18 @@
           "photosPermission": "Lets you attach photos to a complaint.",
           "cameraPermission": "Lets you take a photo to attach to a complaint."
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "./plugins/with-rnfirebase-no-spm.js"
     ],
     "experiments": {
       "typedRoutes": true,

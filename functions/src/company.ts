@@ -16,7 +16,7 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { cleanText, db, ensureUser, FieldValue, notify, rateLimit, supporterUids, uidOf } from './common';
+import { CALLABLE, cleanText, db, ensureUser, FieldValue, notify, rateLimit, supporterUids, uidOf } from './common';
 import { privateFollowerUids } from './private';
 
 const FREE_MAIL = new Set([
@@ -66,7 +66,7 @@ export async function approveClaim(claimId: string, note: string) {
   });
 }
 
-export const requestAccess = onCall({ cors: true }, async (req) => {
+export const requestAccess = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const token = req.auth!.token;
   if (!token.email || !token.email_verified) {
@@ -168,7 +168,7 @@ async function responderFor(uid: string, pointId: string, subjectId: string) {
 }
 
 /** A responder opened the point: the organization has now seen it. */
-export const markSeen = onCall({ cors: true }, async (req) => {
+export const markSeen = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const pointId = String(req.data?.pointId ?? '');
   const subjectId = String(req.data?.subjectId ?? '');
@@ -179,7 +179,7 @@ export const markSeen = onCall({ cors: true }, async (req) => {
   return { seen: true };
 });
 
-export const respondToPoint = onCall({ cors: true }, async (req) => {
+export const respondToPoint = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const pointId = String(req.data?.pointId ?? '');
   const subjectId = String(req.data?.subjectId ?? '');
