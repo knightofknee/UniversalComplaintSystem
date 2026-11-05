@@ -13,7 +13,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Expo SDK 57 + expo-router (screens in `src/app/`), TypeScript strict,
   Firebase JS SDK. Firebase project `universal-complaint-system` (Blaze).
   `src/lib/firebase.ts` holds the LIVE config; emulators only with
-  `EXPO_PUBLIC_USE_EMULATORS=1`.
+  `EXPO_PUBLIC_USE_EMULATORS=1`. UCS's emulator ports are its own (UI 4010,
+  auth 9109, firestore 8180, functions 5011, storage 9209) so they never
+  clash with ../direct-democracy's; keep firebase.json and firebase.ts in
+  sync.
 - No account needed: the app signs in anonymously on first open. Adding an
   email (Account screen) links email+password to that same account. A
   VERIFIED email is what lets someone respond for an organization.
@@ -58,6 +61,35 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   listed emails (their responses read "Official").
 - Independence rules (docs/SPEC.md): orgs respond, never remove or edit;
   removals only via `npm run remove`, which logs to the public `removals`.
-- Every callable is rate limited (`LIMITS` in functions/src/common.ts).
+- Private complaints (2026-11-05, functions/src/private.ts): only to an
+  ORGANIZATION (topics are public by definition), only from a verified
+  email. They are support conversations: `subjects/{org}/inbox/{thread}`
+  (+ `messages`), readable only by the author and the org's responders;
+  the author's index is `users/{uid}/threads`. Personal details stay in
+  them; card numbers, ID numbers and passwords are removed everywhere
+  (model's `pii.sensitive` on intake, `stripSensitive` on messages). Each
+  point a private complaint raises adds to the org's
+  `subjects/{org}/privatePoints` (linked to a public point via `pointId`,
+  or `isPrivateOnly` with its own embedding). NOTHING public moves:
+  support, weekSupport, topic supporters and org stats count public
+  complaints only. A public complaint matching a private-only point
+  promotes it (`promotePrivatePoint`); public authors get a yes/no "raised
+  privately" hint (search + analysis), never a count, and never a private
+  id (the analysis copy sent to the app is scrubbed). Private complaints
+  never create public topics. An org can publish its private COUNTS
+  (`publishPrivate`, Settings > Advanced): points then carry
+  `privateCounts.{org}` and private followers may confirm fixes. Private
+  TEXT is never published. Unclaimed orgs: the thread is held.
+- AI cost guardrails: every callable is rate limited per account AND per
+  hashed network address (`LIMITS` / `IP_LIMITS` in functions/src/common.ts,
+  since anonymous accounts are free to make); every Claude call checks and
+  records a daily dollar ceiling (functions/src/budget.ts,
+  `config/ai.dailyBudgetUsd`, default $25; spend in `usage/{date}`), with
+  `max_tokens` 6000 and junk text rejected before the model. Past the
+  ceiling only complaint checking pauses.
+- Account deletion (`deleteAccount`, functions/src/account.ts) does exactly
+  what src/app/privacy.tsx promises; change both together. The privacy
+  policy and terms (src/app/privacy.tsx, terms.tsx) are ours to keep
+  accurate whenever behavior changes.
 - Secrets: `ANTHROPIC_API_KEY` via `firebase functions:secrets:set`; for the
   emulator put it in `functions/.secret.local` (gitignored).

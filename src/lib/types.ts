@@ -27,6 +27,8 @@ export type Point = {
   respondedBy: Record<string, Timestamp>;
   fixClaimedBy: string | null;
   fixVotes: { yes: number; no: number };
+  /** Private complaint counts, only for organizations that chose to publish them. */
+  privateCounts?: Record<string, number>;
   canonical: { submissionId: string; authorName: string; actionability: number };
   addedBy: 'model';
   firstSubmissionId: string;
@@ -45,6 +47,8 @@ export type Subject = {
   domains: string[];
   claimed: boolean;
   restrictedTo: string[] | null;
+  /** Advanced setting: show this organization's private counts publicly. */
+  publishPrivate?: boolean;
   stats: { points: number; seen: number; responded: number; fixed: number; supporters?: number };
 };
 
@@ -81,6 +85,7 @@ export type Notification = {
   type: string;
   pointId?: string;
   subjectId?: string;
+  threadId?: string;
   text: string;
   read: boolean;
   at: Timestamp | null;
@@ -93,7 +98,13 @@ export type IntakeResult = {
   isComplaint: boolean;
   notComplaintReason: string | null;
   supportTicket: { isTicket: boolean; advice: string | null };
-  pii: { found: string[]; redactedText: string | null };
+  pii: {
+    found: string[];
+    redactedText: string | null;
+    /** Never stored, even privately (card numbers, ID numbers, passwords). */
+    sensitive: string[];
+    sensitiveRemovedText: string | null;
+  };
   subjects: unknown[];
   points: {
     matchedPointId: string | null;
@@ -127,4 +138,55 @@ export type Analysis = {
     isNew: boolean;
   }[];
   matched: Record<string, PointHit>;
+  /** Per point: has anyone raised it privately? Never a count. */
+  alsoPrivate: boolean[];
+};
+
+/** A private complaint: a conversation between its author and one organization. */
+export type Thread = {
+  id: string;
+  uid: string;
+  email: string;
+  authorName: string;
+  text: string;
+  language: string;
+  englishText: string | null;
+  photos: string[];
+  points: { privatePointId: string; pointId: string | null; statement: string }[];
+  status: 'open' | 'resolved';
+  createdAt: Timestamp | null;
+  lastMessageAt: Timestamp | null;
+  lastFrom: 'user' | 'org';
+  unreadByOrg: boolean;
+  unreadByUser: boolean;
+};
+
+export type Message = {
+  id: string;
+  from: 'user' | 'org';
+  text: string;
+  domain?: string;
+  authorName?: string;
+  at: Timestamp | null;
+};
+
+/** users/{uid}/threads: the author's index of their private complaints. */
+export type MyThread = {
+  id: string;
+  orgId: string;
+  orgName: string;
+  preview: string;
+  status: 'open' | 'resolved';
+  lastMessageAt: Timestamp | null;
+  unread: boolean;
+};
+
+/** The organization's private count for one point (subjects/{id}/privatePoints). */
+export type PrivatePoint = {
+  id: string;
+  pointId: string | null;
+  isPrivateOnly: boolean;
+  text: string;
+  count: number;
+  lastAt: Timestamp | null;
 };

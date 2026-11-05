@@ -5,12 +5,14 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { Alert, Platform } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { Button, Card, Field, Notice, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
-import { errorText } from '@/lib/api';
+import { deleteAccount, errorText } from '@/lib/api';
 import { auth } from '@/lib/firebase';
 
 /**
@@ -56,6 +58,7 @@ export default function AccountScreen() {
           </Card>
         )}
         <Button label="Sign out" kind="secondary" onPress={() => run(() => signOut(auth))} />
+        <DeleteAccount />
       </Screen>
     );
   }
@@ -109,6 +112,49 @@ export default function AccountScreen() {
         }
       />
       <T variant="small">Passwords need at least 8 characters.</T>
+      <DeleteAccount />
     </Screen>
+  );
+}
+
+function confirmDelete(): Promise<boolean> {
+  const title = 'Delete your account?';
+  const message =
+    'Your private complaints and their conversations are deleted. Your public complaints lose their words, photos and name; the points they fed stay, unattributed. Every "Me too" you gave is withdrawn. This can\'t be undone.';
+  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  return new Promise((resolve) =>
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+    ]),
+  );
+}
+
+/** Everything the privacy policy promises happens server-side (functions/src/account.ts). */
+function DeleteAccount() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    if (!(await confirmDelete())) return;
+    setBusy(true);
+    try {
+      await deleteAccount({ confirm: true });
+      // The sign-in is gone; signing out starts a fresh anonymous account.
+      await signOut(auth).catch(() => {});
+      router.replace('/');
+    } catch (e) {
+      showAlert("Couldn't delete your account", errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <T variant="label">Delete account</T>
+      <T variant="small">
+        Removes your private complaints, your words from public complaints, and every &quot;Me too&quot; you gave.
+      </T>
+      <Button label="Delete my account" kind="secondary" onPress={remove} busy={busy} />
+    </Card>
   );
 }

@@ -1,20 +1,25 @@
 import { useRouter } from 'expo-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Switch } from 'react-native';
 
-import { PointCard } from '@/components/point-card';
+import { PointCard, showAlert } from '@/components/point-card';
 import { Stats } from '@/components/stats';
-import { Button, Empty, Notice, Screen, T, Tabs } from '@/components/ui';
+import { Button, Card, Chip, Empty, Notice, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
+import { useTheme } from '@/hooks/use-theme';
+import { errorText, setOrgSettings } from '@/lib/api';
 import { db } from '@/lib/firebase';
-import { useCollection, useDoc } from '@/lib/hooks';
-import type { Point, Subject } from '@/lib/types';
+import { count, timeAgo, useCollection, useDoc } from '@/lib/hooks';
+import type { Point, PrivatePoint, Subject, Thread } from '@/lib/types';
 
-type View = 'top' | 'unseen' | 'unanswered' | 'new' | 'trending';
+type Section = 'points' | 'inbox' | 'settings';
+type View = 'top' | 'unseen' | 'unanswered' | 'trending' | 'new' | 'private';
 
 /**
- * What a feedback vendor would sell them: every point about the
- * organization, duplicates already merged, sorted the ways they work.
+ * What a feedback vendor and a support desk would sell them, in one place:
+ * every point about the organization (duplicates merged, public and private
+ * counts side by side) and the private complaints sent to it.
  */
 export default function CompanyScreen() {
   const { profile } = useAuth();
@@ -35,6 +40,51 @@ export default function CompanyScreen() {
 
 function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: string[]; onSwitch: (id: string) => void }) {
   const { data: subject } = useDoc<Subject>(`subjects/${subjectId}`);
+  const [section, setSection] = useState<Section>('points');
+  const privatePoints = useCollection<PrivatePoint>(
+    query(collection(db, `subjects/${subjectId}/privatePoints`), limit(1000)),
+    `private:${subjectId}`,
+  );
+  const inbox = useCollection<Thread>(
+    query(collection(db, `subjects/${subjectId}/inbox`), orderBy('lastMessageAt', 'desc'), limit(200)),
+    `inbox:${subjectId}`,
+  );
+  const unread = inbox.items.filter((t) => t.unreadByOrg).length;
+  const privateTotal = privatePoints.items.reduce((n, p) => n + p.count, 0);
+
+  return (
+    <Screen>
+      {orgs.length > 1 && (
+        <Tabs
+          options={orgs.map((o) => ({ key: o, label: o === subjectId ? (subject?.name ?? '…') : 'Switch' }))}
+          value={subjectId}
+          onChange={onSwitch}
+        />
+      )}
+      <T variant="title">{subject?.name ?? ''}</T>
+      {subject && <Stats subject={subject} />}
+      <T variant="small">
+        Public numbers above. Private: {count(privateTotal, 'complaint')} across{' '}
+        {count(privatePoints.items.length, 'point')}, visible only to your team.
+      </T>
+      <Tabs
+        options={[
+          { key: 'points', label: 'Points' },
+          { key: 'inbox', label: unread ? `Private inbox · ${unread}` : 'Private inbox' },
+          { key: 'settings', label: 'Settings' },
+        ]}
+        value={section}
+        onChange={setSection}
+      />
+      {section === 'points' && <Points subjectId={subjectId} privatePoints={privatePoints.items} />}
+      {section === 'inbox' && <Inbox subjectId={subjectId} threads={inbox.items} loading={inbox.loading} />}
+      {section === 'settings' && subject && <Settings subject={subject} />}
+    </Screen>
+  );
+}
+
+function Points({ subjectId, privatePoints }: { subjectId: string; privatePoints: PrivatePoint[] }) {
+  const theme = useTheme();
   const [view, setView] = useState<View>('top');
   const { items, loading } = useCollection<Point>(
     query(
@@ -46,6 +96,10 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
     ),
     `dash:${subjectId}:${view === 'new' ? 'new' : 'top'}`,
   );
+  const privateByPoint = useMemo(
+    () => new Map(privatePoints.flatMap((p) => (p.pointId ? [[p.pointId, p.count] as const] : []))),
+    [privatePoints],
+  );
   const [weekAgo] = useState(() => Date.now() - 7 * 24 * 3600_000);
   const shown = items.filter((p) => {
     if (view === 'unseen') return !p.seenBy?.[subjectId];
@@ -56,13 +110,10 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
   if (view === 'trending') {
     shown.sort((a, b) => (b.lastActivityAt?.toMillis() ?? 0) - (a.lastActivityAt?.toMillis() ?? 0));
   }
+  const privateOnly = privatePoints.filter((p) => p.isPrivateOnly).sort((a, b) => b.count - a.count);
+
   return (
-    <Screen>
-      {orgs.length > 1 && (
-        <Tabs options={orgs.map((o) => ({ key: o, label: o === subjectId ? (subject?.name ?? '…') : 'Switch' }))} value={subjectId} onChange={onSwitch} />
-      )}
-      <T variant="title">{subject?.name ?? ''}</T>
-      {subject && <Stats subject={subject} />}
+    <>
       <Notice>
         <T variant="small">
           Opening a point marks it seen. Respond on the point itself; supporters are notified, and anything you mark
@@ -76,15 +127,104 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
           { key: 'unanswered', label: 'No response' },
           { key: 'trending', label: 'Active this week' },
           { key: 'new', label: 'Newest' },
+          { key: 'private', label: 'Private only' },
         ]}
         value={view}
         onChange={setView}
       />
-      {shown.length === 0 ? (
+      {view === 'private' ? (
+        privateOnly.length === 0 ? (
+          <Empty text="Nothing raised only privately." />
+        ) : (
+          privateOnly.map((p) => (
+            <Card key={p.id}>
+              <T>{p.text}</T>
+              <Row>
+                <Chip label={`${count(p.count, 'private complaint')}`} color={theme.primary} bg={theme.primarySoft} />
+                <T variant="small">Not on the public record · last {timeAgo(p.lastAt?.toMillis())}</T>
+              </Row>
+            </Card>
+          ))
+        )
+      ) : shown.length === 0 ? (
         <Empty loading={loading} text="Nothing here." />
       ) : (
-        shown.map((p) => <PointCard key={p.id} point={p} hideSubjects />)
+        shown.map((p) => (
+          <PointCard
+            key={p.id}
+            point={p}
+            hideSubjects
+            note={privateByPoint.get(p.id) ? `+${privateByPoint.get(p.id)} private` : undefined}
+          />
+        ))
       )}
-    </Screen>
+    </>
+  );
+}
+
+function Inbox({ subjectId, threads, loading }: { subjectId: string; threads: Thread[]; loading: boolean }) {
+  const router = useRouter();
+  const theme = useTheme();
+  const [filter, setFilter] = useState<'open' | 'resolved'>('open');
+  const shown = threads.filter((t) => t.status === filter);
+  return (
+    <>
+      <Tabs
+        options={[
+          { key: 'open', label: `Open · ${threads.filter((t) => t.status === 'open').length}` },
+          { key: 'resolved', label: 'Resolved' },
+        ]}
+        value={filter}
+        onChange={setFilter}
+      />
+      {shown.length === 0 ? (
+        <Empty loading={loading} text={filter === 'open' ? 'No open private complaints.' : 'Nothing resolved yet.'} />
+      ) : (
+        shown.map((t) => (
+          <Card key={t.id} onPress={() => router.push(`/thread/${subjectId}/${t.id}`)}>
+            <Row style={{ flexWrap: 'wrap' }}>
+              <T style={{ fontWeight: '700', flex: 1 }}>{t.authorName}</T>
+              {t.unreadByOrg && <Chip label="New" color={theme.primary} bg={theme.primarySoft} />}
+              {t.lastFrom === 'user' && !t.unreadByOrg && t.status === 'open' && (
+                <Chip label="Awaiting reply" color={theme.warning} bg={theme.warningSoft} />
+              )}
+            </Row>
+            <T numberOfLines={2}>{t.englishText ?? t.text}</T>
+            <T variant="small">{timeAgo(t.lastMessageAt?.toMillis())}</T>
+          </Card>
+        ))
+      )}
+    </>
+  );
+}
+
+/** Advanced, and deliberately quiet: most organizations never need it. */
+function Settings({ subject }: { subject: Subject }) {
+  const [busy, setBusy] = useState(false);
+  const on = subject.publishPrivate === true;
+  const toggle = async (next: boolean) => {
+    setBusy(true);
+    try {
+      await setOrgSettings({ subjectId: subject.id, publishPrivate: next });
+    } catch (e) {
+      showAlert("Couldn't change that", errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <T variant="label">Advanced</T>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <T variant="heading" style={{ flex: 1 }}>
+          Show private counts publicly
+        </T>
+        <Switch value={on} onValueChange={toggle} disabled={busy} />
+      </Row>
+      <T variant="small">
+        Public points about {subject.name} would show how many people also raised them privately, and those people
+        could confirm your fixes. What they wrote stays private either way: only the numbers are shown.
+      </T>
+    </Card>
   );
 }

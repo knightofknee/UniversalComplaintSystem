@@ -14,7 +14,7 @@ export const supportPoint = onCall({ cors: true }, async (req) => {
   const uid = uidOf(req);
   const pointId = typeof req.data?.pointId === 'string' ? req.data.pointId : '';
   const support = req.data?.support !== false;
-  await rateLimit(uid, 'support');
+  await rateLimit(req, 'support');
   const { responderFor } = await ensureUser(uid);
   const ref = db.doc(`points/${pointId}`);
   await db.runTransaction(async (tx) => {
@@ -32,7 +32,7 @@ export const supportPoint = onCall({ cors: true }, async (req) => {
     // Withdrawing only takes back this week's count if it was given this week.
     const recent = !support && Date.now() - (mine.get('at') as Timestamp).toMillis() < RISING_WINDOW_MS;
     if (support) {
-      tx.set(mine.ref, { at: FieldValue.serverTimestamp(), via: 'direct' });
+      tx.set(mine.ref, { uid, at: FieldValue.serverTimestamp(), via: 'direct' });
       tx.update(ref, {
         supportCount: FieldValue.increment(1),
         weekSupport: FieldValue.increment(1),
@@ -52,12 +52,30 @@ export const supportPoint = onCall({ cors: true }, async (req) => {
   return { supported: support };
 });
 
+/**
+ * People who raised a point privately can confirm its fix only where the
+ * organization publishes its private counts; otherwise a vote would reveal
+ * private complaints exist.
+ */
+async function followsPrivatelyWhereCountsArePublic(uid: string, pointId: string) {
+  const holders = await db.collectionGroup('privatePoints').where('pointId', '==', pointId).get();
+  for (const h of holders.docs) {
+    const [org, follower] = await Promise.all([
+      db.doc(`subjects/${h.get('orgId')}`).get(),
+      h.ref.collection('followers').doc(uid).get(),
+    ]);
+    if (follower.exists && org.get('publishPrivate') === true) return true;
+  }
+  return false;
+}
+
 export const voteFix = onCall({ cors: true }, async (req) => {
   const uid = uidOf(req);
   const pointId = typeof req.data?.pointId === 'string' ? req.data.pointId : '';
   const fixed = req.data?.fixed === true;
-  await rateLimit(uid, 'support');
+  await rateLimit(req, 'support');
   const ref = db.doc(`points/${pointId}`);
+  const privateVoter = await followsPrivatelyWhereCountsArePublic(uid, pointId);
   const outcome = await db.runTransaction(async (tx) => {
     const point = await tx.get(ref);
     if (!point.exists) throw new HttpsError('not-found', 'That point is gone.');
@@ -66,7 +84,9 @@ export const voteFix = onCall({ cors: true }, async (req) => {
       throw new HttpsError('failed-precondition', 'Nobody has said this is fixed yet.');
     }
     const supporter = await tx.get(ref.collection('supports').doc(uid));
-    if (!supporter.exists) throw new HttpsError('permission-denied', 'Only supporters of this point can confirm.');
+    if (!supporter.exists && !privateVoter) {
+      throw new HttpsError('permission-denied', 'Only supporters of this point can confirm.');
+    }
     const voteRef = ref.collection('fixVotes').doc(uid);
     const prev = await tx.get(voteRef);
     const votes = { ...(point.get('fixVotes') as { yes: number; no: number }) };
@@ -78,7 +98,7 @@ export const voteFix = onCall({ cors: true }, async (req) => {
     if (votes.yes >= needed && votes.yes > votes.no) next = 'fixed';
     else if (votes.no >= needed && votes.no >= votes.yes) next = 'not_fixed';
     else next = 'fix_claimed';
-    tx.set(voteRef, { fixed, at: FieldValue.serverTimestamp() });
+    tx.set(voteRef, { uid, fixed, at: FieldValue.serverTimestamp() });
     tx.update(ref, { fixVotes: votes, status: next });
     const by = point.get('fixClaimedBy') as string | null;
     if (by && next !== status && (next === 'fixed' || status === 'fixed')) {

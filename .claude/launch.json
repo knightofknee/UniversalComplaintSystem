@@ -8,7 +8,7 @@
         "run",
         "emulators"
       ],
-      "port": 4000
+      "port": 4010
     },
     {
       "name": "web",

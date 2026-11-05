@@ -18,7 +18,8 @@ export default function NotificationsScreen() {
   );
   const open = (n: Notification) => {
     if (!n.read && user) updateDoc(doc(db, `users/${user.uid}/notifications/${n.id}`), { read: true }).catch(() => {});
-    if (n.pointId) router.push(`/point/${n.pointId}`);
+    if (n.threadId && n.subjectId) router.push(`/thread/${n.subjectId}/${n.threadId}`);
+    else if (n.pointId) router.push(`/point/${n.pointId}`);
     else if (n.subjectId) router.push(`/subject/${n.subjectId}`);
   };
   return (

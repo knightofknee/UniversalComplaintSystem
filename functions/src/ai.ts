@@ -17,6 +17,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
+import { assertBudget, countEmbeddingCall, recordClaudeUsage } from './budget';
 import { CATEGORIES } from './categories';
 
 export const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
@@ -38,6 +39,7 @@ function gemini() {
 
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
+  await countEmbeddingCall();
   const res = await gemini().models.embedContent({
     model: EMBEDDING_MODEL,
     contents: texts,
@@ -69,7 +71,7 @@ export const IntakeResult = z.object({
     advice: z
       .string()
       .nullable()
-      .describe('One sentence telling the person where that private issue belongs (the organization support channel).'),
+      .describe('One sentence suggesting they send it privately to the organization here, so it can look up their case.'),
   }),
   pii: z.object({
     found: z
@@ -79,6 +81,17 @@ export const IntakeResult = z.object({
       .string()
       .nullable()
       .describe('The submission exactly as written with only that data replaced by [removed]; null when none found.'),
+    sensitive: z
+      .array(z.string())
+      .describe(
+        'Labels of data nobody should ever send, even privately: "card number", "card security code", "bank account number", "government ID number", "password", "one-time code". Empty when none.',
+      ),
+    sensitiveRemovedText: z
+      .string()
+      .nullable()
+      .describe(
+        'The submission exactly as written with ONLY those sensitive items replaced by [removed] (order numbers, emails, addresses and names stay); null when none found.',
+      ),
   }),
   subjects: z
     .array(
@@ -144,9 +157,9 @@ Your job, for one submission:
 
 2. Points. Split the submission into atomic points: each one specific thing that is wrong or could be better. A point matches a candidate point when fixing one would fix the other; matching is the goal, because people supporting the same point is what gives it weight. When the submission adds a new angle to a candidate point (a different cause, place, or consequence), that is a new point. Write each statement in English, as close to the author's own words as possible: you are condensing, not editorializing. A topic point about something nobody owns should also list the organizations that could fix it when they are among the subjects.
 
-3. Support tickets. "My order #4471 never arrived" is a private case; "orders to Chicago routinely arrive late" is a complaint. If the text is mainly a private case, say so and where it belongs, but still extract any general pattern in it as a point.
+3. Support tickets. "My order #4471 never arrived" is a private case; "orders to Chicago routinely arrive late" is a complaint. If the text is mainly a private case, say so. The author can send it privately to the organization right here in UCS, where the organization can reply and look up their order, so the advice should say that (for example "Send this privately to Delta so they can look up your booking."), never point them to another support channel. Still extract any general pattern in it as a point.
 
-4. Personal data. Flag order numbers, account numbers, phone numbers, emails, addresses, and names of private people (front-line staff included). Public figures and organizations are fine.
+4. Personal data. The author will choose whether this goes on the public record or privately to one organization. Flag order numbers, account numbers, phone numbers, emails, addresses, and names of private people (front-line staff included): they are removed if it goes public. Separately flag what must never be stored at all, even privately: payment card numbers and security codes, bank account numbers, government ID numbers, passwords and one-time codes. Public figures and organizations are fine.
 
 5. Tone and actionability. Rants are welcome and are never removed, but specific, fixable complaints help more. Score honestly. Only coach when it would really help, and keep it to one friendly sentence.
 
@@ -162,6 +175,7 @@ export async function runIntake(input: {
   candidatePoints: { id: string; text: string; subjects: string[]; supportCount: number }[];
   photos: { mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; base64: string }[];
 }): Promise<IntakeResult> {
+  await assertBudget();
   anthropic ??= new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
   const context = JSON.stringify(
     { candidateSubjects: input.candidateSubjects, candidatePoints: input.candidatePoints },
@@ -170,7 +184,8 @@ export async function runIntake(input: {
   );
   const response = await anthropic.beta.messages.parse({
     model: CLAUDE_MODEL,
-    max_tokens: 16000,
+    // A full analysis is ~1-2k tokens; this caps what one call can ever cost.
+    max_tokens: 6000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
     output_config: { effort: 'low', format: betaZodOutputFormat(IntakeResult) },
@@ -189,6 +204,10 @@ export async function runIntake(input: {
       },
     ],
   });
+  await recordClaudeUsage(response.usage);
+  if (response.stop_reason === 'max_tokens') {
+    throw new HttpsError('invalid-argument', 'That complaint is too much to process at once. Try a shorter one.');
+  }
   if (response.stop_reason === 'refusal') {
     throw new HttpsError('failed-precondition', 'This complaint could not be processed. Try rewording it.');
   }

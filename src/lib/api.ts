@@ -10,7 +10,12 @@ function call<In, Out>(name: string) {
 
 export const searchPoints = call<
   { query: string },
-  { points: PointHit[]; subjects: { id: string; name: string; kind: string; description: string }[] }
+  {
+    points: PointHit[];
+    subjects: { id: string; name: string; kind: string; description: string }[];
+    /** Something like this was raised privately (never how many times). */
+    raisedPrivately: boolean;
+  }
 >('searchPoints');
 
 export const analyzeComplaint = call<
@@ -28,9 +33,32 @@ export const submitComplaint = call<
     removeSubjects: number[];
     /** Existing subjects the author added; they apply to every point. */
     addSubjectIds: string[];
+    visibility: 'public' | 'private';
+    /** For private: index into the analysis's subjects of the organization it goes to. */
+    privateTo?: number;
   },
-  { submissionId: string; matchedPointIds: string[]; addedPointIds: string[] }
+  | { visibility?: undefined; submissionId: string; matchedPointIds: string[]; addedPointIds: string[] }
+  | {
+      visibility: 'private';
+      threadId: string;
+      orgId: string;
+      orgName: string;
+      claimed: boolean;
+      website: string | null;
+      pointCount: number;
+    }
 >('submitComplaint');
+
+type ThreadRef = { orgId: string; threadId: string };
+export const sendMessage = call<ThreadRef & { text: string }, { ok: boolean }>('sendMessage');
+export const setThreadStatus = call<ThreadRef & { status: 'open' | 'resolved' }, { status: string }>(
+  'setThreadStatus',
+);
+export const markThreadRead = call<ThreadRef, { ok: boolean }>('markThreadRead');
+export const setOrgSettings = call<{ subjectId: string; publishPrivate: boolean }, { publishPrivate: boolean }>(
+  'setOrgSettings',
+);
+export const deleteAccount = call<{ confirm: true }, { deleted: boolean }>('deleteAccount');
 
 export const supportPoint = call<{ pointId: string; support: boolean }, { supported: boolean }>(
   'supportPoint',

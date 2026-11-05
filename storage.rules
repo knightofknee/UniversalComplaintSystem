@@ -13,5 +13,10 @@ service firebase.storage {
     match /public/{submissionId}/{file} {
       allow read: if true;
     }
+    // Photos on private complaints: the author and the organization's responders.
+    match /private/{orgId}/{uid}/{threadId}/{file} {
+      allow read: if request.auth != null && (request.auth.uid == uid
+        || firestore.exists(/databases/(default)/documents/subjects/$(orgId)/responders/$(request.auth.uid)));
+    }
   }
 }

@@ -10,6 +10,8 @@ import { FieldValue as AdminFieldValue, type Firestore } from 'firebase-admin/fi
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { ANTHROPIC_API_KEY, embed, runIntake, type IntakeResult } from './ai';
+// Candidate ids for private-only points carry their path (PRIVATE_PREFIX), so they can't collide with public ids.
+import { PRIVATE_PREFIX, promotePrivatePoint, submitPrivate } from './private';
 import { bucket, cleanText, db, ensureUser, FieldValue, rateLimit, uidOf } from './common';
 
 const MAX_TEXT = 4000;
@@ -50,21 +52,53 @@ type PointDoc = {
   status: string;
 };
 type SubjectDoc = { kind: string; name: string; description: string; category?: string };
+type PrivatePointDoc = { orgId: string; text: string; count: number };
 type ResolvedSubject = { id: string; name: string; kind: string; category: string | null };
+
+/** Points raised only privately so far (never shown; used for matching and a yes/no hint). */
+async function nearestPrivateOnly(vector: number[], limit: number) {
+  const snap = await db
+    .collectionGroup('privatePoints')
+    .where('isPrivateOnly', '==', true)
+    .findNearest({
+      vectorField: 'embedding',
+      queryVector: AdminFieldValue.vector(vector),
+      limit,
+      distanceMeasure: 'COSINE',
+      distanceResultField: 'distance',
+    })
+    .get();
+  return snap.docs.map((d) => ({
+    path: d.ref.path,
+    ...(d.data() as PrivatePointDoc),
+    distance: d.get('distance') as number,
+  }));
+}
+
+/** Does any organization hold private complaints on this public point? */
+async function raisedPrivately(pointId: string) {
+  const snap = await db.collectionGroup('privatePoints').where('pointId', '==', pointId).limit(1).get();
+  return !snap.empty;
+}
 
 /** Live "is this what you mean?" while someone types, or the search box. */
 export const searchPoints = onCall({ cors: true }, async (req) => {
-  const uid = uidOf(req);
+  uidOf(req);
   const query = cleanText(req.data?.query, 1000, 'Search');
-  await rateLimit(uid, 'search');
+  await rateLimit(req, 'search');
   const [vector] = await embed([query]);
-  const [points, subjects] = await Promise.all([
+  const [points, subjects, privateOnly] = await Promise.all([
     nearest<PointDoc>(db, 'points', vector, 10),
     nearest<SubjectDoc>(db, 'subjects', vector, 5),
+    nearestPrivateOnly(vector, 1),
   ]);
   // Cosine distance: 0 is identical. Past ~0.45 results stop being related.
+  const close = points.filter((p) => p.distance < 0.45);
   return {
-    points: points.filter((p) => p.distance < 0.45).map(publicPoint),
+    points: close.map(publicPoint),
+    // Private complaints are never shown or counted publicly, but someone
+    // about to say the same thing is told they aren't the first.
+    raisedPrivately: (privateOnly[0]?.distance ?? 1) < 0.3,
     subjects: subjects
       .filter((s) => s.distance < 0.4)
       .map((s) => ({ id: s.id, name: s.name, kind: s.kind, description: s.description })),
@@ -101,15 +135,19 @@ export const analyzeComplaint = onCall(
   async (req) => {
     const uid = uidOf(req);
     const text = cleanText(req.data?.text, MAX_TEXT, 'Your complaint');
-    if (text.length < 8) throw new HttpsError('invalid-argument', 'Say a little more.');
+    // Junk ("aaaaaaaa", "!!!!!!!!") never reaches the model.
+    if (text.length < 8 || new Set(text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')).size < 5) {
+      throw new HttpsError('invalid-argument', 'Say a little more.');
+    }
     const photoPaths: unknown[] = Array.isArray(req.data?.photoPaths) ? req.data.photoPaths : [];
     if (photoPaths.length > MAX_PHOTOS) throw new HttpsError('invalid-argument', `At most ${MAX_PHOTOS} photos.`);
     const hintId = typeof req.data?.subjectId === 'string' ? req.data.subjectId : null;
-    await rateLimit(uid, 'analyze');
+    await rateLimit(req, 'analyze');
 
     const [vector] = await embed([text]);
-    const [points, nearSubjects, nearTopics, photos, hint] = await Promise.all([
+    const [points, privateOnly, nearSubjects, nearTopics, photos, hint] = await Promise.all([
       nearest<PointDoc>(db, 'points', vector, 15),
+      nearestPrivateOnly(vector, 8),
       nearest<SubjectDoc>(db, 'subjects', vector, 10),
       // Topics get their own search so existing ones are reused, not re-invented.
       nearest<SubjectDoc>(db, 'subjects', vector, 10, 'topic'),
@@ -130,18 +168,16 @@ export const analyzeComplaint = onCall(
     const result = await runIntake({
       text: hint?.exists ? `(Written on the page for ${hint.get('name')})\n${text}` : text,
       candidateSubjects,
-      candidatePoints: points.map((p) => ({
-        id: p.id,
-        text: p.text,
-        subjects: p.subjectNames,
-        supportCount: p.supportCount,
-      })),
+      candidatePoints: [
+        ...points.map((p) => ({ id: p.id, text: p.text, subjects: p.subjectNames, supportCount: p.supportCount })),
+        ...privateOnly.map((p) => ({ id: `${PRIVATE_PREFIX}${p.path}`, text: p.text, subjects: [], supportCount: 0 })),
+      ],
       photos,
     });
 
     // The model may only point at candidates it was shown.
     const subjectIds = new Set(candidateSubjects.map((s) => s.id));
-    const pointIds = new Set(points.map((p) => p.id));
+    const pointIds = new Set([...points.map((p) => p.id), ...privateOnly.map((p) => `${PRIVATE_PREFIX}${p.path}`)]);
     result.subjects = result.subjects.filter(
       (s) => (s.existingId && subjectIds.has(s.existingId)) || (!s.existingId && s.newSubject),
     );
@@ -161,6 +197,12 @@ export const analyzeComplaint = onCall(
     });
 
     const byId = new Map(points.map((p) => [p.id, p]));
+    // Per point: has anyone raised it privately? A yes/no only, never a count.
+    const alsoPrivate = await Promise.all(
+      result.points.map((p) =>
+        !p.matchedPointId ? false : p.matchedPointId.startsWith(PRIVATE_PREFIX) ? true : raisedPrivately(p.matchedPointId),
+      ),
+    );
     const subjectInfo = (s: IntakeResult['subjects'][number]) => {
       if (s.existingId) {
         const c = subjects.find((x) => x.id === s.existingId) ?? { ...hint!.data(), id: hint!.id } as SubjectDoc & { id: string };
@@ -171,11 +213,20 @@ export const analyzeComplaint = onCall(
     };
     return {
       draftId: draft.id,
-      result,
+      // The draft keeps private matches; the author's copy never names one.
+      result: {
+        ...result,
+        points: result.points.map((p) =>
+          p.matchedPointId?.startsWith(PRIVATE_PREFIX) ? { ...p, matchedPointId: null } : p,
+        ),
+      },
       subjects: result.subjects.map(subjectInfo),
+      alsoPrivate,
+      // Only public matches are described; a private-only match reads as a
+      // new point (its text is the organization's to see, not the author's).
       matched: Object.fromEntries(
         result.points
-          .filter((p) => p.matchedPointId)
+          .filter((p) => p.matchedPointId && byId.has(p.matchedPointId))
           .map((p) => [p.matchedPointId!, publicPoint(byId.get(p.matchedPointId!)!)]),
       ),
     };
@@ -248,20 +299,28 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
   if (!draftSnap?.exists || draftSnap.get('uid') !== uid) {
     throw new HttpsError('not-found', 'That draft has expired. Check your complaint again.');
   }
-  await rateLimit(uid, 'submit');
+  await rateLimit(req, 'submit');
   const { text, photoPaths, result } = draftSnap.data() as {
     text: string;
     photoPaths: string[];
     result: IntakeResult;
   };
   if (!result.isComplaint) throw new HttpsError('failed-precondition', 'There is nothing to record in this one.');
+  if (req.data?.visibility === 'private') {
+    return submitPrivate(req, { draftRef: draftSnap.ref, text, photoPaths, result, resolveSubject, existingSubject });
+  }
 
   const useRewrite = req.data?.useRewrite === true && !!result.suggestedRewrite;
   const removePII = req.data?.removePII !== false && !!result.pii.redactedText;
   const keep: number[] = Array.isArray(req.data?.keepPoints)
     ? req.data.keepPoints.filter((i: unknown) => Number.isInteger(i))
     : result.points.map((_, i) => i);
-  const finalText = useRewrite ? result.suggestedRewrite! : removePII ? result.pii.redactedText! : text;
+  // Card numbers, ID numbers and passwords go whatever the author chose.
+  const finalText = useRewrite
+    ? result.suggestedRewrite!
+    : removePII
+      ? result.pii.redactedText!
+      : (result.pii.sensitiveRemovedText ?? text);
   const kept = result.points.filter((_, i) => keep.includes(i));
   if (kept.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one point.');
 
@@ -295,7 +354,10 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
     photos.push(dest);
   }
 
-  const newStatements = kept.filter((p) => !p.matchedPointId).map((p) => p.statement);
+  // A match to a private-only point makes a new public point (then links the two).
+  const fromPrivate = (p: IntakeResult['points'][number]) =>
+    p.matchedPointId?.startsWith(PRIVATE_PREFIX) ? p.matchedPointId.slice(PRIVATE_PREFIX.length) : null;
+  const newStatements = kept.filter((p) => !p.matchedPointId || fromPrivate(p)).map((p) => p.statement);
   const vectors = await embed(newStatements);
   const matchedPointIds: string[] = [];
   const addedPointIds: string[] = [];
@@ -306,7 +368,7 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
       ...added,
     ]);
     if (pointSubjects.length === 0) pointSubjects = unique(allSubjects);
-    if (p.matchedPointId) {
+    if (p.matchedPointId && !fromPrivate(p)) {
       const ref = db.doc(`points/${p.matchedPointId}`);
       const pointSnap = await ref.get();
       if (!pointSnap.exists || pointSnap.get('removed')) continue;
@@ -315,7 +377,7 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
       matchedPointIds.push(ref.id);
       const newSupporter = await db
         .doc(`points/${ref.id}/supports/${uid}`)
-        .create({ at: FieldValue.serverTimestamp(), via: 'submission', submissionId: submission.id })
+        .create({ uid, at: FieldValue.serverTimestamp(), via: 'submission', submissionId: submission.id })
         .then(() => true)
         .catch(() => false);
       const subCount = (pointSnap.get('submissionCount') as number) + 1;
@@ -379,6 +441,7 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
         lastActivityAt: FieldValue.serverTimestamp(),
       });
       await ref.collection('supports').doc(uid).set({
+        uid,
         at: FieldValue.serverTimestamp(),
         via: 'submission',
         submissionId: submission.id,
@@ -387,6 +450,8 @@ export const submitComplaint = onCall({ cors: true, timeoutSeconds: 120 }, async
         await db.doc(`subjects/${s.id}`).update({ 'stats.points': FieldValue.increment(1) });
       }
       await addSupporters(pointSubjects.map((s) => s.id), 1);
+      const privatePath = fromPrivate(p);
+      if (privatePath) await promotePrivatePoint(privatePath, ref.id);
     }
   }
 

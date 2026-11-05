@@ -17,6 +17,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { cleanText, db, ensureUser, FieldValue, notify, rateLimit, supporterUids, uidOf } from './common';
+import { privateFollowerUids } from './private';
 
 const FREE_MAIL = new Set([
   'gmail.com', 'googlemail.com', 'yahoo.com', 'ymail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
@@ -76,7 +77,7 @@ export const requestAccess = onCall({ cors: true }, async (req) => {
   if (FREE_MAIL.has(domain)) {
     throw new HttpsError('failed-precondition', `${domain} is a personal email service. Use your work email.`);
   }
-  await rateLimit(uid, 'claim');
+  await rateLimit(req, 'claim');
   const { responderFor: mine } = await ensureUser(uid);
   const subjectId = typeof req.data?.subjectId === 'string' ? req.data.subjectId : '';
   const subject = await db.doc(`subjects/${subjectId}`).get();
@@ -186,7 +187,7 @@ export const respondToPoint = onCall({ cors: true }, async (req) => {
   if (status && !STATUSES.includes(status)) throw new HttpsError('invalid-argument', 'Unknown status.');
   const text = req.data?.text ? cleanText(req.data.text, 4000, 'Response') : null;
   if (!text && !status) throw new HttpsError('invalid-argument', 'Write a response or pick a status.');
-  await rateLimit(uid, 'respond');
+  await rateLimit(req, 'respond');
   const { point, responder } = await responderFor(uid, pointId, subjectId);
   const subject = await db.doc(`subjects/${subjectId}`).get();
   const email = responder.get('email') as string;
@@ -230,7 +231,8 @@ export const respondToPoint = onCall({ cors: true }, async (req) => {
     await batch.commit();
   }
 
-  const uids = await supporterUids(pointId);
+  // People who raised it privately follow it too.
+  const uids = [...new Set([...(await supporterUids(pointId)), ...(await privateFollowerUids(pointId))])];
   await notify(uids, {
     type: status ? 'status' : 'response',
     pointId,

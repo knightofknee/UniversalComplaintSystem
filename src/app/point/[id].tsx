@@ -65,6 +65,8 @@ export default function PointScreen() {
   if (!point) return <Screen><Empty loading={loading} text="This point isn't on the record." /></Screen>;
 
   const seenCount = Object.keys(point.seenBy ?? {}).length;
+  // Only present for organizations that chose to publish their private counts.
+  const publishedPrivate = Object.values(point.privateCounts ?? {}).reduce((n, c) => n + c, 0);
   const respondedCount = Object.keys(point.respondedBy ?? {}).length;
 
   return (
@@ -87,6 +89,12 @@ export default function PointScreen() {
         <StatusChip status={point.status} />
         {point.hot && <Chip label="Rant" color={theme.rant} bg={theme.rantSoft} />}
       </Row>
+      {publishedPrivate > 0 && (
+        <T variant="small">
+          +{publishedPrivate} raised privately (the organization publishes its private counts; what they wrote stays
+          private)
+        </T>
+      )}
       <T variant="small">
         Wording by {point.canonical.authorName} · {point.submissionCount} complaint
         {point.submissionCount === 1 ? '' : 's'} · first raised {timeAgo(point.createdAt?.toMillis())}
@@ -186,7 +194,7 @@ function FixCheck({ point, uid }: { point: Point; uid?: string }) {
         {point.fixVotes.yes} supporter{point.fixVotes.yes === 1 ? '' : 's'} say yes, {point.fixVotes.no} say no. It only
         shows as Fixed once supporters confirm.
       </T>
-      {supporter ? (
+      {supporter || Object.keys(point.privateCounts ?? {}).length > 0 ? (
         <Row>
           <Button
             label={myVote === true ? 'Yes ✓' : 'Yes, fixed'}

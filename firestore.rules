@@ -8,12 +8,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    function respondsFor(subjectId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/subjects/$(subjectId)/responders/$(request.auth.uid));
+    }
 
     match /subjects/{subjectId} {
       allow read: if resource.data.removed == false;
       // Who responds for an organization is not public.
       match /responders/{uid} {
         allow read: if isMe(uid);
+      }
+      // Private complaints: the organization and the author, nobody else.
+      // Private counts (what private complaints are about) are the
+      // organization's alone; who raised them is nobody's.
+      match /privatePoints/{id} {
+        allow read: if respondsFor(subjectId);
+      }
+      match /inbox/{threadId} {
+        allow read: if respondsFor(subjectId) || (signedIn() && resource.data.uid == request.auth.uid);
+        match /messages/{messageId} {
+          allow read: if respondsFor(subjectId)
+            || (signedIn()
+              && get(/databases/$(database)/documents/subjects/$(subjectId)/inbox/$(threadId)).data.uid
+                == request.auth.uid);
+        }
       }
     }
 
@@ -45,6 +64,9 @@ service cloud.firestore {
       match /mine/{submissionId} {
         allow read: if isMe(uid);
       }
+      match /threads/{threadId} {
+        allow read: if isMe(uid);
+      }
       match /notifications/{id} {
         allow read: if isMe(uid);
         allow update: if isMe(uid)
@@ -56,6 +78,6 @@ service cloud.firestore {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
-    // drafts, rateLimits: server only.
+    // drafts, rateLimits, usage, config: server only.
   }
 }

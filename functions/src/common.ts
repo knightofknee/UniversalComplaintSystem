@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -48,11 +50,41 @@ export const LIMITS = {
   support: { max: 300, windowMs: 24 * 3600_000 },
   respond: { max: 200, windowMs: 24 * 3600_000 },
   claim: { max: 5, windowMs: 24 * 3600_000 },
+  message: { max: 100, windowMs: 24 * 3600_000 },
 } as const;
 
-export async function rateLimit(uid: string, bucketName: keyof typeof LIMITS) {
-  const { max, windowMs } = LIMITS[bucketName];
-  const ref = db.doc(`rateLimits/${uid}`);
+/**
+ * The same buckets per network address. Anonymous accounts are free to
+ * make, so per-account limits alone can be reset by a script; these can't.
+ * Set high enough for a shared office or campus connection.
+ */
+const IP_LIMITS: Record<keyof typeof LIMITS, { max: number; windowMs: number }> = {
+  analyze: { max: 80, windowMs: 24 * 3600_000 },
+  submit: { max: 40, windowMs: 24 * 3600_000 },
+  search: { max: 1500, windowMs: 3600_000 },
+  support: { max: 1000, windowMs: 24 * 3600_000 },
+  respond: { max: 600, windowMs: 24 * 3600_000 },
+  claim: { max: 15, windowMs: 24 * 3600_000 },
+  message: { max: 300, windowMs: 24 * 3600_000 },
+};
+
+/** A one-way hash of the caller's address: we never store the address itself. */
+function ipKey(req: CallableRequest): string | null {
+  const forwarded = req.rawRequest?.headers['x-forwarded-for'];
+  const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() || req.rawRequest?.ip;
+  if (!ip) return null;
+  return `ip_${createHash('sha256').update(`ucs:${ip}`).digest('hex').slice(0, 32)}`;
+}
+
+/** Account and network-address limits for one action. */
+export async function rateLimit(req: CallableRequest, bucketName: keyof typeof LIMITS) {
+  await limitKey(uidOf(req), bucketName, LIMITS[bucketName]);
+  const ip = ipKey(req);
+  if (ip) await limitKey(ip, bucketName, IP_LIMITS[bucketName]);
+}
+
+async function limitKey(key: string, bucketName: string, { max, windowMs }: { max: number; windowMs: number }) {
+  const ref = db.doc(`rateLimits/${key}`);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const now = Date.now();
@@ -69,7 +101,7 @@ export async function rateLimit(uid: string, bucketName: keyof typeof LIMITS) {
 
 export async function notify(
   uids: string[],
-  n: { type: string; pointId?: string; subjectId?: string; text: string },
+  n: { type: string; pointId?: string; subjectId?: string; threadId?: string; text: string },
 ) {
   for (let i = 0; i < uids.length; i += 400) {
     const batch = db.batch();

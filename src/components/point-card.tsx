@@ -89,10 +89,13 @@ export function PointCard({
   point,
   rank,
   hideSubjects,
+  note,
 }: {
   point: PointHit & { hot?: boolean };
   rank?: number;
   hideSubjects?: boolean;
+  /** A small extra label, e.g. an organization's private count on its own dashboard. */
+  note?: string;
 }) {
   const router = useRouter();
   const theme = useTheme();
@@ -110,6 +113,7 @@ export function PointCard({
             <SupportButton pointId={point.id} count={point.supportCount} />
             <StatusChip status={point.status} />
             {point.hot && <Chip label="Rant" color={theme.rant} bg={theme.rantSoft} />}
+            {note && <Chip label={note} color={theme.primary} bg={theme.primarySoft} />}
           </Row>
           {!hideSubjects && point.subjectNames.length > 0 && (
             <T variant="small" numberOfLines={1}>

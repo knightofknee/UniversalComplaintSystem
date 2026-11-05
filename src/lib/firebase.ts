@@ -44,13 +44,15 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app, 'us-central1');
 export const storage = getStorage(app);
 
+// Emulator ports (firebase.json) are UCS's own, so they never clash with
+// ../direct-democracy's emulators running at the same time.
 if (usingEmulators) {
   // Physical devices can't reach "localhost" on the dev machine; use the LAN
   // address Expo already knows.
   const host =
     Platform.OS === 'web' ? 'localhost' : (Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost');
-  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
-  connectFirestoreEmulator(db, host, 8080);
-  connectFunctionsEmulator(functions, host, 5001);
-  connectStorageEmulator(storage, host, 9199);
+  connectAuthEmulator(auth, `http://${host}:9109`, { disableWarnings: true });
+  connectFirestoreEmulator(db, host, 8180);
+  connectFunctionsEmulator(functions, host, 5011);
+  connectStorageEmulator(storage, host, 9209);
 }

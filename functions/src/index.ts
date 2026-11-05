@@ -8,6 +8,8 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 20 });
 export { analyzeComplaint, searchPoints, submitComplaint } from './intake';
 export { recountRising, supportPoint, voteFix } from './points';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
+export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
+export { deleteAccount } from './account';
 
 /** Drafts nobody submitted are deleted after a day; they were never public. */
 export const clearDrafts = onSchedule('every day 03:00', async () => {

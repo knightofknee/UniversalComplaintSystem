@@ -68,7 +68,7 @@ export default function MeScreen() {
       <T variant="title">{profile?.displayName ?? 'You'}</T>
       <T variant="small">
         {user?.isAnonymous
-          ? 'No account: complaints from this device are yours. Add an email to keep them on every device.'
+          ? 'No account: public complaints from this device are yours. Add an email to keep your history in one place and to send private complaints.'
           : user?.email}
       </T>
       <Link
@@ -77,6 +77,7 @@ export default function MeScreen() {
         detail={unread.items.length ? `${unread.items.length} new` : undefined}
         href="/notifications"
       />
+      <Link icon="lock-closed-outline" label="Private complaints" href="/threads" />
       <Link icon="person-circle-outline" label={user?.isAnonymous ? 'Add an email' : 'Account'} href="/account" />
       {responder && <Link icon="briefcase-outline" label="Respond for your organization" href="/company" />}
       <Link icon="business-outline" label="Respond for an organization" href="/company/claim" />
@@ -98,6 +99,8 @@ export default function MeScreen() {
       <T variant="label">About</T>
       <Link icon="information-circle-outline" label="How UCS works" href="/about" />
       <Link icon="trash-bin-outline" label="Removal log" href="/removals" />
+      <Link icon="shield-checkmark-outline" label="Privacy policy" href="/privacy" />
+      <Link icon="document-text-outline" label="Terms of use" href="/terms" />
     </Screen>
   );
 }
