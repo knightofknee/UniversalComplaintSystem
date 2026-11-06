@@ -105,7 +105,7 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: 'new', label: '🆕 New' },
 ];
 
-/** Hot, most shared, new: the same sorts as the Record. */
+/** Hot, most shared, new: the same sorts as the Complaints tab. */
 function SubjectFeed({ subject }: { subject: Subject }) {
   const [sort, setSort] = useState<Sort>('top');
   const points = usePoints(subject.id, sort);

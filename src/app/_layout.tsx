@@ -61,7 +61,7 @@ export default function RootLayout() {
           }}>
           <Stack.Screen name="index" options={{ headerShown: false, title: 'Universal Complaint System' }} />
           <Stack.Screen name="complain" options={{ title: '' }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'The Record' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Complaints' }} />
           <Stack.Screen name="point/[id]" options={{ title: 'Point' }} />
           <Stack.Screen name="subject/[id]" options={{ title: '' }} />
           <Stack.Screen name="submission/[id]" options={{ title: 'Complaint' }} />

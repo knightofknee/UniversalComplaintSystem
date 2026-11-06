@@ -44,13 +44,6 @@ const MAX_PHOTOS = 4;
 const SEARCH_AFTER_CHARS = 15;
 /** Cosine distance under which a point "sounds familiar" (search itself goes to 0.45). */
 const FAMILIAR = 0.3;
-const PROMPTS = [
-  "What's bugging you?",
-  "What broke today?",
-  "Who let you down?",
-  "What should be better?",
-  "Go on. Say it.",
-];
 
 type Photo = { uri: string; path: string | null };
 type Step =
@@ -87,9 +80,6 @@ export function Composer({ home }: { home?: boolean }) {
     subjectName?: string;
     draft?: string;
   }>();
-  const [prompt] = useState(
-    () => PROMPTS[Math.floor(Math.random() * PROMPTS.length)],
-  );
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [similar, setSimilar] = useState<PointHit[]>([]);
@@ -273,24 +263,15 @@ export function Composer({ home }: { home?: boolean }) {
       </Row>
       <Pressable
         onPress={() => router.push("/browse")}
-        accessibilityRole="link"
+        accessibilityRole="button"
+        accessibilityLabel="Everything else: browse, search, your account"
         hitSlop={8}
         style={({ pressed }) => [
-          styles.recordLink,
+          styles.menu,
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Text
-          style={{
-            color: theme.text,
-            fontFamily: Fonts.bold,
-            fontSize: 15,
-            paddingRight: 2,
-          }}
-        >
-          The Record
-        </Text>
-        <Ionicons name="arrow-forward" size={16} color={theme.text} />
+        <Ionicons name="menu" size={24} color={theme.text} />
       </Pressable>
     </Row>
   ) : null;
@@ -480,8 +461,8 @@ export function Composer({ home }: { home?: boolean }) {
           onChangeText={setText}
           placeholder={
             params.subjectName
-              ? `What's wrong with ${params.subjectName}?`
-              : prompt
+              ? `Your complaint about ${params.subjectName}`
+              : "Your complaint"
           }
           placeholderTextColor={theme.textSecondary}
           maxLength={4000}
@@ -493,12 +474,12 @@ export function Composer({ home }: { home?: boolean }) {
       {!reviewing && text.trim().length === 0 && (
         <View style={{ gap: 6 }}>
           <T color={theme.textSecondary}>
-            Type it out and see who else has the same problem. Nothing is posted
-            until you say so.
+            Enter your complaint to see if any similar complaints have been
+            made. Nothing is posted until you say so.
           </T>
           <T variant="small">
-            Vent all you want. Then say what would make it better: that&apos;s
-            the part that gets things fixed.
+            Say what happened and what would make it right: that&apos;s the
+            part that gets things fixed.
           </T>
         </View>
       )}
@@ -1089,14 +1070,13 @@ const styles = StyleSheet.create({
   },
   mark: { width: 28, height: 28 },
   wordmark: { fontFamily: Fonts.display, fontSize: 20, letterSpacing: 0.5 },
-  recordLink: {
-    flexDirection: "row",
+  menu: {
+    width: 42,
+    height: 42,
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
   },
   box: {
     fontFamily: Fonts.medium,

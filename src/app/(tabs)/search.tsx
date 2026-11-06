@@ -14,18 +14,49 @@ import { people, useCollection } from '@/lib/hooks';
 import type { PointHit, Subject } from '@/lib/types';
 
 type SubjectHit = { id: string; name: string; kind: string; description: string };
+type Kind = 'organization' | 'topic' | 'both';
+const KINDS: { key: Kind; label: string }[] = [
+  { key: 'organization', label: 'Companies' },
+  { key: 'topic', label: 'Topics' },
+  { key: 'both', label: 'Both' },
+];
+
+/** A small choice of what kind of pages to show. Stays out of the way. */
+function KindPick({ value, onChange }: { value: Kind; onChange: (k: Kind) => void }) {
+  const theme = useTheme();
+  return (
+    <Row style={{ gap: 16, marginTop: -6 }}>
+      {KINDS.map((k) => {
+        const on = k.key === value;
+        return (
+          <Pressable
+            key={k.key}
+            onPress={() => onChange(k.key)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            hitSlop={8}>
+            <T variant="small" color={on ? theme.text : theme.textSecondary} style={{ fontWeight: on ? '700' : '400' }}>
+              {k.label}
+            </T>
+          </Pressable>
+        );
+      })}
+    </Row>
+  );
+}
 
 /** Search by meaning (any language), plus organizations and topics by name. */
 export default function SearchScreen() {
   const router = useRouter();
   const [q, setQ] = useState('');
+  const [kind, setKind] = useState<Kind>('both');
   const [points, setPoints] = useState<PointHit[]>([]);
   const [subjects, setSubjects] = useState<SubjectHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
   const active = q.trim().length >= 2;
-  const shownSubjects = active ? subjects : [];
+  const shownSubjects = active ? subjects.filter((s) => kind === 'both' || s.kind === kind) : [];
   const shownPoints = active ? points : [];
 
   useEffect(() => {
@@ -76,8 +107,13 @@ export default function SearchScreen() {
         accessibilityLabel="Search"
       />
       <InlineError text={error} />
-      {!active && <Starters />}
-      {shownSubjects.length > 0 && <T variant="label">Pages</T>}
+      {!active && <Starters kind={kind} onKind={setKind} />}
+      {shownSubjects.length > 0 && (
+        <Row style={{ justifyContent: 'space-between' }}>
+          <T variant="label">Pages</T>
+          <KindPick value={kind} onChange={setKind} />
+        </Row>
+      )}
       <View>
         {shownSubjects.map((s) => (
           <SubjectRow
@@ -123,18 +159,19 @@ function SubjectRow({ name, detail, rank, onPress }: { name: string; detail: str
   );
 }
 
-/** Before typing: the hall of shame (most complained-about organizations). */
-function Starters() {
+/** Before typing: the most complained-about companies, topics, or both. */
+function Starters({ kind, onKind }: { kind: Kind; onKind: (k: Kind) => void }) {
   const router = useRouter();
+  const kinds = kind === 'both' ? ['organization', 'topic'] : [kind];
   const orgs = useCollection<Subject>(
     query(
       collection(db, 'subjects'),
       where('removed', '==', false),
-      where('kind', '==', 'organization'),
+      where('kind', 'in', kinds),
       orderBy('stats.supporters', 'desc'),
       limit(10),
     ),
-    'starters:org',
+    `starters:${kind}`,
   );
   if (orgs.loading) return <Empty text="" loading />;
   if (orgs.items.length === 0) {
@@ -142,10 +179,8 @@ function Starters() {
   }
   return (
     <>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <T variant="heading">Hall of shame</T>
-        <T variant="small">most complained about</T>
-      </Row>
+      <T variant="heading">Most complained about</T>
+      <KindPick value={kind} onChange={onKind} />
       <View>
         {orgs.items.map((s, i) => (
           <SubjectRow

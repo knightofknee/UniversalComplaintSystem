@@ -42,7 +42,7 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   under"), never invent one. Tags are only ever added to an existing point.
 - Design (2026-11-06, the user's direction): COMPLAINING FIRST. `/` is the
   composer (src/components/composer.tsx, `<Composer home />`): a sparse box,
-  no tab bar, a "The Record" link to everything else. As they type it fills
+  no tab bar, a menu button to everything else. As they type it fills
   in: the live read-out (src/lib/read.ts, on-device: heat calm..volcanic,
   fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
   (similar points, vote right there). "See how it posts" runs the model and
@@ -53,13 +53,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big "Same here"
   (`SupportButton`) is only on a point's own page.
-- The Record (`/browse`, tabs: Record, Search, Complain → `/`, Me) sorts by
+- Complaints (`/browse`, tabs: Complaints, Search, Complain → `/`, Me) sorts by
   🔥 Hot (`weekSupport`, recounted every 6h by `recountRising`), 🤬 Best
   rants (rant submissions by `rantScore`, 1-10 from the model), 👥 Most
   shared (`supportCount`), ✅ Fixed, 🆕 New. No category browsing and no
   "biggest topics" grid: topics are tags on points, reachable from them.
-  Topic and organization pages use the same sorts. Search opens on a "Hall
-  of shame" (organizations by supporters).
+  Topic and organization pages use the same sorts. Search opens on "Most
+  complained about" (subjects by supporters) with a small Companies /
+  Topics / Both pick that also filters search results. Composer copy is
+  neutral ("Your complaint", "Enter your complaint to see if any similar
+  complaints have been made"): never prompt what the complaint is about.
 - Type: Bricolage Grotesque (`Fonts` in src/constants/theme.ts) for titles,
   the complaint box and counts; the system face for reading.
 - Intake is two calls: `analyzeComplaint` writes a private draft and shows

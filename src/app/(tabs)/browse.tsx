@@ -23,7 +23,7 @@ const FEEDS: { key: Feed; label: string; blurb: string; empty: string }[] = [
   { key: 'new', label: '🆕 New', blurb: 'Fresh off the record.', empty: 'Quiet. Too quiet.' },
 ];
 
-/** The Record: everything people complained about, sorted in ways worth scrolling. */
+/** Complaints: everything people complained about, sorted in ways worth scrolling. */
 export default function RecordScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function RecordScreen() {
   return (
     <Screen topInset>
       <Row style={{ justifyContent: 'space-between' }}>
-        <T variant="display">The Record</T>
+        <T variant="display">Complaints</T>
         <Pressable
           onPress={() => router.navigate('/')}
           accessibilityRole="button"
