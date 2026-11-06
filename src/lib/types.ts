@@ -157,6 +157,8 @@ export type PointHit = {
   subjectNames: string[];
   supportCount: number;
   status: PointStatus;
+  /** From search: cosine distance to the query (0 is the same thing). */
+  distance?: number;
 };
 
 export type Analysis = {

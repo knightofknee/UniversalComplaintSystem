@@ -139,7 +139,8 @@ export const searchPoints = onCall(CALLABLE, async (req) => {
   // Cosine distance: 0 is identical. Past ~0.45 results stop being related.
   const close = points.filter((p) => p.distance < 0.45);
   return {
-    points: close.map(publicPoint),
+    // The distance lets the complaint box show only close matches ("Sounds familiar").
+    points: close.map((p) => ({ ...publicPoint(p), distance: Math.round(p.distance * 1000) / 1000 })),
     // Private complaints are never shown or counted publicly, but someone
     // about to say the same thing is told they aren't the first.
     raisedPrivately: (privateOnly?.distance ?? 1) < 0.3,

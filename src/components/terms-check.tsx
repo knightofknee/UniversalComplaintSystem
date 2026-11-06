@@ -32,25 +32,22 @@ export function TermsCheck({
   if (accepted) return null;
   if (compact) {
     return (
-      <View style={styles.row}>
-        <Pressable
-          onPress={() => onChange(!checked)}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked }}
-          accessibilityLabel="I agree to the terms of use: no threats, hate, harassment, sexual content, or posts aimed at private people"
-          hitSlop={8}
-          style={styles.row}>
-          <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={22} color={checked ? theme.primary : theme.textSecondary} />
-          <T variant="small" color={theme.text}>
-            No threats, hate or going after private people. I agree to the
-          </T>
-        </Pressable>
-        <Pressable onPress={() => router.push('/terms')} accessibilityRole="link" hitSlop={8}>
-          <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
+      <Pressable
+        onPress={() => onChange(!checked)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked }}
+        accessibilityLabel="I agree to the terms of use: no threats, hate, harassment, sexual content, or posts aimed at private people"
+        hitSlop={8}
+        style={[styles.row, { flexWrap: 'nowrap' }]}>
+        <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={22} color={checked ? theme.primary : theme.textSecondary} />
+        <T variant="small" color={theme.text} style={{ flex: 1 }}>
+          I agree to the{' '}
+          <T variant="small" color={theme.primary} style={{ fontWeight: '700' }} onPress={() => router.push('/terms')}>
             terms
           </T>
-        </Pressable>
-      </View>
+          : no threats, hate, or going after private people.
+        </T>
+      </Pressable>
     );
   }
   return (

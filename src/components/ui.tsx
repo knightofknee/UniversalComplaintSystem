@@ -58,18 +58,24 @@ export function T({
   color,
   style,
   numberOfLines,
+  onPress,
 }: {
   children: ReactNode;
   variant?: Variant;
   color?: string;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /** For an inline link inside a sentence. */
+  onPress?: () => void;
 }) {
   const theme = useTheme();
   const muted = variant === 'small' || variant === 'label';
   return (
     <Text
       numberOfLines={numberOfLines}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'link' : undefined}
+      suppressHighlighting
       style={[styles[variant], { color: color ?? (muted ? theme.textSecondary : theme.text) }, style]}>
       {children}
     </Text>

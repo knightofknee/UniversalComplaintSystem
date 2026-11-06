@@ -42,6 +42,8 @@ import type { Analysis, PointHit } from "@/lib/types";
 
 const MAX_PHOTOS = 4;
 const SEARCH_AFTER_CHARS = 15;
+/** Cosine distance under which a point "sounds familiar" (search itself goes to 0.45). */
+const FAMILIAR = 0.3;
 const PROMPTS = [
   "What's bugging you?",
   "What broke today?",
@@ -116,7 +118,8 @@ export function Composer({ home }: { home?: boolean }) {
       try {
         const res = await searchPoints({ query: text.trim() });
         if (seq !== searchSeq.current) return;
-        setSimilar(res.points.slice(0, 5));
+        // Only close matches here: "Sounds familiar" should mean it.
+        setSimilar(res.points.filter((p) => (p.distance ?? 0) < FAMILIAR).slice(0, 5));
         setRaisedPrivately(res.raisedPrivately);
       } catch {
         // Search is a convenience; a failure just shows nothing.
