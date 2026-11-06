@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Scrolling page, centered and capped in width on wide (web) screens. */
@@ -49,7 +50,7 @@ export function Screen({
   );
 }
 
-type Variant = 'title' | 'heading' | 'body' | 'small' | 'label';
+type Variant = 'display' | 'title' | 'heading' | 'body' | 'small' | 'label';
 
 export function T({
   children,
@@ -204,6 +205,29 @@ export function Empty({ text, loading }: { text: string; loading?: boolean }) {
   );
 }
 
+/** A friendly line under whatever failed: no pop-up, no codes. */
+export function InlineError({ text, onDismiss }: { text: string | null; onDismiss?: () => void }) {
+  const theme = useTheme();
+  if (!text) return null;
+  return (
+    <View style={[styles.inlineError, { backgroundColor: theme.dangerSoft }]} accessibilityRole="alert">
+      <Ionicons name="alert-circle" size={18} color={theme.danger} />
+      <Text style={{ flex: 1, color: theme.text, fontSize: 15, lineHeight: 20 }}>{text}</Text>
+      {onDismiss && (
+        <Pressable onPress={onDismiss} hitSlop={10} accessibilityLabel="Dismiss">
+          <Ionicons name="close" size={18} color={theme.textSecondary} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+/** Hairline between list rows. */
+export function Divider() {
+  const theme = useTheme();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />;
+}
+
 export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'warn' | 'new' }) {
   const theme = useTheme();
   const bg = tone === 'warn' ? theme.warningSoft : tone === 'new' ? theme.newSoft : theme.primarySoft;
@@ -216,25 +240,27 @@ export function Row({ children, style }: { children: ReactNode; style?: StylePro
 
 const styles = StyleSheet.create({
   screen: { paddingHorizontal: 16, gap: 14, width: '100%', maxWidth: 720, alignSelf: 'center' },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  heading: { fontSize: 19, fontWeight: '700' },
+  display: { fontFamily: Fonts.display, fontSize: 40, lineHeight: 42, letterSpacing: -1 },
+  title: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6 },
+  heading: { fontFamily: Fonts.bold, fontSize: 20, lineHeight: 24, letterSpacing: -0.2 },
   body: { fontSize: 16, lineHeight: 22 },
   small: { fontSize: 13, lineHeight: 18 },
   label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   button: {
-    minHeight: 46,
-    borderRadius: 12,
+    minHeight: 50,
+    borderRadius: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  buttonText: { fontSize: 16, fontWeight: '700' },
-  card: { borderRadius: 14, padding: 14, gap: 8 },
+  buttonText: { fontFamily: Fonts.bold, fontSize: 17 },
+  card: { borderRadius: 16, padding: 14, gap: 8 },
   chip: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, alignSelf: 'flex-start' },
   chipText: { fontSize: 12, fontWeight: '700' },
   field: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
   tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  notice: { borderRadius: 12, padding: 12, gap: 6 },
+  notice: { borderRadius: 14, padding: 12, gap: 6 },
+  inlineError: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
 });

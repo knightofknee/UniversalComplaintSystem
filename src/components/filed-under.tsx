@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Card, Field, Row, T } from '@/components/ui';
+import { Field, Row, T } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { db } from '@/lib/firebase';
 
@@ -59,8 +59,11 @@ export function FiledUnder({
 
   const taken = new Set([...tags.map((t) => t.id), ...added.map((t) => t.id)]);
   return (
-    <Card>
-      <T variant="label">Filed under</T>
+    <View style={{ gap: 10 }}>
+      <View>
+        <T variant="heading">Filed under</T>
+        <T variant="small">Picked by the model. Tap one to untag it, or add another.</T>
+      </View>
       <Row style={{ flexWrap: 'wrap' }}>
         {tags.map((t, i) => (
           <TagChip
@@ -83,7 +86,6 @@ export function FiledUnder({
           </Pressable>
         )}
       </Row>
-      <T variant="small">Picked automatically. Tap one to untag it, or add another.</T>
       {adding && (
         <>
           <Field value={q} onChangeText={setQ} placeholder="Find an organization or topic" autoFocus autoCorrect={false} />
@@ -110,7 +112,7 @@ export function FiledUnder({
           </Pressable>
         </>
       )}
-    </Card>
+    </View>
   );
 }
 

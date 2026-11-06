@@ -3,7 +3,7 @@ import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useMemo, useState } from 'react';
 import { Switch } from 'react-native';
 
-import { PointCard, showAlert } from '@/components/point-card';
+import { PointCard, PointList, showAlert } from '@/components/point-card';
 import { Stats } from '@/components/stats';
 import { Button, Card, Chip, Empty, Notice, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -151,14 +151,16 @@ function Points({ subjectId, privatePoints }: { subjectId: string; privatePoints
       ) : shown.length === 0 ? (
         <Empty loading={loading} text="Nothing here." />
       ) : (
-        shown.map((p) => (
-          <PointCard
-            key={p.id}
-            point={p}
-            hideSubjects
-            note={privateByPoint.get(p.id) ? `+${privateByPoint.get(p.id)} private` : undefined}
-          />
-        ))
+        <PointList>
+          {shown.map((p) => (
+            <PointCard
+              key={p.id}
+              point={p}
+              hideSubjects
+              note={privateByPoint.get(p.id) ? `+${privateByPoint.get(p.id)} private` : undefined}
+            />
+          ))}
+        </PointList>
       )}
     </>
   );

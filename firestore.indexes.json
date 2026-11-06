@@ -475,6 +475,24 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tone",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "rantScore",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

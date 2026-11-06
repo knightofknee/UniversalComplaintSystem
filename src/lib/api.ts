@@ -103,7 +103,18 @@ export const resolveReport = call<
 >('resolveReport');
 
 /** The message a callable threw, for showing to the person. */
+/**
+ * What to tell a person when a call fails: the server's own sentence when it
+ * wrote one for people, otherwise a plain one. Never a code.
+ */
 export function errorText(e: unknown): string {
-  const m = (e as { message?: string })?.message;
-  return m && !m.startsWith('internal') ? m : 'Something went wrong. Try again.';
+  const err = e as { message?: string; code?: string };
+  const code = (err?.code ?? '').replace(/^functions\//, '');
+  const m = (err?.message ?? '').replace(/\s*\[\d+\]\s*$/, '').trim();
+  if (code === 'unavailable' || /network|fetch|offline/i.test(m)) return "Can't reach UCS right now. Check your connection and try again.";
+  if (code === 'resource-exhausted') return m || 'Easy there. Too many tries in a row; give it a minute.';
+  if (code === 'deadline-exceeded') return 'That took too long. Try once more.';
+  if (code === 'unauthenticated') return 'Still signing you in. Try again in a second.';
+  if (!m || m.startsWith('internal') || /^[A-Z_\-]+$/.test(m)) return 'Something broke on our side. Try again.';
+  return m;
 }

@@ -134,6 +134,12 @@ export const IntakeResult = z.object({
       }),
     ),
   tone: z.enum(['constructive', 'neutral', 'rant']),
+  rantScore: z
+    .number()
+    .int()
+    .describe(
+      'Only when tone is rant, 1-10: how good a rant it is to read: vivid, funny, cathartic, quotable, specific. Cruelty and slurs score low. 0 when tone is not rant.',
+    ),
   actionability: z.number().int().describe('0-100 for the submission as a whole.'),
   coaching: z
     .string()
@@ -172,7 +178,7 @@ Your job, for one submission:
 
 4. Personal data. The author will choose whether this goes on the public record or privately to one organization. Flag order numbers, account numbers, phone numbers, emails, addresses, and names of private people (front-line staff included): they are removed if it goes public. Separately flag what must never be stored at all, even privately: payment card numbers and security codes, bank account numbers, government ID numbers, passwords and one-time codes. Public figures and organizations are fine.
 
-5. Tone and actionability. Rants are welcome and are never removed, but specific, fixable complaints help more. Score honestly. Only coach when it would really help, and keep it to one friendly sentence.
+5. Tone and actionability. Rants are welcome and are never removed, but specific, fixable complaints help more. Score honestly. A rant also gets a rantScore: the best rants are vivid, specific and funny enough that a stranger would read them aloud; mean or merely loud ones score low. Only coach when it would really help, and keep it to one friendly sentence.
 
 6. Photos (if any): flag ones that are unsafe or show personal data.
 

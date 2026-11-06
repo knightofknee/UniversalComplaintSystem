@@ -5,7 +5,7 @@ export default function PrivacyScreen() {
   return (
     <LegalPage
       title="Privacy policy"
-      updated="November 5, 2026"
+      updated="November 6, 2026"
       sections={[
         {
           heading: 'Who we are',
@@ -53,7 +53,7 @@ export default function PrivacyScreen() {
         {
           heading: 'AI processing',
           body: [
-            'When you check a complaint before sending it, its text and photos are sent to Anthropic (Claude) to split it into points, match it to what others have said, suggest how to file it, and spot personal data. Complaint and point text is also sent to Google (Vertex AI) to compute the search vectors that make matching work across languages. Photos are also checked by Google Cloud Vision (SafeSearch) for sexual or violent content before anyone else can see them. Both process it on our behalf under their commercial API terms, under which API data is not used to train their models by default.',
+            'When you check a complaint before sending it, its text and photos are sent to Anthropic (Claude) to split it into points, match it to what others have said, suggest how to file it, spot personal data, and rate its tone (a rant also gets a score for how good a read it is, which sorts "Best rants"). Complaint and point text is also sent to Google (Vertex AI) to compute the search vectors that make matching work across languages. Photos are also checked by Google Cloud Vision (SafeSearch) for sexual or violent content before anyone else can see them. Both process it on our behalf under their commercial API terms, under which API data is not used to train their models by default.',
             'Nothing is sent to the public record or to an organization until you have seen how it will be filed and confirmed it.',
           ],
         },

@@ -677,6 +677,8 @@ export async function recordPublic(args: {
     matchedPointIds,
     addedPointIds,
     tone: result.tone,
+    // "Best rants" ranks by this; only rants have one.
+    rantScore: result.tone === 'rant' && !useRewrite ? Math.max(1, Math.min(10, Math.round(result.rantScore ?? 1))) : 0,
     actionability: result.actionability,
     photos,
     source: source ?? null,

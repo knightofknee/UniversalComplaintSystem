@@ -53,4 +53,14 @@ export const Colors = {
   },
 } as const;
 
+/**
+ * Bricolage Grotesque for anything that speaks (titles, the complaint box,
+ * counts); the system face for reading. Loaded in src/app/_layout.tsx.
+ */
+export const Fonts = {
+  display: 'BricolageGrotesque_800ExtraBold',
+  bold: 'BricolageGrotesque_700Bold',
+  medium: 'BricolageGrotesque_500Medium',
+} as const;
+
 export type Palette = Record<keyof (typeof Colors)["light"], string>;

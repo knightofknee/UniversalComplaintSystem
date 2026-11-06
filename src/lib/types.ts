@@ -78,6 +78,8 @@ export type Submission = {
   matchedPointIds: string[];
   addedPointIds: string[];
   tone: 'constructive' | 'neutral' | 'rant';
+  /** 1-10 for rants (how good a read it is), 0 otherwise; "Best rants" sorts by it. */
+  rantScore?: number;
   actionability: number;
   photos: string[];
   createdAt: Timestamp | null;

@@ -40,12 +40,28 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   carry denormalized `topicIds` and `categories` for browsing. The model
   tags; the author can untag or add EXISTING subjects at review ("Filed
   under"), never invent one. Tags are only ever added to an existing point.
-- Browse: "Most supported" (`supportCount`) and "Rising this week"
-  (`weekSupport`: +1 on support, recounted from support timestamps every 6h
-  by `recountRising`) are shown side by side at >= 760pt wide, one after
-  the other on phones (`PairedLists`). Topics rank by `stats.supporters`.
-  Topic pages are a conversation (paired lists + "Who could fix this");
-  organization pages are a ledger (stats + one sorted list).
+- Design (2026-11-06, the user's direction): COMPLAINING FIRST. `/` is the
+  composer (src/components/composer.tsx, `<Composer home />`): a sparse box,
+  no tab bar, a "The Record" link to everything else. As they type it fills
+  in: the live read-out (src/lib/read.ts, on-device: heat calm..volcanic,
+  fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
+  (similar points, vote right there). "See how it posts" runs the model and
+  the review appears inline on the same page; nothing posts until "Post it".
+  Copy is fun and pushes toward improvement, not criticism. Errors are
+  inline lines or toasts (`showToast`, src/components/toast.tsx), never
+  pop-up alerts, never codes (`errorText` in src/lib/api.ts).
+- Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
+  vote box on the right (`Vote`: arrow over count). The big "Same here"
+  (`SupportButton`) is only on a point's own page.
+- The Record (`/browse`, tabs: Record, Search, Complain → `/`, Me) sorts by
+  🔥 Hot (`weekSupport`, recounted every 6h by `recountRising`), 🤬 Best
+  rants (rant submissions by `rantScore`, 1-10 from the model), 👥 Most
+  shared (`supportCount`), ✅ Fixed, 🆕 New. No category browsing and no
+  "biggest topics" grid: topics are tags on points, reachable from them.
+  Topic and organization pages use the same sorts. Search opens on a "Hall
+  of shame" (organizations by supporters).
+- Type: Bricolage Grotesque (`Fonts` in src/constants/theme.ts) for titles,
+  the complaint box and counts; the system face for reading.
 - Intake is two calls: `analyzeComplaint` writes a private draft and shows
   the author everything (matches, new points, PII, rewrite); only
   `submitComplaint` touches the record. Personal data is removed by default;

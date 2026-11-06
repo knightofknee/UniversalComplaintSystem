@@ -1,9 +1,16 @@
+import {
+  BricolageGrotesque_500Medium,
+  BricolageGrotesque_700Bold,
+  BricolageGrotesque_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/bricolage-grotesque';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
+import { Toaster } from '@/components/toast';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { loadAppearance, useScheme } from '@/lib/appearance';
 import { usePush } from '@/lib/push';
@@ -11,17 +18,22 @@ import { usePush } from '@/lib/push';
 SplashScreen.preventAutoHideAsync();
 void loadAppearance();
 
-/** Holds the splash until the (anonymous) account is ready. */
-function SplashGate() {
+/** Holds the splash until the (anonymous) account and the fonts are ready. */
+function SplashGate({ fontsReady }: { fontsReady: boolean }) {
   const { loading, user, profile } = useAuth();
   usePush(user?.uid, profile?.pushOn);
   useEffect(() => {
-    if (!loading) void SplashScreen.hideAsync();
-  }, [loading]);
+    if (!loading && fontsReady) void SplashScreen.hideAsync();
+  }, [loading, fontsReady]);
   return null;
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    BricolageGrotesque_500Medium,
+    BricolageGrotesque_700Bold,
+    BricolageGrotesque_800ExtraBold,
+  });
   const dark = useScheme() === 'dark';
   const palette = dark ? Colors.dark : Colors.light;
   const base = dark ? DarkTheme : DefaultTheme;
@@ -39,10 +51,17 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navTheme}>
       <AuthProvider>
-        <SplashGate />
+        <SplashGate fontsReady={fontsLoaded || !!fontError} />
         <StatusBar style={dark ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShadowVisible: false, headerBackButtonDisplayMode: 'minimal' }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Universal Complaint System' }} />
+        <Stack
+          screenOptions={{
+            headerShadowVisible: false,
+            headerBackButtonDisplayMode: 'minimal',
+            headerTitleStyle: { fontFamily: Fonts.bold, fontSize: 18 },
+          }}>
+          <Stack.Screen name="index" options={{ headerShown: false, title: 'Universal Complaint System' }} />
+          <Stack.Screen name="complain" options={{ title: '' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'The Record' }} />
           <Stack.Screen name="point/[id]" options={{ title: 'Point' }} />
           <Stack.Screen name="subject/[id]" options={{ title: '' }} />
           <Stack.Screen name="submission/[id]" options={{ title: 'Complaint' }} />
@@ -58,6 +77,7 @@ export default function RootLayout() {
           <Stack.Screen name="terms" options={{ title: 'Terms of use' }} />
           <Stack.Screen name="operator" options={{ title: 'Operator queue' }} />
         </Stack>
+        <Toaster />
       </AuthProvider>
     </ThemeProvider>
   );

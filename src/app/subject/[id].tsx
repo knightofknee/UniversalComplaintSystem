@@ -4,17 +4,15 @@ import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 
-import { PairedLists } from '@/components/paired-lists';
-import { PointCard } from '@/components/point-card';
+import { PointCard, PointList } from '@/components/point-card';
 import { RelatedSubjects } from '@/components/related-subjects';
 import { ReportButton } from '@/components/report';
 import { Stats } from '@/components/stats';
 import { Button, Card, Chip, Empty, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { categoryLabel } from '@/lib/categories';
 import { db } from '@/lib/firebase';
-import { count, useCollection, useDoc } from '@/lib/hooks';
+import { count, people, useCollection, useDoc } from '@/lib/hooks';
 import { shareLink } from '@/lib/share';
 import type { Point, Subject } from '@/lib/types';
 
@@ -51,7 +49,6 @@ function Header({ subject }: { subject: Subject }) {
   const theme = useTheme();
   const router = useRouter();
   const org = subject.kind === 'organization';
-  const category = categoryLabel(subject.category);
   return (
     <>
       <Stack.Screen
@@ -74,10 +71,10 @@ function Header({ subject }: { subject: Subject }) {
           ),
         }}
       />
-      <T variant="title">{subject.name}</T>
+      <T variant="display" style={{ fontSize: 34, lineHeight: 38 }}>
+        {subject.name}
+      </T>
       <Row style={{ flexWrap: 'wrap' }}>
-        <Chip label={org ? 'Organization' : 'Topic'} color={theme.textSecondary} bg={theme.backgroundElement} />
-        {category && <Chip label={category} color={theme.textSecondary} bg={theme.backgroundElement} />}
         {org && (
           <Chip
             label={
@@ -102,33 +99,44 @@ function Header({ subject }: { subject: Subject }) {
   );
 }
 
-/** A topic is a conversation: what's biggest and what's rising, side by side. */
+const SORTS: { key: Sort; label: string }[] = [
+  { key: 'rising', label: '🔥 Hot' },
+  { key: 'top', label: '👥 Most shared' },
+  { key: 'new', label: '🆕 New' },
+];
+
+/** Hot, most shared, new: the same sorts as the Record. */
+function SubjectFeed({ subject }: { subject: Subject }) {
+  const [sort, setSort] = useState<Sort>('top');
+  const points = usePoints(subject.id, sort);
+  const shown = sort === 'rising' ? points.items.filter((p) => (p.weekSupport ?? 0) > 0) : points.items;
+  return (
+    <>
+      <Tabs options={SORTS} value={sort} onChange={setSort} />
+      {shown.length === 0 ? (
+        <Empty loading={points.loading} text={sort === 'rising' ? 'Nothing heating up this week.' : 'Nothing here yet.'} />
+      ) : (
+        <PointList>
+          {shown.map((p, i) => (
+            <PointCard key={p.id} point={p} hideSubjects rank={sort === 'new' ? undefined : i + 1} />
+          ))}
+        </PointList>
+      )}
+    </>
+  );
+}
+
+/** A kind of problem: who could fix it, then the complaints. */
 function TopicPage({ subject }: { subject: Subject }) {
   const top = usePoints(subject.id, 'top');
-  const rising = usePoints(subject.id, 'rising');
-  const newest = usePoints(subject.id, 'new');
   return (
     <Screen>
       <Header subject={subject} />
       <T variant="small">
-        {count(subject.stats.supporters ?? 0, 'supporter')} · {count(subject.stats.points, 'point')}
+        {people(subject.stats.supporters ?? 0)} · {count(subject.stats.points, 'problem')}
       </T>
       <RelatedSubjects subjectId={subject.id} points={top.items} kind="organization" title="Who could fix this" />
-      <PairedLists
-        hideSubjects
-        first={{ title: 'Most supported', items: top.items, loading: top.loading, empty: 'No points yet.' }}
-        second={{
-          title: 'Rising this week',
-          hint: 'Most new support in the last 7 days',
-          items: rising.items.filter((p) => (p.weekSupport ?? 0) > 0),
-          loading: rising.loading,
-          empty: 'Nothing new this week.',
-        }}
-      />
-      <T variant="heading">Newest</T>
-      {newest.items.slice(0, 10).map((p) => (
-        <PointCard key={p.id} point={p} hideSubjects />
-      ))}
+      <SubjectFeed subject={subject} />
       <ReportButton target={{ kind: 'subject', id: subject.id }} label="Report this page" />
     </Screen>
   );
@@ -138,11 +146,8 @@ function TopicPage({ subject }: { subject: Subject }) {
 function OrganizationPage({ subject }: { subject: Subject }) {
   const router = useRouter();
   const { profile } = useAuth();
-  const [sort, setSort] = useState<Sort>('top');
-  const points = usePoints(subject.id, sort);
   const top = usePoints(subject.id, 'top');
   const mine = profile?.responderFor.includes(subject.id);
-  const shown = sort === 'rising' ? points.items.filter((p) => (p.weekSupport ?? 0) > 0) : points.items;
   return (
     <Screen>
       <Header subject={subject} />
@@ -155,21 +160,8 @@ function OrganizationPage({ subject }: { subject: Subject }) {
           </T>
         </Card>
       )}
-      <RelatedSubjects subjectId={subject.id} points={top.items} kind="topic" title="Topics" />
-      <Tabs
-        options={[
-          { key: 'top', label: 'Most supported' },
-          { key: 'rising', label: 'Rising this week' },
-          { key: 'new', label: 'Newest' },
-        ]}
-        value={sort}
-        onChange={setSort}
-      />
-      {shown.length === 0 ? (
-        <Empty loading={points.loading} text={sort === 'rising' ? 'Nothing new this week.' : 'No points yet.'} />
-      ) : (
-        shown.map((p) => <PointCard key={p.id} point={p} hideSubjects />)
-      )}
+      <RelatedSubjects subjectId={subject.id} points={top.items} kind="topic" title="Kinds of problems" />
+      <SubjectFeed subject={subject} />
       <ReportButton target={{ kind: 'subject', id: subject.id }} label="Report this page" />
     </Screen>
   );

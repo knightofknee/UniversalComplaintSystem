@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { collection, documentId, query, where } from 'firebase/firestore';
 
-import { PointCard } from '@/components/point-card';
+import { PointCard, PointList } from '@/components/point-card';
 import { SubmissionCard } from '@/components/submission-card';
 import { Empty, Screen, T } from '@/components/ui';
 import { db } from '@/lib/firebase';
@@ -23,9 +23,11 @@ export default function SubmissionScreen() {
     <Screen>
       <SubmissionCard s={s} />
       <T variant="label">Recorded as</T>
-      {points.items.map((p) => (
-        <PointCard key={p.id} point={p} />
-      ))}
+      <PointList>
+        {points.items.map((p) => (
+          <PointCard key={p.id} point={p} />
+        ))}
+      </PointList>
     </Screen>
   );
 }

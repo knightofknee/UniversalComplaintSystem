@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
-import { PointCard } from '@/components/point-card';
+import { PointCard, PointList } from '@/components/point-card';
 import { Empty, T } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import type { Point } from '@/lib/types';
@@ -46,7 +46,11 @@ function Column({ spec, hideSubjects }: { spec: ListSpec; hideSubjects?: boolean
       {shown.length === 0 ? (
         <Empty loading={spec.loading} text={spec.empty} />
       ) : (
-        shown.map((p) => <PointCard key={p.id} point={p} hideSubjects={hideSubjects} />)
+        <PointList>
+          {shown.map((p) => (
+            <PointCard key={p.id} point={p} hideSubjects={hideSubjects} />
+          ))}
+        </PointList>
       )}
       {spec.items.length > PREVIEW && (
         <Pressable onPress={() => setAll((a) => !a)} accessibilityRole="button" hitSlop={8}>

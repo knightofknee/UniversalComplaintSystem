@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+/** Everything past the complaint box. "Complain" takes you back to it. */
 export default function TabsLayout() {
   const theme = useTheme();
+  const router = useRouter();
   return (
     <Tabs
       screenOptions={{
@@ -12,19 +15,14 @@ export default function TabsLayout() {
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarHideOnKeyboard: true,
+        tabBarLabelStyle: { fontFamily: Fonts.bold, fontSize: 11 },
+        tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
       }}>
       <Tabs.Screen
-        name="index"
+        name="browse"
         options={{
-          title: 'Browse',
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="complain"
-        options={{
-          title: 'Complain',
-          tabBarIcon: ({ color, size }) => <Ionicons name="megaphone" size={size} color={color} />,
+          title: 'Record',
+          tabBarIcon: ({ color, size }) => <Ionicons name="flame" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -32,6 +30,19 @@ export default function TabsLayout() {
         options={{
           title: 'Search',
           tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="new"
+        options={{
+          title: 'Complain',
+          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size + 6} color={color} />,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.navigate('/');
+          },
         }}
       />
       <Tabs.Screen

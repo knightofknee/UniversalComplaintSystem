@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { showAlert, StatusChip, STATUS_LABEL, SupportButton } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
 import { SubmissionCard } from '@/components/submission-card';
 import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
-import { Button, Card, Chip, Empty, Field, Notice, Row, Screen, T, Tabs } from '@/components/ui';
+import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, markSeen, respondToPoint, voteFix } from '@/lib/api';
@@ -96,23 +96,26 @@ export default function PointScreen() {
           ),
         }}
       />
-      <T variant="small">Filed under (tagged automatically)</T>
-      <Row style={{ flexWrap: 'wrap' }}>
-        {point.subjectIds.map((sid, i) => (
-          <Card key={sid} onPress={() => router.push(`/subject/${sid}`)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
-            <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
-              {point.subjectNames[i]}
-            </T>
-          </Card>
-        ))}
-      </Row>
-      <T variant="heading" style={{ fontSize: 22, lineHeight: 29 }}>
+      <T variant="title" style={{ fontSize: 28, lineHeight: 33 }}>
         {point.text}
       </T>
       <Row style={{ flexWrap: 'wrap' }}>
         <SupportButton pointId={point.id} count={point.supportCount} />
         <StatusChip status={point.status} />
-        {point.hot && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
+        {point.hot && <Chip label="🔥 rant" color={theme.rant} bg={theme.rantSoft} />}
+      </Row>
+      <Row style={{ flexWrap: 'wrap', gap: 6 }}>
+        {point.subjectIds.map((sid, i) => (
+          <Pressable
+            key={sid}
+            onPress={() => router.push(`/subject/${sid}`)}
+            accessibilityRole="link"
+            style={({ pressed }) => [styles.tag, { borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
+            <T variant="small" color={theme.text} style={{ fontWeight: '600' }}>
+              {point.subjectNames[i]}
+            </T>
+          </Pressable>
+        ))}
       </Row>
       {Object.entries(point.orgStatus ?? {}).length > 1 && (
         <Row style={{ flexWrap: 'wrap' }}>
@@ -141,12 +144,12 @@ export default function PointScreen() {
           {timeAgo(point.createdAt?.toMillis())}
         </T>
       </Pressable>
-      <Notice tone="new">
-        <T variant="small" color={theme.new}>
-          The model wrote this summary from people&apos;s complaints and matches new complaints to it. Each complaint
-          below is in its author&apos;s own words.
-        </T>
-      </Notice>
+      <T variant="small">
+        <T variant="small" color={theme.new} style={{ fontWeight: '700' }}>
+          ✨ Worded by the model
+        </T>{' '}
+        from the complaints below, which are each in their author&apos;s own words.
+      </T>
       <T variant="small">
         {seenCount > 0
           ? `Seen by ${seenCount === 1 ? 'the organization' : `${seenCount} organizations`}${
@@ -356,3 +359,7 @@ function RespondBox({ point, subjectId, subjectName }: { point: Point; subjectId
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  tag: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+});
