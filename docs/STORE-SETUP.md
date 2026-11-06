@@ -24,43 +24,47 @@ Identifiers you'll need:
 
 ## 0. Before either store
 
-### 0a. Put the website live
+### 0a. The website (done, Claude deploys it)
 
-Both stores link to these pages, and Play rejects an account-deletion URL
-that doesn't load. They're written and sitting uncommitted in the Waldgrave
-repo:
-- `pages/ucs/`: landing, privacy, terms, support, delete-account.
-- `public/ucs/`: the icon, and the web version in `public/ucs/app`, built by
-  `npm run publish-web` here.
-- `next.config.js`: routing for /ucs/app.
-- `public/.well-known/apple-app-site-association`: shared links open the
-  app.
+The pages in the table above, the web version at
+https://www.waldgrave.com/ucs/app and the universal-link file are live on
+waldgrave.com (Waldgrave commit b8c13b64, deployed to Heroku 2026-11-06).
+Whenever the app or these pages change, Claude runs `npm run publish-web` here,
+commits in ~/Documents/GitHub/the-waldgrave and runs `git push heroku main`.
+Nothing for you to do.
 
-Commit and deploy only those, the same way as Basic Autocorrect:
+### 0b. Link the EAS project (once, about a minute)
 
-```bash
-cd ~/Documents/GitHub/the-waldgrave
-```
+Push notifications need an EAS project id in app.json; until it's there the
+app never offers them. You're logged in to EAS as **knightofknee**.
 
 ```bash
-git add pages/ucs public/ucs public/.well-known/apple-app-site-association next.config.js && git commit -m "Universal Complaint System pages and web version" && git push && git push heroku
+cd ~/repos/UniversalComplaintSystem
 ```
-
-Then check that each URL in the table above loads, and
-https://www.waldgrave.com/ucs/app. Whenever the app changes, run
-`npm run publish-web` here and deploy the Waldgrave site again.
-
-### 0b. Link the EAS project (once)
-
-UCS has an `eas.json` copied from Direct Democracy, but no EAS project yet.
-From this repo:
 
 ```bash
 eas init
 ```
 
-It writes `extra.eas.projectId` into app.json; commit that. Push notifications
-need it: until it's there, the app never offers them.
+What it asks, and what to answer:
+
+1. **"Would you like to create a project for @knightofknee/universal-complaint-system?"**
+   Yes (Enter).
+2. Only if you belong to more than one Expo account or organization:
+   **"Which account should own this project?"** Pick **knightofknee** (the
+   same owner as Direct Democracy).
+3. If it says **"Project already exists"** and asks to link it: Yes.
+
+That's all. It prints "Project successfully linked" and adds
+`"extra": { "eas": { "projectId": "…" } }` (and `"owner"`) to app.json.
+Then either tell Claude "eas init done" (Claude commits it), or:
+
+```bash
+git add app.json && git commit -m "EAS project id" && git push
+```
+
+If it ever asks you to log in instead: `eas login`, username **knightofknee**,
+then run `eas init` again.
 
 ### 0b2. Make yourself the operator (once)
 
@@ -76,6 +80,32 @@ Your usual process: `eas build --platform ios` / `--platform android` with
 the production profile, then `eas submit`. EAS builds from git, so the
 gitignored `.env.local` (the App Check debug token) never goes into a store
 build. That's what we want: store builds attest for real.
+
+**First iOS build** (`eas build -p ios`) asks, in this order:
+
+1. "Do you want to log in to your Apple account?" **Yes**, your Apple ID,
+   then the 2FA code.
+2. Team: **R3H7M2M4F5**.
+3. "Reuse this distribution certificate?" (the one Direct Democracy uses)
+   **Yes**.
+4. "Generate a new Apple Provisioning Profile?" **Yes**.
+5. "Would you like to set up Push Notifications for your project?" **Yes**,
+   then "Reuse an existing Apple Push Notifications service key?" **Yes**
+   (pick Direct Democracy's key; one key serves every app on the team) or
+   generate a new one if it offers none. Without this, iPhones get no push.
+
+**First Android build** (`eas build -p android`) asks "Generate a new
+Android Keystore?" **Yes** (EAS keeps it). Then, once, for Android push:
+
+```bash
+eas credentials -p android
+```
+
+→ production → **Google Service Account** → **Manage your Google Service
+Account Key for Push Notifications (FCM V1)** → **Set up** → upload a key
+from Firebase console → Project settings → Service accounts → **Generate new
+private key** (project `universal-complaint-system`). Delete the downloaded
+JSON afterwards; EAS keeps it. Without this, Android phones get no push.
 
 ---
 
@@ -133,8 +163,9 @@ location, purchases, or advertising data.
 
 ### 1e. Version page
 
-- Screenshots: 6.9" iPhone (1320 × 2868), 3 to 10 of them. iPad screenshots
-  are only needed if the app keeps iPad support (see AUDIT.md).
+- Screenshots: 6.9" iPhone (1320 × 2868), 3 to 10 of them, in
+  `store/screenshots/ios/`. No iPad screenshots: the app is iPhone-only
+  (`supportsTablet: false`).
 - Promotional text, description, keywords: see the listing copy section at
   the end.
 - Build: pick the one from `eas submit`.
@@ -233,7 +264,9 @@ complaint, search and "Same here" on Android is refused.
 
 - Short description (80): see listing copy.
 - Full description: see listing copy.
-- App icon 512 × 512, feature graphic 1024 × 500, 2 to 8 phone screenshots.
+- App icon 512 × 512, feature graphic 1024 × 500, 2 to 8 phone screenshots:
+  all in `store/` (`play-icon.png`, `feature-graphic.png`,
+  `screenshots/android/`).
 
 ---
 
