@@ -91,6 +91,8 @@ export type Source = {
   url: string;
   date: Timestamp | null;
   orgReply: string | null;
+  /** The agency's own caveat about its data (e.g. that it doesn't verify reports). */
+  note?: string | null;
 };
 
 export type Response = {

@@ -140,7 +140,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     `removed: true, pendingPublic: true`; a public complaint or an approved
     claim makes it public. `restrictedTo` lives in `restricted/{id}`.
   - **Public-record seed**: `npm run import` (CFPB grouped by issue, NHTSA
-    per complaint), synthetic supporters `import:<source>:<id>`, labelled
+    per complaint, FCC grouped by issue as topic-only points; CPSC needs an
+    API key we don't have, never scrape it), each agency's caveat in
+    `source.note`, synthetic supporters `import:<source>:<id>`, labelled
     `submissions.source`. `npm run usage`, `npm run migrate`,
     `npm run reviewer` (credentials only in gitignored .reviewer.local).
   - Shared links are `https://www.waldgrave.com/ucs/app/...` (src/lib/share.ts);

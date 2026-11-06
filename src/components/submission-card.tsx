@@ -65,6 +65,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
       {source && (
         <Notice>
           {source.orgReply && <T variant="small">{source.orgReply}</T>}
+          {source.note && <T variant="small">{source.note}</T>}
           <Pressable onPress={() => Linking.openURL(source.url)} accessibilityRole="link" hitSlop={6}>
             <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
               From the {source.name} <Ionicons name="open-outline" size={12} />
