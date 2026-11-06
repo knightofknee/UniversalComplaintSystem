@@ -1,6 +1,6 @@
 import { Composer } from '@/components/composer';
 
-/** Home is the complaint box. Everything else is one tap away (the menu button). */
+/** The main screen: the complaint box. The first tab, and where the app opens. */
 export default function Home() {
   return <Composer home />;
 }

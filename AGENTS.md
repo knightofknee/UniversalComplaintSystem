@@ -41,8 +41,13 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   tags; the author can untag or add EXISTING subjects at review ("Filed
   under"), never invent one. Tags are only ever added to an existing point.
 - Design (2026-11-06, the user's direction): COMPLAINING FIRST. `/` is the
-  composer (src/components/composer.tsx, `<Composer home />`): a sparse box,
-  no tab bar, a menu button to everything else. As they type it fills
+  composer (src/components/composer.tsx, `<Composer home />`), the FIRST
+  (far-left) tab and where the app opens: a bordered text box centered on
+  an otherwise empty screen (no logo, no wordmark), a "+" inside it for
+  photos (iOS action sheet: camera or library), one plain line under it,
+  and a small "?" to `/help`. Copy is plain and never prompts what the
+  complaint is about. The root Stack mounts only after the fonts load
+  (tab labels measured in the fallback face truncate). As they type it fills
   in: the live read-out (src/lib/read.ts, on-device: heat calm..volcanic,
   fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
   (similar points, vote right there). "See how it posts" runs the model and

@@ -6,8 +6,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ref, uploadBytes } from "firebase/storage";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ActionSheetIOS,
   Animated,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Linking,
   Platform,
   Pressable,
@@ -82,6 +84,8 @@ export function Composer({ home }: { home?: boolean }) {
   }>();
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photoMenu, setPhotoMenu] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [similar, setSimilar] = useState<PointHit[]>([]);
   const [raisedPrivately, setRaisedPrivately] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "write" });
@@ -98,6 +102,12 @@ export function Composer({ home }: { home?: boolean }) {
   const searchSeq = useRef(0);
   const read = readComplaint(text);
   const searching = text.trim().length >= SEARCH_AFTER_CHARS;
+  const empty = text.trim().length === 0 && photos.length === 0;
+
+  // The box sits in the middle of an empty screen and moves up as content appears below it.
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [empty]);
 
   // Who already said it, while typing.
   useEffect(() => {
@@ -118,15 +128,10 @@ export function Composer({ home }: { home?: boolean }) {
     return () => clearTimeout(timer);
   }, [text, step.kind]);
 
-  const addPhoto = async () => {
+  /** Resize, strip metadata (location included), upload. */
+  const ingest = async (uri: string) => {
     if (!user) return;
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 1,
-    });
-    if (picked.canceled) return;
-    // Re-encoding resizes the photo and drops its metadata (location included).
-    const rendered = await ImageManipulator.manipulate(picked.assets[0].uri)
+    const rendered = await ImageManipulator.manipulate(uri)
       .resize({ width: 1600 })
       .renderAsync();
     const saved = await rendered.saveAsync({
@@ -146,6 +151,47 @@ export function Composer({ home }: { home?: boolean }) {
       setPhotos((p) => p.filter((x) => x !== local));
       setError(`That photo didn't upload. ${errorText(e)}`);
     }
+  };
+
+  const addPhoto = async (source: "camera" | "library") => {
+    setPhotoMenu(false);
+    const room = MAX_PHOTOS - photos.length;
+    if (room <= 0) return;
+    if (source === "camera") {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        setError("Camera access is off. Allow it in Settings to take a photo.");
+        return;
+      }
+      const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 });
+      if (shot.canceled) return;
+      await ingest(shot.assets[0].uri);
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 1,
+      allowsMultipleSelection: room > 1,
+      selectionLimit: room,
+    });
+    if (picked.canceled) return;
+    for (const a of picked.assets.slice(0, room)) await ingest(a.uri);
+  };
+
+  /** Take a photo or choose one: the platform's own sheet on iOS, a row of choices on Android, the file picker on web. */
+  const choosePhoto = () => {
+    if (Platform.OS === "web") return void addPhoto("library");
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ["Take Photo", "Choose from Library", "Cancel"], cancelButtonIndex: 2 },
+        (i) => {
+          if (i === 0) void addPhoto("camera");
+          if (i === 1) void addPhoto("library");
+        },
+      );
+      return;
+    }
+    setPhotoMenu((m) => !m);
   };
 
   const review = (analysis: Analysis) => {
@@ -251,27 +297,20 @@ export function Composer({ home }: { home?: boolean }) {
       });
   };
 
+  // The main screen carries nothing but the box and a way to get help.
   const top = home ? (
-    <Row style={{ justifyContent: "space-between" }}>
-      <Row style={{ gap: 8 }}>
-        <Image
-          source={require("../../assets/images/mark.png")}
-          style={styles.mark}
-          accessibilityIgnoresInvertColors
-        />
-        <Text style={[styles.wordmark, { color: theme.text }]}>UCS</Text>
-      </Row>
+    <Row style={{ justifyContent: "flex-end" }}>
       <Pressable
-        onPress={() => router.push("/browse")}
+        onPress={() => router.push("/help")}
         accessibilityRole="button"
-        accessibilityLabel="Everything else: browse, search, your account"
+        accessibilityLabel="Help"
         hitSlop={8}
         style={({ pressed }) => [
-          styles.menu,
+          styles.help,
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Ionicons name="menu" size={24} color={theme.text} />
+        <Ionicons name="help" size={20} color={theme.textSecondary} />
       </Pressable>
     </Row>
   ) : null;
@@ -339,7 +378,7 @@ export function Composer({ home }: { home?: boolean }) {
         />
         {home && (
           <Button
-            label="See the record"
+            label="See all complaints"
             kind="quiet"
             onPress={() => router.push("/browse")}
           />
@@ -454,71 +493,88 @@ export function Composer({ home }: { home?: boolean }) {
           </View>
         </Pressable>
       ) : (
-        <TextInput
-          multiline
-          autoFocus={home && Platform.OS !== "web"}
-          value={text}
-          onChangeText={setText}
-          placeholder={
-            params.subjectName
-              ? `Your complaint about ${params.subjectName}`
-              : "Your complaint"
-          }
-          placeholderTextColor={theme.textSecondary}
-          maxLength={4000}
-          accessibilityLabel="Your complaint"
-          style={[styles.box, { color: theme.text }]}
-        />
-      )}
-
-      {!reviewing && text.trim().length === 0 && (
-        <View style={{ gap: 6 }}>
-          <T color={theme.textSecondary}>
-            Enter your complaint to see if any similar complaints have been
-            made. Nothing is posted until you say so.
-          </T>
-          <T variant="small">
-            Say what happened and what would make it right: that&apos;s the
-            part that gets things fixed.
-          </T>
-        </View>
-      )}
-
-      {!reviewing && (
-        <Row style={{ flexWrap: "wrap" }}>
-          {photos.map((p, i) => (
-            <View key={i}>
-              <Image source={{ uri: p.uri }} style={styles.thumb} />
-              <Pressable
-                accessibilityLabel="Remove photo"
-                onPress={() => setPhotos((ps) => ps.filter((x) => x !== p))}
-                style={[styles.remove, { backgroundColor: theme.text }]}
-              >
-                <Ionicons name="close" size={14} color={theme.background} />
-              </Pressable>
-            </View>
-          ))}
-          {photos.length < MAX_PHOTOS && (
-            <Pressable
-              onPress={addPhoto}
-              accessibilityLabel="Add a photo"
-              hitSlop={6}
-              style={({ pressed }) => [
-                styles.photoButton,
-                { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Ionicons
-                name="camera-outline"
-                size={18}
-                color={theme.textSecondary}
-              />
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
-                {photos.length ? "Another" : "Photo"}
-              </Text>
-            </Pressable>
+        <View style={[styles.boxWrap, empty && styles.boxWrapEmpty]}>
+          <View
+            style={[
+              styles.box,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: focused ? theme.primary : theme.border,
+              },
+            ]}
+          >
+            <TextInput
+              multiline
+              value={text}
+              onChangeText={setText}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={
+                params.subjectName
+                  ? `Your complaint about ${params.subjectName}`
+                  : "Your complaint"
+              }
+              placeholderTextColor={theme.textSecondary}
+              maxLength={4000}
+              accessibilityLabel="Your complaint"
+              style={[styles.input, { color: theme.text }]}
+            />
+            {photos.length > 0 && (
+              <Row style={{ flexWrap: "wrap", gap: 10 }}>
+                {photos.map((p, i) => (
+                  <View key={i}>
+                    <Image source={{ uri: p.uri }} style={styles.thumb} />
+                    {!p.path && (
+                      <View style={[styles.uploading, { backgroundColor: theme.background }]} />
+                    )}
+                    <Pressable
+                      accessibilityLabel="Remove photo"
+                      hitSlop={8}
+                      onPress={() => setPhotos((ps) => ps.filter((x) => x !== p))}
+                      style={[styles.remove, { backgroundColor: theme.text }]}
+                    >
+                      <Ionicons name="close" size={14} color={theme.background} />
+                    </Pressable>
+                  </View>
+                ))}
+              </Row>
+            )}
+            <Row style={{ justifyContent: "space-between" }}>
+              <Row style={{ gap: 14 }}>
+                {photos.length < MAX_PHOTOS && (
+                  <Pressable
+                    onPress={choosePhoto}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a photo"
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.tool, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="add" size={24} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+                {photoMenu && (
+                  <>
+                    <Pressable onPress={() => addPhoto("camera")} hitSlop={8} accessibilityRole="button">
+                      <Text style={[styles.toolText, { color: theme.primary }]}>Take photo</Text>
+                    </Pressable>
+                    <Pressable onPress={() => addPhoto("library")} hitSlop={8} accessibilityRole="button">
+                      <Text style={[styles.toolText, { color: theme.primary }]}>Choose photo</Text>
+                    </Pressable>
+                  </>
+                )}
+              </Row>
+              {text.length >= 3500 && (
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{4000 - text.length}</Text>
+              )}
+            </Row>
+          </View>
+          {empty && (
+            <T variant="small" style={{ textAlign: "center" }}>
+              Nothing is submitted from here. The next step shows similar
+              complaints and a preview of your post.
+            </T>
           )}
-        </Row>
+        </View>
       )}
 
       {!reviewing && read.words > 0 && <ReadOut read={read} />}
@@ -609,7 +665,8 @@ function Page({
           style={[
             styles.bar,
             {
-              paddingBottom: Math.max(insets.bottom, 12),
+              // Inside the tabs the tab bar already clears the home indicator.
+              paddingBottom: home ? 12 : Math.max(insets.bottom, 12),
               backgroundColor: theme.background,
               borderTopColor: theme.border,
             },
@@ -1068,39 +1125,41 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexGrow: 1,
   },
-  mark: { width: 28, height: 28 },
-  wordmark: { fontFamily: Fonts.display, fontSize: 20, letterSpacing: 0.5 },
-  menu: {
-    width: 42,
-    height: 42,
+  help: {
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderRadius: 999,
   },
+  boxWrap: { gap: 10 },
+  // An empty screen: the box in the middle of it.
+  boxWrapEmpty: { flex: 1, justifyContent: "center", paddingBottom: 48 },
   box: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  input: {
     fontFamily: Fonts.medium,
-    fontSize: 26,
-    lineHeight: 34,
-    minHeight: 150,
+    fontSize: 20,
+    lineHeight: 28,
+    minHeight: 120,
+    maxHeight: 360,
     textAlignVertical: "top",
-    paddingTop: 8,
-    paddingHorizontal: 0,
+    padding: 0,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
   },
+  tool: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
+  toolText: { fontSize: 14, fontWeight: "700" },
   quote: { borderLeftWidth: 3, paddingLeft: 12, gap: 6 },
   quoteText: { fontFamily: Fonts.medium, fontSize: 19, lineHeight: 26 },
-  photoButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
   thumb: { width: 64, height: 64, borderRadius: 12 },
+  uploading: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12, opacity: 0.5 },
   remove: {
     position: "absolute",
     top: -6,
