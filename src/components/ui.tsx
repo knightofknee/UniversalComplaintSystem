@@ -93,7 +93,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
-  const bg = kind === 'primary' ? theme.primary : kind === 'secondary' ? theme.primarySoft : 'transparent';
+  const bg = kind === 'primary' ? theme.primaryFill : kind === 'secondary' ? theme.primarySoft : 'transparent';
   const fg = kind === 'primary' ? theme.onPrimary : theme.primary;
   return (
     <Pressable

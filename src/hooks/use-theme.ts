@@ -1,7 +1,6 @@
-import { useColorScheme } from 'react-native';
-
 import { Colors, type Palette } from '@/constants/theme';
+import { useScheme } from '@/lib/appearance';
 
 export function useTheme(): Palette {
-  return useColorScheme() === 'dark' ? Colors.dark : Colors.light;
+  return useScheme() === 'dark' ? Colors.dark : Colors.light;
 }

@@ -147,6 +147,13 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     `+native-intent.ts` strips the prefix; `npm run publish-web` copies the
     web export into ../../Documents/GitHub/the-waldgrave/public/ucs/app.
   - "Same here" (never "Me too") is the support button.
+- Appearance (2026-11-06): DARK is the default, chosen by the app, not the
+  phone (src/lib/appearance.ts; Me > Appearance: Dark / Light / Match phone,
+  saved per device). Native: `Appearance.setColorScheme`, so the tab bar,
+  alerts and keyboard follow. Every color comes from src/constants/theme.ts;
+  never hardcode one. `primary` is for text/icons/outlines, `primaryFill`
+  for solid buttons (in dark they differ so both stay readable). The splash
+  is dark in both phone modes.
 - Account deletion (`deleteAccount`, functions/src/account.ts) does exactly
   what src/app/privacy.tsx promises; change both together. The privacy
   policy and terms (src/app/privacy.tsx, terms.tsx) are ours to keep

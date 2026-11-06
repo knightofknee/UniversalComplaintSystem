@@ -2,13 +2,14 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
+import { loadAppearance, useScheme } from '@/lib/appearance';
 import { usePush } from '@/lib/push';
 
 SplashScreen.preventAutoHideAsync();
+void loadAppearance();
 
 /** Holds the splash until the (anonymous) account is ready. */
 function SplashGate() {
@@ -21,7 +22,7 @@ function SplashGate() {
 }
 
 export default function RootLayout() {
-  const dark = useColorScheme() === 'dark';
+  const dark = useScheme() === 'dark';
   const palette = dark ? Colors.dark : Colors.light;
   const base = dark ? DarkTheme : DefaultTheme;
   const navTheme = {
@@ -39,7 +40,7 @@ export default function RootLayout() {
     <ThemeProvider value={navTheme}>
       <AuthProvider>
         <SplashGate />
-        <StatusBar style="auto" />
+        <StatusBar style={dark ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShadowVisible: false, headerBackButtonDisplayMode: 'minimal' }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Universal Complaint System' }} />
           <Stack.Screen name="point/[id]" options={{ title: 'Point' }} />

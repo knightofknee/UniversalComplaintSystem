@@ -83,7 +83,7 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
       hitSlop={8}
       style={[
         styles.support,
-        { backgroundColor: on ? theme.primary : theme.background, borderColor: theme.primary },
+        { backgroundColor: on ? theme.primaryFill : theme.background, borderColor: on ? theme.primaryFill : theme.primary },
       ]}>
       <Ionicons name={on ? 'checkmark-circle' : 'add-circle-outline'} size={16} color={on ? theme.onPrimary : theme.primary} />
       <Text style={{ color: on ? theme.onPrimary : theme.primary, fontWeight: '800' }}>

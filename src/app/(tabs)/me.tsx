@@ -5,7 +5,7 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { Switch } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
-import { Button, Card, Empty, Row, Screen, T } from '@/components/ui';
+import { Button, Card, Empty, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText } from '@/lib/api';
@@ -13,6 +13,7 @@ import { unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { timeAgo, useCollection } from '@/lib/hooks';
 import { isOperator } from '@/lib/operator';
+import { type AppearancePref, setAppearance, useAppearancePref } from '@/lib/appearance';
 import { pushSupported, turnOffPush, turnOnPush } from '@/lib/push';
 import type { Notification, Submission } from '@/lib/types';
 
@@ -72,6 +73,26 @@ function PushSwitch({ on }: { on: boolean }) {
   );
 }
 
+const LOOKS: { key: AppearancePref; label: string }[] = [
+  { key: 'dark', label: 'Dark' },
+  { key: 'light', label: 'Light' },
+  { key: 'system', label: 'Match phone' },
+];
+
+function AppearancePicker() {
+  const theme = useTheme();
+  const choice = useAppearancePref();
+  return (
+    <Card>
+      <Row>
+        <Ionicons name="contrast-outline" size={20} color={theme.primary} />
+        <T style={{ flex: 1, fontWeight: '600' }}>Appearance</T>
+      </Row>
+      <Tabs options={LOOKS} value={choice} onChange={setAppearance} />
+    </Card>
+  );
+}
+
 export default function MeScreen() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -117,6 +138,7 @@ export default function MeScreen() {
         href="/notifications"
       />
       <PushSwitch on={!!profile?.pushOn} />
+      <AppearancePicker />
       <Link icon="lock-closed-outline" label="Private complaints" href="/threads" />
       <Link icon="person-circle-outline" label={user?.isAnonymous ? 'Add an email' : 'Account'} href="/account" />
       <Link

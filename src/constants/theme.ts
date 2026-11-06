@@ -1,7 +1,8 @@
 /**
  * Universal Complaint System theme: plain ink on paper, one signal color
  * (a clear blue for actions), and status colors that mean the same thing
- * everywhere.
+ * everywhere. Dark is the default (src/lib/appearance.ts); every color used
+ * anywhere in the app comes from here, so this file is the whole look.
  */
 export const Colors = {
   light: {
@@ -12,6 +13,7 @@ export const Colors = {
     backgroundSelected: '#E3E8FA',
     border: '#E2E5EB',
     primary: '#2346D8',
+    primaryFill: '#2346D8',
     primarySoft: '#DDE4FB',
     onPrimary: '#FFFFFF',
     new: '#7A3FD1',
@@ -32,9 +34,12 @@ export const Colors = {
     backgroundElement: '#181C25',
     backgroundSelected: '#222B45',
     border: '#262B36',
+    // Text, icons and outlines: bright enough to read on the dark background.
     primary: '#7D97FF',
+    // Solid buttons: the brand blue, lifted, with white text (5.2:1).
+    primaryFill: '#3D5CF5',
     primarySoft: '#1E2A55',
-    onPrimary: '#0E1117',
+    onPrimary: '#FFFFFF',
     new: '#B795F2',
     newSoft: '#2D2145',
     rant: '#FB8F52',
@@ -42,7 +47,7 @@ export const Colors = {
     good: '#4ADE80',
     goodSoft: '#12301E',
     warning: '#F2B04F',
-    warningSoft: '#3A2A12',
+    warningSoft: '#2B2213',
     danger: '#FF6B81',
     dangerSoft: '#3D1620',
   },

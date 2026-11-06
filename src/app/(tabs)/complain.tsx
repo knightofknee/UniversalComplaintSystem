@@ -370,7 +370,7 @@ export default function ComplainScreen() {
                             <Chip
                               label={subjects[i].name}
                               color={i === privateTo ? theme.onPrimary : theme.text}
-                              bg={i === privateTo ? theme.primary : theme.backgroundElement}
+                              bg={i === privateTo ? theme.primaryFill : theme.backgroundElement}
                             />
                           </Pressable>
                         ))}
