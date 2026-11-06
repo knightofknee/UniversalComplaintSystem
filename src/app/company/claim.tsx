@@ -3,6 +3,7 @@ import { collection, getDocs, limit, orderBy, query, where } from 'firebase/fire
 import { useEffect, useState } from 'react';
 
 import { showAlert } from '@/components/point-card';
+import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Field, Notice, Screen, T } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { errorText, requestAccess } from '@/lib/api';
@@ -34,6 +35,8 @@ export default function ClaimScreen() {
   const [picked, setPicked] = useState<string | null>(params.subjectId ?? null);
   const [typedWebsite, setWebsite] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const termsAccepted = useTermsAccepted();
+  const [agreed, setAgreed] = useState(false);
   const { data: subject } = useDoc<Subject>(picked ? `subjects/${picked}` : null);
   const claims = useCollection<Claim>(
     user ? query(collection(db, 'claims'), where('uid', '==', user.uid), limit(20)) : null,
@@ -70,7 +73,7 @@ export default function ClaimScreen() {
     if (!picked) return;
     setBusy(true);
     try {
-      const res = await requestAccess({ subjectId: picked, website: website.trim() || undefined });
+      const res = await requestAccess({ subjectId: picked, website: website.trim() || undefined, ...(agreed ? { acceptTerms: true } : {}) });
       showAlert(
         res.status === 'approved' ? 'You can respond now' : 'Request received',
         res.status === 'approved'
@@ -132,7 +135,8 @@ export default function ClaimScreen() {
             keyboardType="url"
             placeholder="https://"
           />
-          <Button label="Request access" onPress={submit} busy={busy} disabled={!verified} />
+          <TermsCheck checked={agreed} onChange={setAgreed} />
+          <Button label="Request access" onPress={submit} busy={busy} disabled={!verified || (!termsAccepted && !agreed)} />
         </>
       )}
 

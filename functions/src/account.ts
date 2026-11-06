@@ -4,9 +4,10 @@
  *   (the organization's anonymous private counts stay: they hold no words);
  * - public complaints lose their text, photos and author name; the points
  *   they fed stay on the record (other people share them), unattributed;
- * - every "Me too" and fix confirmation is withdrawn and the counts drop;
- * - organization access, requests, notifications, limits and the sign-in
- *   itself are removed.
+ * - every "Same here" and fix confirmation is withdrawn and the counts drop;
+ * - organization access, requests, queued complaints, blocks, notifications,
+ *   phone notification tokens, limits and the sign-in itself are removed;
+ *   reports they sent stay (they're about others' posts) without their name.
  */
 import { getAuth } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
@@ -35,7 +36,7 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   const follows = await db.collectionGroup('followers').where('uid', '==', uid).get();
   await Promise.all(follows.docs.map((d) => d.ref.delete()));
 
-  // "Me too": withdraw, and take it out of every count it was in.
+  // "Same here": withdraw, and take it out of every count it was in.
   const supports = await db.collectionGroup('supports').where('uid', '==', uid).get();
   for (const s of supports.docs) {
     const pointRef = s.ref.parent.parent!;
@@ -54,7 +55,12 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   }
   const votes = await db.collectionGroup('fixVotes').where('uid', '==', uid).get();
   for (const v of votes.docs) {
-    await v.ref.parent.parent!.update({ [`fixVotes.${v.get('fixed') ? 'yes' : 'no'}`]: FieldValue.increment(-1) });
+    const orgId = v.get('orgId') as string | undefined;
+    if (orgId) {
+      await v.ref.parent.parent!
+        .update({ [`orgStatus.${orgId}.${v.get('fixed') ? 'yes' : 'no'}`]: FieldValue.increment(-1) })
+        .catch(() => {});
+    }
     await v.ref.delete();
   }
 
@@ -84,8 +90,18 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   const drafts = await db.collection('drafts').where('uid', '==', uid).get();
   await Promise.all(drafts.docs.map((d) => d.ref.delete()));
 
+  // Complaints waiting for the AI budget, the private links from public
+  // complaints and responses to this account, and who sent which report.
+  const queued = await db.collection('queue').where('uid', '==', uid).get();
+  await Promise.all(queued.docs.map((d) => d.ref.delete()));
+  const authored = await db.collection('authors').where('uid', '==', uid).get();
+  await Promise.all(authored.docs.map((d) => d.ref.delete()));
+  const reported = await db.collection('reports').where('reporterUid', '==', uid).get();
+  await Promise.all(reported.docs.map((d) => d.ref.update({ reporterUid: null })));
+
   await db.doc(`rateLimits/${uid}`).delete();
   await bucket().deleteFiles({ prefix: `uploads/${uid}/` });
+  await bucket().deleteFiles({ prefix: `queued/${uid}/` });
   await deleteTree(db.doc(`users/${uid}`));
   await getAuth().deleteUser(uid);
   return { deleted: true };

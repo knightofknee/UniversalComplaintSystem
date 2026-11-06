@@ -4,7 +4,15 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import { auth, db } from '@/lib/firebase';
 
-export type Profile = { displayName: string; responderFor: string[] };
+export type Profile = {
+  displayName: string;
+  responderFor: string[];
+  /** Set once the terms are agreed (with the first post). */
+  termsAcceptedAt?: unknown;
+  /** Phone notifications on for this account. */
+  pushOn?: boolean;
+  banned?: boolean;
+};
 
 type AuthState = {
   user: User | null;

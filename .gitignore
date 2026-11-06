@@ -44,3 +44,6 @@ functions/lib/
 
 # Service account keys
 *-firebase-adminsdk-*.json
+
+# App review credentials (npm run reviewer)
+.reviewer.local

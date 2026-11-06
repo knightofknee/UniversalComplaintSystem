@@ -3,10 +3,11 @@ import { collection, getDocs, limit, orderBy, query, where } from 'firebase/fire
 import { useEffect, useRef, useState } from 'react';
 
 import { PointCard } from '@/components/point-card';
-import { Card, Empty, Field, Screen, T } from '@/components/ui';
+import { Card, Empty, Field, Row, Screen, T } from '@/components/ui';
 import { errorText, searchPoints } from '@/lib/api';
 import { db } from '@/lib/firebase';
-import type { PointHit } from '@/lib/types';
+import { people, useCollection } from '@/lib/hooks';
+import type { PointHit, Subject } from '@/lib/types';
 
 type SubjectHit = { id: string; name: string; kind: string; description: string };
 
@@ -71,6 +72,7 @@ export default function SearchScreen() {
         accessibilityLabel="Search"
       />
       {error && <T variant="small">{error}</T>}
+      {!active && <Starters />}
       {shownSubjects.length > 0 && <T variant="label">Organizations & topics</T>}
       {shownSubjects.map((s) => (
         <Card key={s.id} onPress={() => router.push(`/subject/${s.id}`)}>
@@ -89,5 +91,43 @@ export default function SearchScreen() {
       )}
       {active && loading && shownPoints.length === 0 && shownSubjects.length === 0 && <Empty text="" loading />}
     </Screen>
+  );
+}
+
+/** Before typing: the biggest topics and the most complained-about organizations. */
+function Starters() {
+  const router = useRouter();
+  const top = (kind: 'topic' | 'organization') =>
+    query(
+      collection(db, 'subjects'),
+      where('removed', '==', false),
+      where('kind', '==', kind),
+      orderBy('stats.supporters', 'desc'),
+      limit(8),
+    );
+  const topics = useCollection<Subject>(top('topic'), 'starters:topic');
+  const orgs = useCollection<Subject>(top('organization'), 'starters:org');
+  if (topics.loading || orgs.loading) return <Empty text="" loading />;
+  if (topics.items.length === 0 && orgs.items.length === 0) {
+    return <Empty text="Search by meaning, in any language: “bag fees”, “hold music”, “my bank”." />;
+  }
+  const list = (items: Subject[]) =>
+    items.map((s) => (
+      <Card key={s.id} onPress={() => router.push(`/subject/${s.id}`)}>
+        <Row>
+          <T style={{ fontWeight: '700', flex: 1 }} numberOfLines={1}>
+            {s.name}
+          </T>
+          <T variant="small">{people(s.stats.supporters ?? 0)}</T>
+        </Row>
+      </Card>
+    ));
+  return (
+    <>
+      {orgs.items.length > 0 && <T variant="label">Most complained about</T>}
+      {list(orgs.items)}
+      {topics.items.length > 0 && <T variant="label">Biggest topics</T>}
+      {list(topics.items)}
+    </>
   );
 }

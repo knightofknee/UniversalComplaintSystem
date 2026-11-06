@@ -109,6 +109,44 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Testing native builds: use a simulator of our own, never one already
   booted (that's the developer's), and Metro on port 8095. EAS builds are
   the developer's.
+- Pre-submission build (2026-11-05), see docs/AUDIT.md:
+  - **Moderation** (functions/src/moderation.ts): Report on everything
+    (`report` → `reports`, never auto-hides), operator queue in the app
+    (`/operator`, only OPERATOR_EMAIL verified; mirrored in firestore.rules
+    and src/lib/operator.ts), Remove / Remove + suspend (`users.banned`,
+    enforced in `ensureUser`), public `removals` log. Cloud Vision SafeSearch
+    on every photo; `safety.unsafe` from the model blocks posting;
+    `badSubjectName` filters new subject names.
+  - **Terms**: first post/message/response/claim needs `acceptTerms`
+    (`requireTerms`; `users.termsAcceptedAt`), shown by `TermsCheck`.
+  - **Block**: readers hide authors (`users/{uid}/blocks`, opaque
+    `submissions.authorId`); either side blocks a private thread
+    (`blockedBy`). Who wrote what is server-only in `authors/{id}`.
+  - **Fixes are per organization** (`points.orgStatus.{orgId}`); only
+    supporters from before `fixClaimedAt` confirm; `fixVotes/{orgId}_{uid}`.
+    Point `status`/`statusBy` mirror the latest change.
+  - **Never lost**: past the AI budget, complaints go to `queue`
+    (`processQueue` hourly, then a `draft` notification → `/complain?draft=`).
+    Search and intake embeddings have separate daily caps (`countCall`).
+  - **Private-only points are matched by vector only**, after the model runs
+    (`privateMatches` in the draft); private text never goes to the model.
+  - **Headlines** change only if the new wording is close in meaning
+    (cosine < 0.15) and clearly more actionable; credited "Summarized from".
+  - **Push**: expo-notifications, `setPush` (push.ts), `notify` sends to
+    `users.pushTokens` when `pushOn`. Point news fans out at most every 6h
+    (`notifyPointFollowers`, `flushNotices`). Needs `extra.eas.projectId`
+    (from `eas init`) or the app silently offers nothing.
+  - **Hidden organizations**: a private complaint to a new org creates it
+    `removed: true, pendingPublic: true`; a public complaint or an approved
+    claim makes it public. `restrictedTo` lives in `restricted/{id}`.
+  - **Public-record seed**: `npm run import` (CFPB grouped by issue, NHTSA
+    per complaint), synthetic supporters `import:<source>:<id>`, labelled
+    `submissions.source`. `npm run usage`, `npm run migrate`,
+    `npm run reviewer` (credentials only in gitignored .reviewer.local).
+  - Shared links are `https://www.waldgrave.com/ucs/app/...` (src/lib/share.ts);
+    `+native-intent.ts` strips the prefix; `npm run publish-web` copies the
+    web export into ../../Documents/GitHub/the-waldgrave/public/ucs/app.
+  - "Same here" (never "Me too") is the support button.
 - Account deletion (`deleteAccount`, functions/src/account.ts) does exactly
   what src/app/privacy.tsx promises; change both together. The privacy
   policy and terms (src/app/privacy.tsx, terms.tsx) are ours to keep

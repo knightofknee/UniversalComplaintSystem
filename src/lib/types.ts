@@ -22,11 +22,13 @@ export type Point = {
   submissionCount: number;
   rantCount: number;
   hot: boolean;
+  /** The latest status change, for lists; per organization in orgStatus. */
   status: PointStatus;
+  statusBy?: string | null;
+  /** Each organization's own status; fixes are confirmed per organization. */
+  orgStatus?: Record<string, OrgStatus>;
   seenBy: Record<string, Timestamp>;
   respondedBy: Record<string, Timestamp>;
-  fixClaimedBy: string | null;
-  fixVotes: { yes: number; no: number };
   /** Private complaint counts, only for organizations that chose to publish them. */
   privateCounts?: Record<string, number>;
   canonical: { submissionId: string; authorName: string; actionability: number };
@@ -35,6 +37,15 @@ export type Point = {
   photo: string | null;
   createdAt: Timestamp | null;
   lastActivityAt: Timestamp | null;
+};
+
+export type OrgStatus = {
+  status: PointStatus;
+  at: Timestamp | null;
+  /** When the organization said it fixed it: only earlier supporters can confirm. */
+  fixClaimedAt?: Timestamp | null;
+  yes: number;
+  no: number;
 };
 
 export type Subject = {
@@ -46,7 +57,6 @@ export type Subject = {
   category?: string;
   domains: string[];
   claimed: boolean;
-  restrictedTo: string[] | null;
   /** Advanced setting: show this organization's private counts publicly. */
   publishPrivate?: boolean;
   stats: { points: number; seen: number; responded: number; fixed: number; supporters?: number };
@@ -55,6 +65,10 @@ export type Subject = {
 export type Submission = {
   id: string;
   authorName: string;
+  /** Opaque and stable per author: lets a reader hide one author (Block). */
+  authorId?: string;
+  /** Imported from a public government record. */
+  source?: Source | null;
   text: string;
   language: string;
   englishText: string | null;
@@ -69,6 +83,16 @@ export type Submission = {
   createdAt: Timestamp | null;
 };
 
+/** Where an imported complaint came from. */
+export type Source = {
+  name: string;
+  shortName: string;
+  id: string;
+  url: string;
+  date: Timestamp | null;
+  orgReply: string | null;
+};
+
 export type Response = {
   id: string;
   subjectId: string;
@@ -77,12 +101,15 @@ export type Response = {
   official: boolean;
   text: string | null;
   status: PointStatus | null;
+  removed?: boolean;
   createdAt: Timestamp | null;
 };
 
 export type Notification = {
   id: string;
   type: string;
+  link?: string;
+  draftId?: string;
   pointId?: string;
   subjectId?: string;
   threadId?: string;
@@ -95,6 +122,7 @@ export type Notification = {
 export type IntakeResult = {
   language: string;
   englishText: string | null;
+  safety?: { unsafe: boolean; reason: string | null };
   isComplaint: boolean;
   notComplaintReason: string | null;
   supportTicket: { isTicket: boolean; advice: string | null };
@@ -148,10 +176,13 @@ export type Thread = {
   uid: string;
   email: string;
   authorName: string;
+  orgName?: string;
   text: string;
   language: string;
   englishText: string | null;
   photos: string[];
+  /** Who blocked the conversation, if anyone; then nobody can send. */
+  blockedBy?: 'user' | 'org' | null;
   points: { privatePointId: string; pointId: string | null; statement: string }[];
   status: 'open' | 'resolved';
   createdAt: Timestamp | null;
@@ -167,6 +198,7 @@ export type Message = {
   text: string;
   domain?: string;
   authorName?: string;
+  removed?: boolean;
   at: Timestamp | null;
 };
 

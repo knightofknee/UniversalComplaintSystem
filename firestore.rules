@@ -8,6 +8,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    // The person who runs UCS (functions/src/common.ts OPERATOR_EMAIL): reads the
+    // operator queue (held organization requests, reports, AI spend).
+    function isOperator() {
+      return signedIn() && request.auth.token.email == "bricarlis@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
     function respondsFor(subjectId) {
       return signedIn()
         && exists(/databases/$(database)/documents/subjects/$(subjectId)/responders/$(request.auth.uid));
@@ -72,12 +78,30 @@ service cloud.firestore {
         allow update: if isMe(uid)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       }
+      // Authors whose public complaints this person chose to hide (Block).
+      match /blocks/{authorId} {
+        allow read, delete: if isMe(uid);
+        allow create: if isMe(uid)
+          && request.resource.data.keys().hasOnly(['name', 'at'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 80
+          && request.resource.data.at == request.time;
+      }
     }
 
     match /claims/{claimId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if (signedIn() && resource.data.uid == request.auth.uid) || isOperator();
     }
 
-    // drafts, rateLimits, usage, config: server only.
+    match /reports/{id} {
+      allow read: if isOperator();
+    }
+    match /usage/{day} {
+      allow read: if isOperator();
+    }
+    match /config/{id} {
+      allow read: if isOperator();
+    }
+
+    // drafts, queue, rateLimits, authors, restricted, imports, pushTokenOwners: server only.
   }
 }

@@ -21,8 +21,11 @@ export default function PrivacyScreen() {
             'Your email address and a password hash, only if you add an email. We use the email to sign you in, to let organizations reply to private complaints you send them, and to verify you if you respond for an organization. We never show it publicly.',
             'A display name we assign at random (for example "Steady Heron"). It is the only name shown next to anything you post.',
             'What you submit: the text of each complaint, any photos you attach, whether you sent it publicly or privately, how it was filed (the points, organizations and topics), and, for private complaints, the conversation that follows.',
-            'Your "Me too"s and fix confirmations. We store which points you supported so we can notify you and so you can withdraw; only the totals are public.',
-            'Notifications we send you inside the app.',
+            'Your "Same here"s and fix confirmations. We store which points you supported so we can notify you and so you can withdraw; only the totals are public.',
+            'Notifications we send you inside the app, and, if you turn on phone notifications, your phone\'s push token (an address Apple or Google uses to deliver them, through Expo\'s push service).',
+            'When you agreed to the terms of use.',
+            'Reports you send: what you reported and why. Authors you chose to hide (Block); that list is yours alone.',
+            'Complaints you write while complaint checking is paused for the day are saved until they can be checked, then deleted after a week if you don\'t post them.',
             'To stop abuse, a one-way hash of your network address with the times of your recent actions. We never store the address itself, and only recent times are kept.',
             'If you respond for an organization: your work email, the organization, and the result of checking your email domain against the organization\'s website.',
             'Photos are resized and their location data and other metadata are removed on your device before they are uploaded.',
@@ -33,7 +36,8 @@ export default function PrivacyScreen() {
           body: [
             'Public complaints: their text, the photos that pass our checks, your display name, and the points they were filed under. Before a public complaint is posted we offer to remove personal details such as order numbers, phone numbers, and the names of private people; that is on by default.',
             'Counts: how many people support each point, how many points each organization and topic has, and how organizations have responded.',
-            'Never public: your email, which points you supported, your fix confirmations, and anything about private complaints except as described below.',
+            'Never public: your email, which points you supported, your fix confirmations, your reports, who you hid, and anything about private complaints except as described below.',
+            'Some complaints come from public government records (the Consumer Financial Protection Bureau and NHTSA complaint databases). They are labelled with their source and link to it, and contain only what the agency already published.',
           ],
         },
         {
@@ -49,7 +53,7 @@ export default function PrivacyScreen() {
         {
           heading: 'AI processing',
           body: [
-            'When you check a complaint before sending it, its text and photos are sent to Anthropic (Claude) to split it into points, match it to what others have said, suggest how to file it, and spot personal data. Complaint and point text is also sent to Google (Vertex AI) to compute the search vectors that make matching work across languages. Both process it on our behalf under their commercial API terms, under which API data is not used to train their models by default.',
+            'When you check a complaint before sending it, its text and photos are sent to Anthropic (Claude) to split it into points, match it to what others have said, suggest how to file it, and spot personal data. Complaint and point text is also sent to Google (Vertex AI) to compute the search vectors that make matching work across languages. Photos are also checked by Google Cloud Vision (SafeSearch) for sexual or violent content before anyone else can see them. Both process it on our behalf under their commercial API terms, under which API data is not used to train their models by default.',
             'Nothing is sent to the public record or to an organization until you have seen how it will be filed and confirmed it.',
           ],
         },
@@ -68,13 +72,14 @@ export default function PrivacyScreen() {
         {
           heading: 'How long we keep things',
           body: [
-            'Complaints and their counts stay on the record while your account exists. Drafts you check but never send are deleted within a day. Content removed for breaking the rules is hidden from everyone and listed in the public removal log.',
+            'Complaints and their counts stay on the record while your account exists. Drafts you check but never send are deleted within a day (a week for complaints saved while checking was paused). Content removed for breaking the rules is hidden from everyone and listed in the public removal log. Reports are kept so we can act on repeat abuse.',
+            'If you report something, the people who run UCS see the reported item (for a private conversation, the reported message or complaint) so we can act on it. Organizations never see who reported what.',
           ],
         },
         {
           heading: 'Deleting your account',
           body: [
-            'Delete your account at any time from Me > Account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every "Me too" and fix confirmation you gave is withdrawn and the counts drop; your organization access, requests, notifications and sign-in are deleted. An organization\'s private counts keep the anonymous number, which contains none of your words.',
+            'Delete your account at any time from Me > Account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every "Same here" and fix confirmation you gave is withdrawn and the counts drop; your organization access, requests, queued complaints, hidden-author list, notifications, phone tokens and sign-in are deleted; reports you sent stay without your account attached. An organization\'s private counts keep the anonymous number, which contains none of your words.',
           ],
         },
         {
@@ -86,7 +91,7 @@ export default function PrivacyScreen() {
         {
           heading: 'Your choices and rights',
           body: [
-            'You can choose public or private for every complaint, remove personal details before posting, withdraw any "Me too", and delete your account. To ask for a copy of your data or a correction, contact us.',
+            'You can choose public or private for every complaint, remove personal details before posting, withdraw any "Same here", and delete your account. To ask for a copy of your data or a correction, contact us.',
           ],
         },
         {

@@ -24,12 +24,14 @@ export default function TermsScreen() {
           body: [
             'Complain about organizations, products, services, public bodies, and things. Be honest and specific: say what happened, not what you imagine.',
             'Do not: name or target private individuals (front-line staff included); post anything illegal, threatening, harassing, hateful, or sexual; post someone else\'s personal data; post spam, ads, or deliberately false claims; impersonate a person or organization; or try to inflate or deflate counts, for example with multiple accounts.',
-            'Rants are welcome. Abuse is not.',
+            'Rants are welcome. Abuse is not: UCS has zero tolerance for threats, hate, harassment, sexual content, and posts aimed at private people. They are refused before they are posted, removed when reported, and the accounts behind them are suspended.',
+            'Anyone can report anything, and hide an author\'s complaints from themselves. Either side of a private conversation can block the other. We review every report within a day.',
           ],
         },
         {
           heading: 'Your content',
           body: [
+            'You agree to these terms before your first post, message or response.',
             'You keep ownership of what you write. By posting publicly you let us host, display, translate, group and process it (including with AI) as part of the public record, and keep showing it as long as it stays on the record. A private complaint is shown only to you and the organization you sent it to.',
             'Before anything is sent you see how it will be filed; you are responsible for what you choose to send.',
           ],
@@ -51,13 +53,13 @@ export default function TermsScreen() {
         {
           heading: 'Removals',
           body: [
-            'We remove only illegal content, personal data, and complaints about private individuals, and we list every removal in the public removal log. Paying, complaining, or being the organization concerned does not get anything removed.',
+            'We remove only content that breaks these terms: illegal content, abuse, personal data, and complaints about private individuals. We list every public removal in the public removal log. Paying, complaining, reporting, or being the organization concerned does not get criticism removed.',
           ],
         },
         {
           heading: 'Fair use',
           body: [
-            'Actions are rate limited, and the AI that checks complaints has a daily limit. We may suspend accounts that abuse UCS or try to get around its limits.',
+            'Actions are rate limited, and the AI that checks complaints has a daily limit; complaints written past it are saved and checked the next day. We suspend accounts that abuse UCS or try to get around its limits.',
           ],
         },
         {

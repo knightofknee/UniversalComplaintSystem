@@ -24,24 +24,31 @@ Identifiers you'll need:
 
 ## 0. Before either store
 
-### 0a. Put the website pages live
+### 0a. Put the website live
 
-Both stores link to them, and Play rejects an account-deletion URL that
-doesn't load. The pages go in the Waldgrave site repo under `pages/ucs/`
-(landing, privacy, terms, support, delete-account). I write them from the
-in-app policy and terms as part of the pre-submission work in AUDIT.md;
-you deploy.
-Commit and deploy only those files, the same way as Basic Autocorrect:
+Both stores link to these pages, and Play rejects an account-deletion URL
+that doesn't load. They're written and sitting uncommitted in the Waldgrave
+repo:
+- `pages/ucs/`: landing, privacy, terms, support, delete-account.
+- `public/ucs/`: the icon, and the web version in `public/ucs/app`, built by
+  `npm run publish-web` here.
+- `next.config.js`: routing for /ucs/app.
+- `public/.well-known/apple-app-site-association`: shared links open the
+  app.
+
+Commit and deploy only those, the same way as Basic Autocorrect:
 
 ```bash
 cd ~/Documents/GitHub/the-waldgrave
 ```
 
 ```bash
-git add pages/ucs && git commit -m "Universal Complaint System pages" && git push && git push heroku
+git add pages/ucs public/ucs public/.well-known/apple-app-site-association next.config.js && git commit -m "Universal Complaint System pages and web version" && git push && git push heroku
 ```
 
-Then check that each URL in the table above loads.
+Then check that each URL in the table above loads, and
+https://www.waldgrave.com/ucs/app. Whenever the app changes, run
+`npm run publish-web` here and deploy the Waldgrave site again.
 
 ### 0b. Link the EAS project (once)
 
@@ -52,7 +59,16 @@ From this repo:
 eas init
 ```
 
-It writes `extra.eas.projectId` into app.json; commit that.
+It writes `extra.eas.projectId` into app.json; commit that. Push notifications
+need it: until it's there, the app never offers them.
+
+### 0b2. Make yourself the operator (once)
+
+In the UCS app: Me > Add an email > **bricarlis@gmail.com**, and verify it.
+That account then sees **Operator queue** in Me (organization requests to
+check, reports, AI spend) and gets the daily "Needs you" notification at
+6:00 Chicago time whenever something waits. Apple expects reports to be
+acted on within a day.
 
 ### 0c. Builds
 
@@ -111,7 +127,8 @@ Data used to track you: **None.** Data linked to you:
 | Identifiers | User ID | App Functionality |
 
 Data not linked to you: **Other Data** → App Functionality (the one-way hash
-of the network address used for rate limits). No usage data, diagnostics,
+of the network address used for rate limits). Photos are also screened by
+Google Cloud Vision as a service provider (no extra row needed). No usage data, diagnostics,
 location, purchases, or advertising data.
 
 ### 1e. Version page
@@ -128,12 +145,21 @@ location, purchases, or advertising data.
 - Sign-in required: **No**. Say: "No account is needed to read, complain or
   support. An email account is only needed to send a private complaint or
   to respond for an organization."
-- Demo account: a reviewer account that responds for a demo organization,
-  so the reviewer can see responding and private complaints. I create it in
-  production before you submit and give you the credentials directly; they
-  never go in this public repo.
-- Notes: point the reviewer at Report and Block on any complaint, and the
-  terms agreement before the first post (guideline 1.2).
+- Demo account: done. The email and password are in `.reviewer.local` in
+  this repo (gitignored; never commit it). It's a verified account that
+  responds for the "Universal Complaint System" organization page, so the
+  reviewer can respond, set statuses and see the private inbox.
+  `npm run reviewer` prints the same file again.
+- Notes (paste): "No account is needed to read, complain, or say 'Same
+  here'. Sign in with the demo account (Me > Add an email > sign in) to see
+  the organization side: Me > Respond for your organization. User-generated
+  content safeguards (guideline 1.2): the terms agreement is shown before a
+  first post; every complaint, point, response, page and private message has
+  Report; any author can be hidden (Hide this author), and either side of a
+  private conversation can block the other; threats, hate, sexual content
+  and posts about private people are refused before posting; photos are
+  screened; reports reach us immediately and are reviewed within 24 hours,
+  and abusive accounts are suspended."
 
 ### 1g. TestFlight first
 
@@ -170,7 +196,12 @@ before production access. Start that early.
    **Add fingerprint** → paste each SHA-256 → Save.
 
 Until both are done, Android store builds can't attest, and every
-complaint, search and "Me too" on Android is refused.
+complaint, search and "Same here" on Android is refused.
+
+4. Android app links (shared links opening the app): send me the SHA-256 and
+   I'll add the `com.waldgrave.ucs` entry to the Waldgrave
+   `public/.well-known/assetlinks.json`, or add it yourself next to
+   bekin's entry.
 
 ### 2d. App content
 
@@ -187,8 +218,9 @@ complaint, search and "Me too" on Android is refused.
   - Collected: Personal info → Email address (account management,
     communications); App info and performance: none; Photos (app
     functionality); Messages → Other in-app messages (private complaints);
-    App activity → Other user-generated content; Device or other IDs → none
-    beyond the account ID (declare User IDs under Personal info).
+    App activity → Other user-generated content; Device or other IDs →
+    yes, the push notification token (app functionality), only if they turn
+    notifications on; declare User IDs under Personal info.
   - Shared with third parties: **No** (Anthropic and Google process data on
     our behalf as service providers, which Play doesn't count as sharing).
   - Encrypted in transit: **Yes**.
@@ -235,7 +267,9 @@ nobody owns. No organization controls it. They can respond, but they can
 never delete or edit what you wrote.
 
 • Complain in seconds, in any language, no account needed.
-• See if others already said it, and add your "Me too".
+• See if others already said it, and add your "Same here".
+• Starts full: complaints from public government records (CFPB, NHTSA) are
+  already on it, labelled by source.
 • Your complaint is split into specific points and merged with everyone who
   shares them, so a hundred people saying the same thing count as one loud
   point.

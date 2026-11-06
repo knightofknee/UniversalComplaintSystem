@@ -120,7 +120,7 @@ export default function AccountScreen() {
 function confirmDelete(): Promise<boolean> {
   const title = 'Delete your account?';
   const message =
-    'Your private complaints and their conversations are deleted. Your public complaints lose their words, photos and name; the points they fed stay, unattributed. Every "Me too" you gave is withdrawn. This can\'t be undone.';
+    'Your private complaints and their conversations are deleted. Your public complaints lose their words, photos and name; the points they fed stay, unattributed. Every "Same here" you gave is withdrawn. This can\'t be undone.';
   if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${message}`));
   return new Promise((resolve) =>
     Alert.alert(title, message, [
@@ -152,7 +152,7 @@ function DeleteAccount() {
     <Card>
       <T variant="label">Delete account</T>
       <T variant="small">
-        Removes your private complaints, your words from public complaints, and every &quot;Me too&quot; you gave.
+        Removes your private complaints, your words from public complaints, and every &quot;Same here&quot; you gave.
       </T>
       <Button label="Delete my account" kind="secondary" onPress={remove} busy={busy} />
     </Card>

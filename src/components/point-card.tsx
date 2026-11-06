@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Chip, Row, T } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, supportPoint } from '@/lib/api';
 import { db } from '@/lib/firebase';
+import { tapHaptic } from '@/lib/haptics';
 import type { PointHit, PointStatus } from '@/lib/types';
 
 export const STATUS_LABEL: Record<PointStatus, string> = {
@@ -38,7 +39,7 @@ export function showAlert(title: string, message?: string) {
   else Alert.alert(title, message);
 }
 
-/** "Me too" button. Your support is private; only the count is public. */
+/** "Same here" button. Your support is private; only the count is public. It bumps when pressed. */
 export function SupportButton({ pointId, count }: { pointId: string; count: number }) {
   const theme = useTheme();
   const { user } = useAuth();
@@ -54,9 +55,15 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
   // Show the count the person expects right away, before the server catches up.
   const shown = count + (pending === null || pending === mine ? 0 : pending ? 1 : -1);
 
+  const [scale] = useState(() => new Animated.Value(1));
   const toggle = async () => {
     const next = !on;
     setPending(next);
+    if (next) {
+      tapHaptic();
+      scale.setValue(0.88);
+      Animated.spring(scale, { toValue: 1, friction: 3, tension: 220, useNativeDriver: Platform.OS !== 'web' }).start();
+    }
     try {
       await supportPoint({ pointId, support: next });
     } catch (e) {
@@ -67,21 +74,23 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
   };
 
   return (
+    <Animated.View style={{ transform: [{ scale }] }}>
     <Pressable
       onPress={toggle}
       accessibilityRole="button"
-      accessibilityLabel={on ? 'Remove your support' : 'Support this point'}
+      accessibilityLabel={on ? 'Take back your "Same here"' : 'Same here: you have this problem too'}
       accessibilityState={{ selected: on }}
       hitSlop={8}
       style={[
         styles.support,
         { backgroundColor: on ? theme.primary : theme.background, borderColor: theme.primary },
       ]}>
-      <Ionicons name={on ? 'hand-left' : 'hand-left-outline'} size={16} color={on ? theme.onPrimary : theme.primary} />
+      <Ionicons name={on ? 'checkmark-circle' : 'add-circle-outline'} size={16} color={on ? theme.onPrimary : theme.primary} />
       <Text style={{ color: on ? theme.onPrimary : theme.primary, fontWeight: '800' }}>
-        Me too · {shown}
+        Same here · {shown}
       </Text>
     </Pressable>
+    </Animated.View>
   );
 }
 
@@ -112,7 +121,7 @@ export function PointCard({
           <Row style={{ flexWrap: 'wrap' }}>
             <SupportButton pointId={point.id} count={point.supportCount} />
             <StatusChip status={point.status} />
-            {point.hot && <Chip label="Rant" color={theme.rant} bg={theme.rantSoft} />}
+            {point.hot && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
             {note && <Chip label={note} color={theme.primary} bg={theme.primarySoft} />}
           </Row>
           {!hideSubjects && point.subjectNames.length > 0 && (

@@ -6,12 +6,14 @@ import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
+import { usePush } from '@/lib/push';
 
 SplashScreen.preventAutoHideAsync();
 
 /** Holds the splash until the (anonymous) account is ready. */
 function SplashGate() {
-  const { loading } = useAuth();
+  const { loading, user, profile } = useAuth();
+  usePush(user?.uid, profile?.pushOn);
   useEffect(() => {
     if (!loading) void SplashScreen.hideAsync();
   }, [loading]);
@@ -53,6 +55,7 @@ export default function RootLayout() {
           <Stack.Screen name="thread/[orgId]/[threadId]" options={{ title: 'Private' }} />
           <Stack.Screen name="privacy" options={{ title: 'Privacy policy' }} />
           <Stack.Screen name="terms" options={{ title: 'Terms of use' }} />
+          <Stack.Screen name="operator" options={{ title: 'Operator queue' }} />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

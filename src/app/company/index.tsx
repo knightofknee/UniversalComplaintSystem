@@ -39,6 +39,7 @@ export default function CompanyScreen() {
 }
 
 function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: string[]; onSwitch: (id: string) => void }) {
+  const router = useRouter();
   const { data: subject } = useDoc<Subject>(`subjects/${subjectId}`);
   const [section, setSection] = useState<Section>('points');
   const privatePoints = useCollection<PrivatePoint>(
@@ -79,6 +80,7 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
       {section === 'points' && <Points subjectId={subjectId} privatePoints={privatePoints.items} />}
       {section === 'inbox' && <Inbox subjectId={subjectId} threads={inbox.items} loading={inbox.loading} />}
       {section === 'settings' && subject && <Settings subject={subject} />}
+      <Button kind="quiet" icon="add" label="Respond for another organization" onPress={() => router.push('/company/claim')} />
     </Screen>
   );
 }

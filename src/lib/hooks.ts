@@ -62,3 +62,8 @@ export function timeAgo(ms: number | undefined | null): string {
 export function count(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
+
+/** "1 person", "2 people". */
+export function people(n: number): string {
+  return `${n} ${n === 1 ? 'person' : 'people'}`;
+}

@@ -30,70 +30,49 @@ things stand between this and a first version worth submitting:
 
 ---
 
-## Must fix before the first submission
+## Pre-submission build (done, 2026-11-05)
 
-### Store rejection risks
-1. **Report** on every point, complaint, response, organization page and
-   message → a reports queue → `npm run reports` to act on it (removals stay
-   logged publicly). (S)
-2. **Block**: a person can block an organization's responder in a private
-   conversation, and hide an author's complaints. (S)
-3. **Terms agreement** before the first post, with a zero-tolerance line
-   for abuse. (S)
-4. **Photo safety**: Cloud Vision SafeSearch on every photo before it's
-   public, not just the model's "ok". (S)
-5. **Unsafe content** in the intake: a hard `unsafe` verdict (threats,
-   hate, sexual content, targeting a private person) that blocks posting,
-   plus a deterministic filter on new subject names. Subjects become
-   removable with `npm run remove`. (S)
-6. **App icon and splash** are Direct Democracy's. UCS needs its own. (S)
-7. **iPad**: `supportsTablet` is on, which means iPad screenshots and an
-   iPad review. Turn it off for v1. (S)
+Everything below was built, tested end to end against the emulators (33
+checks: terms, fix rules, unsafe block, queueing, private matching, hidden
+organizations, blocking, reports, suspension, operator approvals), and
+deployed.
 
-### Breaks the promise in the name
-8. **Push notifications** (expo-notifications, like Direct Democracy): an
-   organization responds, a status changes, "is it actually fixed?", a reply
-   to a private complaint. Without this, "we'll tell you" is false and the
-   fixed-confirmation loop never closes. (M)
-9. **Never lost.** When the daily AI ceiling is hit, keep the complaint and
-   process it later, instead of "try tomorrow". Separate ceilings for
-   search and for complaints, so searching can't use up complaining. (S)
-10. **Fixes can't be self-graded.** Today an org can confirm its own "fixed"
-    with a few phones, and any org tagged onto a point can set its status.
-    Fix:
-    - Only supporters from *before* the fix was claimed can confirm.
-    - Status is per organization.
-    - Only organizations on the point when it was created (or approved)
-      can set it.
-    - Cap tags per point. (S)
-11. **Headlines can't be hijacked.** One crafted complaint can replace a
-    popular point's headline. Replace only when the new wording is close in
-    meaning, and credit it as "summarized from". It's model-condensed text,
-    which matters for the defamation and Section 230 question. (S)
-12. **Private text never goes to the model next to strangers' input.**
-    Prompt injection could echo private statements back. Match private-only
-    points by vector distance alone. (S)
-13. **Share**: a share button on points and organization pages, and links
-    that open the app or the web version (`waldgrave.com/ucs/app/point/…`).
-    The web build goes live there. (S–M)
-14. **Day one isn't empty.** Import public-domain government complaint data
-    (CFPB, with company responses; NHTSA), clearly labelled by source,
-    through the same pipeline. (M)
-15. **Honest scoreboards.** An unclaimed organization's page says "Not yet
-    notified" rather than 0% responded. The private complainer whose
-    complaint is held gets told when the organization joins (promised, not
-    built). (S)
+| # | Item | What was built |
+| --- | --- | --- |
+| 1 | Report | Report on every point, complaint, response, page and private message. Reports go to the operator queue (Me > Operator queue, plus a notification), never to the organization, and never hide anything automatically. Remove (logged publicly), Remove + suspend, or Keep. `npm run remove` also covers subjects and responses. |
+| 2 | Block | Readers hide an author's complaints (Me > Hidden authors to undo). Either side of a private conversation can block the other. |
+| 3 | Terms | Agreement before the first post, message, response or access request, with the zero-tolerance line. Enforced on the server. |
+| 4 | Photo safety | Cloud Vision SafeSearch on every photo before the model or anyone else sees it; a failed check leaves the photo off. |
+| 5 | Unsafe content | The model returns a hard `unsafe` verdict (threats, hate, sexual content, private people, contact details) that blocks posting with a plain reason. New subject names pass a filter. Subjects are removable. |
+| 6 | Icon and splash | UCS's own mark: a speech bubble holding a tally, "every complaint, counted". iOS icon has no transparency; Android adaptive and monochrome icons; light and dark splash. |
+| 7 | iPad | `supportsTablet` off. |
+| 8 | Push | expo-notifications. Offered right after posting or sending privately (once per phone), or the switch in Me. Responses, statuses, "is it fixed?", private replies, queued complaints ready. **Needs `eas init`** for the project id. |
+| 9 | Never lost | Past the daily AI budget, complaints are queued (photos kept) and checked hourly once there's room; the author is notified to review and post. Search and complaints have separate caps. |
+| 10 | Fixes | Status per organization. Only people who supported before the fix was claimed can confirm; the threshold counts only them. Responders can't vote. Tags capped (4 organizations, 3 topics, 8 total). |
+| 11 | Headlines | Replaced only by wording close in meaning and clearly more actionable; credited "Summarized from X's complaint". |
+| 12 | Private text | Private-only points are matched by vector distance after the model runs; their text never goes to the model. |
+| 13 | Share | Share on points and pages; links go to waldgrave.com/ucs/app and open the app where installed (universal links / app links). The web export is built into the Waldgrave site. |
+| 14 | Day one | `npm run import` seeds from CFPB (grouped by company and issue, one supporter per complaint) and NHTSA (one complaint each), labelled and linked to the source. Production is seeded. |
+| 15 | Honest scoreboards | Organizations that haven't joined show points and people, and say they haven't joined, instead of 0% responded. Held private complainers are told when the organization joins. |
+| – | Fan-out cap | Point news goes out at most every 6 hours per point (`flushNotices`). |
+| – | `restrictedTo` | Moved to server-only `restricted/{id}`. |
+| – | Private to a new org | Creates it hidden until someone complains publicly or it joins. |
+| – | Batches | Vote resets and deletes are chunked. |
+| – | `npm run usage` | Exists; also sets the ceiling. |
+| – | Operator | The daily 6:00 check notifies the operator when requests, reports or queued complaints wait. In-app operator queue to verify websites, approve, deny. |
 
-### Smaller holes from the security review
-- Cap notification fan-out (one status notice per point per day, sent from
-  a queue) so a busy point can't run up writes. (S)
-- `restrictedTo` (responder emails) is publicly readable; move it to a
-  server-only document. (S)
-- A private complaint to a brand-new organization creates a public
-  organization page; it shouldn't. (S)
-- Batches that can exceed 500 writes (fix-vote reset, tag-heavy support
-  transactions). (S)
-- `npm run usage` is documented but doesn't exist. (S)
+**UI** (from the review below): "Same here" bumps with a haptic; posting
+lands an ON THE RECORD stamp; a confirmed fix gets a green check; Browse
+shows its pitch once, then a compact header with the mark; Search opens on
+the biggest organizations and topics; Me has one respond link; rants get a
+flame; empty states have some voice.
+
+### Still open
+
+- Android push and App Check need the Play signing SHA-256 (STORE-SETUP 2c).
+- `eas init` (project id for push), then a TestFlight build to check App
+  Attest and push on a real phone.
+- assetlinks.json for Android app links, after the SHA-256 is known.
 
 ---
 
@@ -121,7 +100,7 @@ things stand between this and a first version worth submitting:
 **What works:**
 - Clean, readable, consistent.
 - The two-list browse works on phone and wide screens.
-- "Me too" is obvious.
+- "Same here" is obvious.
 - The review step shows everything the model did.
 
 **Smooth and simple? Mostly.**
@@ -141,7 +120,7 @@ personality without clutter:
   One strong signal color, an icon and splash in it, and the mark in the
   Browse header.
 - **Motion and feel.**
-  - "Me too" bumps with a count tick and a haptic.
+  - "Same here" bumps with a count tick and a haptic.
   - Posting gets a small "on the record" stamp moment.
   - A confirmed fix gets a green check moment.
 - **Voice in empty states.** "Nothing's broken here yet. Suspicious." beats
@@ -151,12 +130,6 @@ personality without clutter:
 
 ---
 
-## Order of work
+## Next
 
-1. Store blockers (1–7)
-2. The promise (8–15)
-3. The smaller security holes
-
-All together this is roughly the size of the tags-and-browse build plus the
-private-complaints build combined. Then you build and submit, using
-[STORE-SETUP.md](STORE-SETUP.md).
+Build and submit with [STORE-SETUP.md](STORE-SETUP.md).

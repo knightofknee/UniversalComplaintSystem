@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
+import { ReportButton } from '@/components/report';
 import { PublicPhoto } from '@/components/submission-card';
+import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Empty, Field, Notice, Row, Screen, T } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, markThreadRead, sendMessage, setThreadStatus } from '@/lib/api';
+import { blockThread, errorText, markThreadRead, sendMessage, setThreadStatus } from '@/lib/api';
 import { db } from '@/lib/firebase';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
 import type { Message, Subject, Thread } from '@/lib/types';
@@ -16,13 +18,17 @@ import type { Message, Subject, Thread } from '@/lib/types';
 /**
  * A private complaint and the conversation about it. The author and the
  * organization's verified responders see the same page; nobody else can.
+ * Either side can block the other, and report anything abusive to UCS.
  */
 export default function ThreadScreen() {
   const { orgId, threadId } = useLocalSearchParams<{ orgId: string; threadId: string }>();
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const termsAccepted = useTermsAccepted();
+  const [agreed, setAgreed] = useState(false);
   const { data: thread, loading } = useDoc<Thread>(`subjects/${orgId}/inbox/${threadId}`);
+  // Null for an organization that has no public page yet; the thread carries its name.
   const { data: org } = useDoc<Subject>(`subjects/${orgId}`);
   const messages = useCollection<Message>(
     query(collection(db, `subjects/${orgId}/inbox/${threadId}/messages`), orderBy('at', 'asc')),
@@ -49,7 +55,7 @@ export default function ThreadScreen() {
   const send = async () => {
     setBusy(true);
     try {
-      await sendMessage({ orgId, threadId, text: text.trim() });
+      await sendMessage({ orgId, threadId, text: text.trim(), ...(agreed ? { acceptTerms: true } : {}) });
       setText('');
     } catch (e) {
       showAlert("Couldn't send", errorText(e));
@@ -61,7 +67,11 @@ export default function ThreadScreen() {
     setThreadStatus({ orgId, threadId, status: thread.status === 'resolved' ? 'open' : 'resolved' }).catch((e) =>
       showAlert("Couldn't change that", errorText(e)),
     );
-  const orgName = org?.name ?? 'the organization';
+  const me = owner ? 'user' : 'org';
+  const toggleBlock = () =>
+    blockThread({ orgId, threadId, blocked: !thread.blockedBy }).catch((e) => showAlert("Couldn't change that", errorText(e)));
+  const orgName = thread.orgName ?? org?.name ?? 'the organization';
+  const claimed = org?.claimed ?? false;
 
   return (
     <Screen>
@@ -85,9 +95,9 @@ export default function ThreadScreen() {
           read this.
         </T>
       )}
-      {owner && org && !org.claimed && (
+      {owner && !claimed && (
         <Notice tone="warn">
-          <T>{orgName} hasn&apos;t joined UCS yet. This is held for them; you&apos;ll be notified when they reply.</T>
+          <T>{orgName} hasn&apos;t joined UCS yet. This is held for them; we&apos;ll tell you when they join.</T>
         </Notice>
       )}
 
@@ -113,6 +123,7 @@ export default function ThreadScreen() {
             ))}
           </Row>
         )}
+        {!owner && <ReportButton target={{ kind: 'thread', id: threadId, orgId, threadId }} />}
       </Card>
 
       <T variant="label">What it&apos;s about</T>
@@ -134,26 +145,50 @@ export default function ThreadScreen() {
                 {m.from === 'org' ? `${orgName} · @${m.domain}` : m.authorName}
               </T>
               <T>{m.text}</T>
-              <T variant="small">{timeAgo(m.at?.toMillis())}</T>
+              <Row style={{ gap: 12 }}>
+                <T variant="small">{timeAgo(m.at?.toMillis())}</T>
+                {!mine && !m.removed && <ReportButton target={{ kind: 'message', id: m.id, orgId, threadId }} />}
+              </Row>
             </Card>
           </View>
         );
       })}
 
-      <Field
-        multiline
-        value={text}
-        onChangeText={setText}
-        placeholder={owner ? `Reply to ${orgName}` : `Reply to ${thread.authorName}`}
-        maxLength={4000}
-        style={{ minHeight: 80 }}
-      />
-      <Button label="Send" icon="send" onPress={send} busy={busy} disabled={!text.trim()} />
-      <Button
-        kind="quiet"
-        label={thread.status === 'resolved' ? 'Reopen' : 'Mark resolved'}
-        onPress={toggleStatus}
-      />
+      {thread.blockedBy ? (
+        <Notice tone="warn">
+          <T>
+            {thread.blockedBy === me
+              ? 'You blocked this conversation. Nobody can send in it until you unblock it.'
+              : owner
+                ? `${orgName} blocked this conversation.`
+                : `${thread.authorName} blocked this conversation.`}
+          </T>
+        </Notice>
+      ) : (
+        <>
+          <Field
+            multiline
+            value={text}
+            onChangeText={setText}
+            placeholder={owner ? `Reply to ${orgName}` : `Reply to ${thread.authorName}`}
+            maxLength={4000}
+            style={{ minHeight: 80 }}
+          />
+          <TermsCheck checked={agreed} onChange={setAgreed} />
+          <Button label="Send" icon="send" onPress={send} busy={busy} disabled={!text.trim() || (!termsAccepted && !agreed)} />
+        </>
+      )}
+      <Row style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <Button kind="quiet" label={thread.status === 'resolved' ? 'Reopen' : 'Mark resolved'} onPress={toggleStatus} />
+        {(!thread.blockedBy || thread.blockedBy === me) && (
+          <Button
+            kind="quiet"
+            icon={thread.blockedBy ? 'lock-open-outline' : 'hand-left-outline'}
+            label={thread.blockedBy ? 'Unblock' : owner ? `Block ${orgName}` : `Block ${thread.authorName}`}
+            onPress={toggleBlock}
+          />
+        )}
+      </Row>
     </Screen>
   );
 }

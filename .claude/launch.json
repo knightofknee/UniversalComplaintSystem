@@ -18,13 +18,13 @@
         "start",
         "--web",
         "--port",
-        "8081"
+        "8096"
       ],
       "env": {
         "EXPO_PUBLIC_USE_EMULATORS": "1",
         "BROWSER": "none"
       },
-      "port": 8081
+      "port": 8096
     },
     {
       "name": "web-prod",
@@ -40,6 +40,23 @@
         "BROWSER": "none"
       },
       "port": 8093
+    },
+    {
+      "name": "waldgrave",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/briancarlisle/Documents/GitHub/the-waldgrave",
+        "next",
+        "dev",
+        "/Users/briancarlisle/Documents/GitHub/the-waldgrave",
+        "-p",
+        "3078"
+      ],
+      "env": {
+        "CLAUDE_PREVIEW": "1"
+      },
+      "port": 3078
     }
   ]
 }

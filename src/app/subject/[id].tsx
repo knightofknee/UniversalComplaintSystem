@@ -1,10 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useState } from 'react';
+import { Pressable } from 'react-native';
 
 import { PairedLists } from '@/components/paired-lists';
 import { PointCard } from '@/components/point-card';
 import { RelatedSubjects } from '@/components/related-subjects';
+import { ReportButton } from '@/components/report';
 import { Stats } from '@/components/stats';
 import { Button, Card, Chip, Empty, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -12,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { categoryLabel } from '@/lib/categories';
 import { db } from '@/lib/firebase';
 import { count, useCollection, useDoc } from '@/lib/hooks';
+import { shareLink } from '@/lib/share';
 import type { Point, Subject } from '@/lib/types';
 
 type Sort = 'top' | 'rising' | 'new';
@@ -50,7 +54,26 @@ function Header({ subject }: { subject: Subject }) {
   const category = categoryLabel(subject.category);
   return (
     <>
-      <Stack.Screen options={{ title: subject.name }} />
+      <Stack.Screen
+        options={{
+          title: subject.name,
+          headerRight: () => (
+            <Pressable
+              onPress={() =>
+                shareLink(
+                  org
+                    ? `What people say is wrong with ${subject.name}, and what it did about it`
+                    : `${subject.name}: what people say is wrong`,
+                  `/subject/${subject.id}`,
+                )
+              }
+              accessibilityLabel="Share this page"
+              hitSlop={10}>
+              <Ionicons name="share-outline" size={22} color={theme.primary} />
+            </Pressable>
+          ),
+        }}
+      />
       <T variant="title">{subject.name}</T>
       <Row style={{ flexWrap: 'wrap' }}>
         <Chip label={org ? 'Organization' : 'Topic'} color={theme.textSecondary} bg={theme.backgroundElement} />
@@ -60,7 +83,7 @@ function Header({ subject }: { subject: Subject }) {
             label={
               subject.claimed
                 ? `Responds here · ${subject.domains.map((d) => `@${d}`).join(' ')}`
-                : 'Has not claimed this page'
+                : 'Hasn\'t joined UCS yet'
             }
             color={subject.claimed ? theme.good : theme.warning}
             bg={subject.claimed ? theme.goodSoft : theme.warningSoft}
@@ -106,6 +129,7 @@ function TopicPage({ subject }: { subject: Subject }) {
       {newest.items.slice(0, 10).map((p) => (
         <PointCard key={p.id} point={p} hideSubjects />
       ))}
+      <ReportButton target={{ kind: 'subject', id: subject.id }} label="Report this page" />
     </Screen>
   );
 }
@@ -146,6 +170,7 @@ function OrganizationPage({ subject }: { subject: Subject }) {
       ) : (
         shown.map((p) => <PointCard key={p.id} point={p} hideSubjects />)
       )}
+      <ReportButton target={{ kind: 'subject', id: subject.id }} label="Report this page" />
     </Screen>
   );
 }

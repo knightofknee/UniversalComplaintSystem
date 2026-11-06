@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { collection, limit, orderBy, query, where, type QueryConstraint } from 'firebase/firestore';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PairedLists } from '@/components/paired-lists';
 import { PointCard } from '@/components/point-card';
-import { Button, Card, Empty, Screen, T, Tabs } from '@/components/ui';
+import { Button, Card, Empty, Row, Screen, T, Tabs } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { CATEGORIES, type Category } from '@/lib/categories';
 import { db } from '@/lib/firebase';
@@ -15,6 +17,7 @@ import type { Point, Subject } from '@/lib/types';
 
 type More = 'new' | 'rants' | 'fixed';
 const LIST = 30;
+const INTRO_KEY = 'ucs:seenIntro';
 
 /** For people who just want to read: what's most complained about, and what's rising. */
 export default function BrowseScreen() {
@@ -55,14 +58,37 @@ export default function BrowseScreen() {
     `more:${k}:${more}`,
   );
 
+  // The full pitch once; after that the content leads.
+  const [firstVisit, setFirstVisit] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(INTRO_KEY)
+      .then((seen) => {
+        if (seen) return;
+        setFirstVisit(true);
+        return AsyncStorage.setItem(INTRO_KEY, '1');
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <Screen topInset>
-      <T variant="title">Universal Complaint System</T>
-      <T>
-        Everything that&apos;s wrong, about anything. Counted, merged with everyone who shares it, and in front of
-        whoever can fix it.
-      </T>
-      <Button label="Complain about something" icon="megaphone" onPress={() => router.push('/complain')} />
+      <Row>
+        <Image source={require('../../../assets/images/mark.png')} style={styles.mark} accessibilityIgnoresInvertColors />
+        <T variant={firstVisit ? 'title' : 'heading'} style={{ flex: 1 }}>
+          Universal Complaint System
+        </T>
+      </Row>
+      {firstVisit ? (
+        <>
+          <T>
+            Everything that&apos;s wrong, about anything. Counted, merged with everyone who shares it, and in front of
+            whoever can fix it.
+          </T>
+          <Button label="Complain about something" icon="megaphone" onPress={() => router.push('/complain')} />
+        </>
+      ) : (
+        <Button label="What’s bugging you?" icon="megaphone" kind="secondary" onPress={() => router.push('/complain')} />
+      )}
 
       <CategoryChips value={category} onChange={setCategory} />
 
@@ -89,7 +115,7 @@ export default function BrowseScreen() {
           title: 'Most supported',
           items: top.items,
           loading: top.loading,
-          empty: 'Nothing here yet. Be the first.',
+          empty: 'Nothing\'s broken here yet. Suspicious.',
         }}
         second={{
           title: 'Rising this week',
@@ -112,7 +138,7 @@ export default function BrowseScreen() {
       {moreList.items.length === 0 ? (
         <Empty
           loading={moreList.loading}
-          text={more === 'fixed' ? 'Nothing confirmed fixed yet.' : more === 'rants' ? 'No rants yet.' : 'Nothing yet.'}
+          text={more === 'fixed' ? 'Nothing confirmed fixed yet. Organizations, your move.' : more === 'rants' ? 'No rants yet. Everyone is being very calm.' : 'Quiet. Too quiet.'}
         />
       ) : (
         moreList.items.map((p) => <PointCard key={p.id} point={p} />)
@@ -146,6 +172,7 @@ function CategoryChips({ value, onChange }: { value: Category | null; onChange: 
 }
 
 const styles = StyleSheet.create({
+  mark: { width: 36, height: 36 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   topic: { flexGrow: 1, flexBasis: 160, maxWidth: 340 },

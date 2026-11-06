@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { FieldPath, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 
@@ -18,6 +19,23 @@ export const db = getFirestore();
 export const CALLABLE = { cors: true, enforceAppCheck: !process.env.FUNCTIONS_EMULATOR } as const;
 export const bucket = () => getStorage().bucket();
 
+/**
+ * The person who runs UCS. Their account (with this email, verified) gets
+ * the operator queue in the app (held organization requests, reports) and
+ * the daily "needs you" notification. Mirrored in firestore.rules and
+ * src/lib/operator.ts.
+ */
+export const OPERATOR_EMAIL = 'bricarlis@gmail.com';
+
+export function isOperator(req: CallableRequest): boolean {
+  const t = req.auth?.token;
+  return !!t && t.email === OPERATOR_EMAIL && t.email_verified === true;
+}
+
+export function requireOperator(req: CallableRequest) {
+  if (!isOperator(req)) throw new HttpsError('permission-denied', 'Operator only.');
+}
+
 export const NAME_ADJECTIVES = [
   'Patient', 'Candid', 'Steady', 'Curious', 'Earnest', 'Honest', 'Plain', 'Bright', 'Frank', 'Keen',
   'Quiet', 'Sturdy', 'Brave', 'Civil', 'Lucid', 'Nimble', 'Sincere', 'Wry', 'Gentle', 'Direct',
@@ -33,18 +51,49 @@ export function uidOf(req: CallableRequest): string {
   return uid;
 }
 
-/** users/{uid}, created on first use with a random public display name. */
-export async function ensureUser(uid: string): Promise<{ displayName: string; responderFor: string[] }> {
+/**
+ * The public, opaque id of a complaint's author: lets people hide one
+ * author's complaints (Block) without revealing who they are. The same
+ * person always gets the same id; it can't be turned back into an account.
+ */
+export function authorIdOf(uid: string): string {
+  return createHash('sha256').update(`ucs-author:${uid}`).digest('hex').slice(0, 20);
+}
+
+export type UserInfo = { displayName: string; responderFor: string[]; termsAcceptedAt: Timestamp | null };
+
+/**
+ * users/{uid}, created on first use with a random public display name.
+ * Banned accounts (zero tolerance for abuse, set from the operator queue)
+ * stop here for everything that writes.
+ */
+export async function ensureUser(uid: string): Promise<UserInfo> {
   const ref = db.doc(`users/${uid}`);
   const snap = await ref.get();
   if (snap.exists) {
     const d = snap.data()!;
-    return { displayName: d.displayName, responderFor: d.responderFor ?? [] };
+    if (d.banned === true) {
+      throw new HttpsError('permission-denied', 'This account was suspended for breaking the terms of use.');
+    }
+    return { displayName: d.displayName, responderFor: d.responderFor ?? [], termsAcceptedAt: d.termsAcceptedAt ?? null };
   }
   const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
   const displayName = `${pick(NAME_ADJECTIVES)} ${pick(NAME_NOUNS)}`;
   await ref.set({ displayName, responderFor: [], createdAt: FieldValue.serverTimestamp() });
-  return { displayName, responderFor: [] };
+  return { displayName, responderFor: [], termsAcceptedAt: null };
+}
+
+/**
+ * Posting anything (a complaint, a message, a response) needs the terms
+ * agreed once. The app shows the agreement before the first post and sends
+ * `acceptTerms: true` with it; that is recorded here.
+ */
+export async function requireTerms(req: CallableRequest, user: UserInfo) {
+  if (user.termsAcceptedAt) return;
+  if (req.data?.acceptTerms !== true) {
+    throw new HttpsError('failed-precondition', 'Agree to the terms of use first.');
+  }
+  await db.doc(`users/${uidOf(req)}`).set({ termsAcceptedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
 /**
@@ -60,6 +109,8 @@ export const LIMITS = {
   respond: { max: 200, windowMs: 24 * 3600_000 },
   claim: { max: 5, windowMs: 24 * 3600_000 },
   message: { max: 100, windowMs: 24 * 3600_000 },
+  report: { max: 30, windowMs: 24 * 3600_000 },
+  settings: { max: 60, windowMs: 3600_000 },
 } as const;
 
 /**
@@ -75,6 +126,8 @@ const IP_LIMITS: Record<keyof typeof LIMITS, { max: number; windowMs: number }> 
   respond: { max: 600, windowMs: 24 * 3600_000 },
   claim: { max: 15, windowMs: 24 * 3600_000 },
   message: { max: 300, windowMs: 24 * 3600_000 },
+  report: { max: 100, windowMs: 24 * 3600_000 },
+  settings: { max: 200, windowMs: 3600_000 },
 };
 
 /** A one-way hash of the caller's address: we never store the address itself. */
@@ -110,27 +163,124 @@ async function limitKey(key: string, bucketName: string, { max, windowMs }: { ma
   });
 }
 
-export async function notify(
-  uids: string[],
-  n: { type: string; pointId?: string; subjectId?: string; threadId?: string; text: string },
-) {
-  for (let i = 0; i < uids.length; i += 400) {
+export type NoticeInput = {
+  type: string;
+  pointId?: string;
+  subjectId?: string;
+  threadId?: string;
+  draftId?: string;
+  text: string;
+};
+
+/** Where tapping a notification goes (in the app's notifications and on the phone). */
+export function linkFor(n: NoticeInput): string {
+  if (n.threadId && n.subjectId) return `/thread/${n.subjectId}/${n.threadId}`;
+  if (n.draftId) return `/complain?draft=${n.draftId}`;
+  if (n.pointId) return `/point/${n.pointId}`;
+  if (n.type === 'operator') return '/operator';
+  if (n.subjectId) return `/subject/${n.subjectId}`;
+  return '/notifications';
+}
+
+/**
+ * An in-app notification for each person, and a phone notification for
+ * those who turned them on. Push is best effort and never fails the call.
+ */
+export async function notify(uids: string[], n: NoticeInput) {
+  const unique = [...new Set(uids)].filter((u) => !u.includes(':'));
+  const link = linkFor(n);
+  for (let i = 0; i < unique.length; i += 400) {
     const batch = db.batch();
-    for (const uid of uids.slice(i, i + 400)) {
+    for (const uid of unique.slice(i, i + 400)) {
       batch.set(db.collection(`users/${uid}/notifications`).doc(), {
         ...n,
+        link,
         read: false,
         at: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
   }
+  await sendPush(unique, n.text, link).catch((e) => console.error('Push failed', e));
 }
 
-/** Every uid supporting a point (supports docs are keyed by uid). */
+const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
+
+/** Phone notifications through Expo's push service; dead tokens are dropped. */
+export async function sendPush(uids: string[], text: string, link: string) {
+  if (uids.length === 0) return;
+  const messages: { to: string; uid: string; title: string; body: string; sound: string; channelId: string; data: { link: string } }[] = [];
+  for (let i = 0; i < uids.length; i += 100) {
+    const refs = uids.slice(i, i + 100).map((u) => db.doc(`users/${u}`));
+    const snaps = await db.getAll(...refs, { fieldMask: ['pushOn', 'pushTokens'] });
+    for (const s of snaps) {
+      if (s.get('pushOn') !== true) continue;
+      for (const to of Object.keys((s.get('pushTokens') as Record<string, unknown> | undefined) ?? {})) {
+        messages.push({
+          to,
+          uid: s.id,
+          title: 'Universal Complaint System',
+          body: text.length > 178 ? `${text.slice(0, 177)}…` : text,
+          sound: 'default',
+          channelId: 'default',
+          data: { link },
+        });
+      }
+    }
+  }
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100);
+    const res = await fetch(EXPO_PUSH, {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(chunk.map(({ uid: _uid, ...m }) => m)),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const tickets = ((await res.json()) as { data?: { status: string; details?: { error?: string } }[] }).data ?? [];
+    await Promise.all(
+      tickets.map((t, j) =>
+        t.status === 'error' && t.details?.error === 'DeviceNotRegistered'
+          ? db
+              .doc(`users/${chunk[j].uid}`)
+              .update(new FieldPath('pushTokens', chunk[j].to), FieldValue.delete())
+              .catch(() => {})
+          : null,
+      ),
+    );
+  }
+}
+
+/** The operator's account, if they've added and verified OPERATOR_EMAIL in the app. */
+export async function operatorUid(): Promise<string | null> {
+  try {
+    const u = await getAuth().getUserByEmail(OPERATOR_EMAIL);
+    return u.emailVerified ? u.uid : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tell the operator something needs them. `key` throttles: at most one
+ * notice per key per `everyMs` (a burst of reports is one notification).
+ */
+export async function notifyOperator(text: string, key: string, everyMs = 3600_000) {
+  const uid = await operatorUid();
+  if (!uid) return;
+  const ref = db.doc('config/operatorAlerts');
+  const due = await db.runTransaction(async (tx) => {
+    const last = ((await tx.get(ref)).get(key) as Timestamp | undefined)?.toMillis() ?? 0;
+    if (Date.now() - last < everyMs) return false;
+    tx.set(ref, { [key]: Timestamp.now() }, { merge: true });
+    return true;
+  });
+  if (due) await notify([uid], { type: 'operator', text });
+}
+
+/** Every real uid supporting a point (imported public-record supports aren't people we can notify). */
 export async function supporterUids(pointId: string): Promise<string[]> {
   const snap = await db.collection(`points/${pointId}/supports`).select().get();
-  return snap.docs.map((d) => d.id);
+  return snap.docs.map((d) => d.id).filter((id) => !id.includes(':'));
 }
 
 export function cleanText(v: unknown, max: number, field: string): string {
@@ -141,4 +291,13 @@ export function cleanText(v: unknown, max: number, field: string): string {
   return t;
 }
 
-export { FieldValue, Timestamp };
+/** Delete every doc a query returns, 400 at a time (a batch holds at most 500). */
+export async function deleteAll(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db.batch();
+    docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+export { FieldPath, FieldValue, Timestamp };

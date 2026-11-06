@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { collection, doc, limit, orderBy, query, updateDoc } from 'firebase/firestore';
 
 import { Card, Empty, Row, Screen, T } from '@/components/ui';
@@ -18,7 +18,8 @@ export default function NotificationsScreen() {
   );
   const open = (n: Notification) => {
     if (!n.read && user) updateDoc(doc(db, `users/${user.uid}/notifications/${n.id}`), { read: true }).catch(() => {});
-    if (n.threadId && n.subjectId) router.push(`/thread/${n.subjectId}/${n.threadId}`);
+    if (n.link) router.push(n.link as Href);
+    else if (n.threadId && n.subjectId) router.push(`/thread/${n.subjectId}/${n.threadId}`);
     else if (n.pointId) router.push(`/point/${n.pointId}`);
     else if (n.subjectId) router.push(`/subject/${n.subjectId}`);
   };

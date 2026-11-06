@@ -5,15 +5,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Animated, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { FiledUnder, type Tag } from '@/components/filed-under';
 import { PointCard, showAlert } from '@/components/point-card';
+import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Field, Notice, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeComplaint, errorText, searchPoints, submitComplaint } from '@/lib/api';
+import { analyzeComplaint, errorText, getDraft, searchPoints, submitComplaint } from '@/lib/api';
 import { storage } from '@/lib/firebase';
+import { successHaptic } from '@/lib/haptics';
+import { offerPush } from '@/lib/push';
 import type { Analysis, PointHit } from '@/lib/types';
 
 const MAX_PHOTOS = 4;
@@ -22,6 +25,7 @@ const SEARCH_AFTER_CHARS = 15;
 type Photo = { uri: string; path: string | null };
 type Step =
   | { kind: 'write' }
+  | { kind: 'queued' }
   | { kind: 'review'; analysis: Analysis }
   | { kind: 'done'; analysis: Analysis; matched: string[]; added: string[] }
   | {
@@ -41,9 +45,11 @@ type Step =
 export default function ComplainScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const canSendPrivately = !!user && !user.isAnonymous && user.emailVerified;
-  const params = useLocalSearchParams<{ subjectId?: string; subjectName?: string }>();
+  const termsAccepted = useTermsAccepted();
+  const [agreed, setAgreed] = useState(false);
+  const params = useLocalSearchParams<{ subjectId?: string; subjectName?: string; draft?: string }>();
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [similar, setSimilar] = useState<PointHit[]>([]);
@@ -99,22 +105,48 @@ export default function ComplainScreen() {
     }
   };
 
+  const review = (analysis: Analysis) => {
+    setRemovePII(true);
+    setUseRewrite(false);
+    setDropped(new Set());
+    setUntagged(new Set());
+    setAddedTags([]);
+    setVisibility('public');
+    setPrivateTo(analysis.subjects.findIndex((s) => s.kind === 'organization'));
+    setStep({ kind: 'review', analysis });
+  };
+
+  // A queued complaint that has since been checked (from its notification).
+  const draftParam = params.draft;
+  useEffect(() => {
+    if (!draftParam || !user) return;
+    let live = true;
+    getDraft({ draftId: draftParam })
+      .then(({ text: saved, ...analysis }) => {
+        if (!live) return;
+        setText(saved);
+        review(analysis);
+      })
+      .catch((e) => showAlert("Couldn't open that complaint", errorText(e)));
+    return () => {
+      live = false;
+    };
+  }, [draftParam, user]);
+
   const check = async () => {
     setBusy(true);
     try {
-      const analysis = await analyzeComplaint({
+      const res = await analyzeComplaint({
         text: text.trim(),
         photoPaths: photos.flatMap((p) => (p.path ? [p.path] : [])),
         ...(params.subjectId ? { subjectId: params.subjectId } : {}),
       });
-      setRemovePII(true);
-      setUseRewrite(false);
-      setDropped(new Set());
-      setUntagged(new Set());
-      setAddedTags([]);
-      setVisibility('public');
-      setPrivateTo(analysis.subjects.findIndex((s) => s.kind === 'organization'));
-      setStep({ kind: 'review', analysis });
+      if (res.queued) {
+        setStep({ kind: 'queued' });
+        void offerPush('posted', !!profile?.pushOn);
+        return;
+      }
+      review(res);
     } catch (e) {
       showAlert("Couldn't check your complaint", errorText(e));
     } finally {
@@ -134,9 +166,12 @@ export default function ComplainScreen() {
         addSubjectIds: addedTags.map((t) => t.id!),
         visibility,
         ...(visibility === 'private' && privateTo !== null ? { privateTo } : {}),
+        ...(agreed ? { acceptTerms: true } : {}),
       });
+      successHaptic();
       if (res.visibility === 'private') setStep({ kind: 'sent', ...res });
       else setStep({ kind: 'done', analysis, matched: res.matchedPointIds, added: res.addedPointIds });
+      void offerPush(res.visibility === 'private' ? 'private' : 'posted', !!profile?.pushOn);
     } catch (e) {
       showAlert("Couldn't post", errorText(e));
     } finally {
@@ -148,8 +183,22 @@ export default function ComplainScreen() {
     setText('');
     setPhotos([]);
     setStep({ kind: 'write' });
-    if (params.subjectId) router.setParams({ subjectId: undefined, subjectName: undefined });
+    if (params.subjectId || params.draft) router.setParams({ subjectId: undefined, subjectName: undefined, draft: undefined });
   };
+
+  if (step.kind === 'queued') {
+    return (
+      <Screen topInset>
+        <Ionicons name="hourglass-outline" size={44} color={theme.primary} />
+        <T variant="title">Saved. It&apos;s in line.</T>
+        <T>
+          So many complaints came in today that checking them is paused until tomorrow. Yours is saved, nothing is
+          lost: we&apos;ll check it as soon as checking reopens and notify you to review and post it.
+        </T>
+        <Button label="Complain about something else" onPress={reset} kind="quiet" />
+      </Screen>
+    );
+  }
 
   if (step.kind === 'sent') {
     return (
@@ -189,7 +238,7 @@ export default function ComplainScreen() {
     const total = step.matched.length + step.added.length;
     return (
       <Screen topInset>
-        <Ionicons name="checkmark-circle" size={48} color={theme.good} />
+        <Stamp />
         <T variant="title">It&apos;s on the record.</T>
         <T>
           Your complaint is counted and public. You now support {total} point{total === 1 ? '' : 's'}
@@ -232,7 +281,19 @@ export default function ComplainScreen() {
     return (
       <Screen topInset>
         <T variant="title">Here&apos;s what we found</T>
-        {!result.isComplaint ? (
+        {result.safety?.unsafe ? (
+          <>
+            <Notice tone="warn">
+              <T variant="label">This can&apos;t go on the record</T>
+              <T>{result.safety.reason ?? 'It breaks the terms of use.'}</T>
+              <T variant="small">
+                Anger and harsh criticism of organizations are welcome here. Threats, hate, sexual content and posts
+                aimed at private people never are.
+              </T>
+            </Notice>
+            <Button label="Edit what I wrote" kind="secondary" onPress={() => setStep({ kind: 'write' })} />
+          </>
+        ) : !result.isComplaint ? (
           <>
             <Notice tone="warn">
               <T>{result.notComplaintReason ?? 'There is nothing here to record as a complaint.'}</T>
@@ -418,6 +479,7 @@ export default function ComplainScreen() {
               </Notice>
             )}
 
+            <TermsCheck checked={agreed} onChange={setAgreed} />
             <Button
               label={
                 isPrivate
@@ -429,6 +491,7 @@ export default function ComplainScreen() {
               busy={busy}
               disabled={
                 keptCount === 0 ||
+                (!termsAccepted && !agreed) ||
                 (untagged.size >= subjects.length && addedTags.length === 0) ||
                 (isPrivate && !canSendPrivately)
               }
@@ -482,7 +545,7 @@ export default function ComplainScreen() {
 
       {searching && similar.length > 0 && (
         <>
-          <T variant="label">Already on the record? Tap “Me too”</T>
+          <T variant="label">Already on the record? Tap “Same here”</T>
           {similar.map((p) => (
             <PointCard key={p.id} point={p} />
           ))}
@@ -506,12 +569,41 @@ export default function ComplainScreen() {
   );
 }
 
+/** The "on the record" moment: a rubber stamp that lands. */
+function Stamp() {
+  const theme = useTheme();
+  const [anim] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, friction: 5, tension: 120, useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [anim]);
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [2.2, 1] });
+  return (
+    <Animated.View
+      accessibilityLabel="On the record"
+      style={[
+        styles.stamp,
+        { borderColor: theme.good, opacity: anim, transform: [{ rotate: '-8deg' }, { scale }] },
+      ]}>
+      <Text style={[styles.stampText, { color: theme.good }]}>ON THE RECORD</Text>
+    </Animated.View>
+  );
+}
+
 /** The kept new points, in the order the server created them. */
 function newStatements(analysis: Analysis, dropped: Set<number>) {
   return analysis.result.points.filter((p, i) => !dropped.has(i) && !p.matchedPointId).map((p) => p.statement);
 }
 
 const styles = StyleSheet.create({
+  stamp: {
+    alignSelf: 'flex-start',
+    borderWidth: 3,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginVertical: 8,
+  },
+  stampText: { fontSize: 22, fontWeight: '900', letterSpacing: 2 },
   thumb: { width: 72, height: 72, borderRadius: 10 },
   addPhoto: { borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   remove: {

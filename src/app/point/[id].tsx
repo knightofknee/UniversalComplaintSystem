@@ -1,22 +1,32 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable } from 'react-native';
 
 import { showAlert, StatusChip, STATUS_LABEL, SupportButton } from '@/components/point-card';
+import { ReportButton } from '@/components/report';
 import { SubmissionCard } from '@/components/submission-card';
+import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Empty, Field, Notice, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, markSeen, respondToPoint, voteFix } from '@/lib/api';
+import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
+import { successHaptic } from '@/lib/haptics';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
-import type { Point, PointStatus, Response, Submission } from '@/lib/types';
+import { shareLink } from '@/lib/share';
+import type { OrgStatus, Point, PointStatus, Response, Submission } from '@/lib/types';
+
+const FIX_STATES: PointStatus[] = ['fix_claimed', 'fixed', 'not_fixed'];
 
 export default function PointScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
   const { user, profile } = useAuth();
+  const blocked = useBlockedAuthors();
   const { data: point, loading } = useDoc<Point>(`points/${id}`);
   const responses = useCollection<Response>(
     query(collection(db, `points/${id}/responses`), orderBy('createdAt', 'asc')),
@@ -42,11 +52,12 @@ export default function PointScreen() {
   );
   const submissions = useMemo(
     () =>
-      [...added.items, ...matched.items].sort(
-        (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
-      ),
-    [added.items, matched.items],
+      [...added.items, ...matched.items]
+        .filter((s) => !s.authorId || !blocked.ids.has(s.authorId))
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)),
+    [added.items, matched.items, blocked.ids],
   );
+  const hiddenCount = added.items.length + matched.items.length - submissions.length;
 
   // Organizations this person responds for that this point is about.
   const myOrgs = useMemo(
@@ -62,15 +73,29 @@ export default function PointScreen() {
     }
   }, [point, myOrgs]);
 
-  if (!point) return <Screen><Empty loading={loading} text="This point isn't on the record." /></Screen>;
+  if (!point) return <Screen><Empty loading={loading} text="This point isn't on the record (or it was removed)." /></Screen>;
 
   const seenCount = Object.keys(point.seenBy ?? {}).length;
   // Only present for organizations that chose to publish their private counts.
   const publishedPrivate = Object.values(point.privateCounts ?? {}).reduce((n, c) => n + c, 0);
   const respondedCount = Object.keys(point.respondedBy ?? {}).length;
+  const nameOf = (sid: string) => point.subjectNames[point.subjectIds.indexOf(sid)] ?? 'An organization';
+  const fixClaims = Object.entries(point.orgStatus ?? {}).filter(([, s]) => FIX_STATES.includes(s.status));
 
   return (
     <Screen>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={() => shareLink(`"${point.text}" · ${point.supportCount} people said "Same here"`, `/point/${point.id}`)}
+              accessibilityLabel="Share this point"
+              hitSlop={10}>
+              <Ionicons name="share-outline" size={22} color={theme.primary} />
+            </Pressable>
+          ),
+        }}
+      />
       <T variant="small">Filed under (tagged automatically)</T>
       <Row style={{ flexWrap: 'wrap' }}>
         {point.subjectIds.map((sid, i) => (
@@ -87,22 +112,39 @@ export default function PointScreen() {
       <Row style={{ flexWrap: 'wrap' }}>
         <SupportButton pointId={point.id} count={point.supportCount} />
         <StatusChip status={point.status} />
-        {point.hot && <Chip label="Rant" color={theme.rant} bg={theme.rantSoft} />}
+        {point.hot && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
       </Row>
+      {Object.entries(point.orgStatus ?? {}).length > 1 && (
+        <Row style={{ flexWrap: 'wrap' }}>
+          {Object.entries(point.orgStatus ?? {}).map(([sid, s]) => (
+            <T key={sid} variant="small">
+              {nameOf(sid)}: {STATUS_LABEL[s.status]}
+            </T>
+          ))}
+        </Row>
+      )}
       {publishedPrivate > 0 && (
         <T variant="small">
           +{publishedPrivate} raised privately (the organization publishes its private counts; what they wrote stays
           private)
         </T>
       )}
-      <T variant="small">
-        Wording by {point.canonical.authorName} · {point.submissionCount} complaint
-        {point.submissionCount === 1 ? '' : 's'} · first raised {timeAgo(point.createdAt?.toMillis())}
-      </T>
+      <Pressable onPress={() => router.push(`/submission/${point.canonical.submissionId}`)} accessibilityRole="link" hitSlop={6}>
+        <T variant="small">
+          {point.canonical.authorName.endsWith('public record') ? 'From the ' : 'Summarized from '}
+          <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
+            {point.canonical.authorName.endsWith('public record')
+              ? point.canonical.authorName
+              : `${point.canonical.authorName}'s complaint`}
+          </T>{' '}
+          · {point.submissionCount} complaint{point.submissionCount === 1 ? '' : 's'} · first raised{' '}
+          {timeAgo(point.createdAt?.toMillis())}
+        </T>
+      </Pressable>
       <Notice tone="new">
         <T variant="small" color={theme.new}>
-          The model added this point to the record from a complaint, and matches new complaints to it. Each
-          complaint below is in its author&apos;s own words.
+          The model wrote this summary from people&apos;s complaints and matches new complaints to it. Each complaint
+          below is in its author&apos;s own words.
         </T>
       </Notice>
       <T variant="small">
@@ -115,34 +157,44 @@ export default function PointScreen() {
             : ''}
       </T>
 
-      <FixCheck point={point} uid={user?.uid} />
-
-      {responses.items.length > 0 && <T variant="label">Responses</T>}
-      {responses.items.map((r) => (
-        <Card key={r.id} style={{ borderLeftWidth: 4, borderLeftColor: theme.primary }}>
-          <Row style={{ flexWrap: 'wrap' }}>
-            <T style={{ fontWeight: '700' }}>{r.subjectName}</T>
-            <Chip
-              label={r.official ? `Official · @${r.domain}` : `Verified @${r.domain}`}
-              color={theme.primary}
-              bg={theme.primarySoft}
-            />
-            <T variant="small">{timeAgo(r.createdAt?.toMillis())}</T>
-          </Row>
-          {r.status && <T variant="small">Set status: {STATUS_LABEL[r.status]}</T>}
-          {r.text && <T>{r.text}</T>}
-        </Card>
+      {fixClaims.map(([sid, s]) => (
+        <FixCheck key={sid} point={point} orgId={sid} orgName={nameOf(sid)} entry={s} uid={user?.uid} />
       ))}
 
+      {responses.items.length > 0 && <T variant="label">Responses</T>}
+      {responses.items
+        .filter((r) => !r.removed)
+        .map((r) => (
+          <Card key={r.id} style={{ borderLeftWidth: 4, borderLeftColor: theme.primary }}>
+            <Row style={{ flexWrap: 'wrap' }}>
+              <T style={{ fontWeight: '700' }}>{r.subjectName}</T>
+              <Chip
+                label={r.official ? `Official · @${r.domain}` : `Verified @${r.domain}`}
+                color={theme.primary}
+                bg={theme.primarySoft}
+              />
+              <T variant="small">{timeAgo(r.createdAt?.toMillis())}</T>
+            </Row>
+            {r.status && <T variant="small">Set status: {STATUS_LABEL[r.status]}</T>}
+            {r.text && <T>{r.text}</T>}
+            <ReportButton target={{ kind: 'response', id: r.id, pointId: point.id }} />
+          </Card>
+        ))}
+
       {myOrgs.map((sid) => (
-        <RespondBox key={sid} point={point} subjectId={sid} subjectName={point.subjectNames[point.subjectIds.indexOf(sid)]} />
+        <RespondBox key={sid} point={point} subjectId={sid} subjectName={nameOf(sid)} />
       ))}
 
       <T variant="label">Complaints</T>
       {submissions.length === 0 ? (
-        <Empty text="" loading={matched.loading || added.loading} />
+        <Empty text={hiddenCount ? 'Only complaints from authors you hid.' : ''} loading={matched.loading || added.loading} />
       ) : (
         submissions.map((s) => <SubmissionCard key={s.id} s={s} addedPoint={s.addedPointIds.includes(point.id)} />)
+      )}
+      {hiddenCount > 0 && submissions.length > 0 && (
+        <T variant="small">
+          {hiddenCount} complaint{hiddenCount === 1 ? '' : 's'} from authors you hid.
+        </T>
       )}
       <Button
         kind="secondary"
@@ -155,32 +207,53 @@ export default function PointScreen() {
           })
         }
       />
+      <ReportButton target={{ kind: 'point', id: point.id }} label="Report this point" />
     </Screen>
   );
 }
 
-/** Supporters, not the organization, decide whether a fix is real. */
-function FixCheck({ point, uid }: { point: Point; uid?: string }) {
-  const [supporter, setSupporter] = useState(false);
+/**
+ * Supporters, not the organization, decide whether a fix is real: only
+ * people who supported the point before the fix was claimed can confirm.
+ */
+function FixCheck({
+  point,
+  orgId,
+  orgName,
+  entry,
+  uid,
+}: {
+  point: Point;
+  orgId: string;
+  orgName: string;
+  entry: OrgStatus;
+  uid?: string;
+}) {
+  const theme = useTheme();
+  const [supportedAt, setSupportedAt] = useState<number | null | undefined>(undefined);
   const [myVote, setMyVote] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!uid) return;
-    const a = onSnapshot(doc(db, `points/${point.id}/supports/${uid}`), (s) => setSupporter(s.exists()));
-    const b = onSnapshot(doc(db, `points/${point.id}/fixVotes/${uid}`), (s) =>
+    const a = onSnapshot(doc(db, `points/${point.id}/supports/${uid}`), (s) =>
+      setSupportedAt(s.exists() ? (s.get('at')?.toMillis?.() ?? Date.now()) : null),
+    );
+    const b = onSnapshot(doc(db, `points/${point.id}/fixVotes/${orgId}_${uid}`), (s) =>
       setMyVote(s.exists() ? (s.get('fixed') as boolean) : null),
     );
     return () => {
       a();
       b();
     };
-  }, [point.id, uid]);
+  }, [point.id, orgId, uid]);
 
-  if (!['fix_claimed', 'fixed', 'not_fixed'].includes(point.status)) return null;
+  const claimedAt = entry.fixClaimedAt?.toMillis() ?? 0;
+  const canVote = (supportedAt != null && supportedAt < claimedAt) || Object.keys(point.privateCounts ?? {}).includes(orgId);
   const vote = async (fixed: boolean) => {
     setBusy(true);
     try {
-      await voteFix({ pointId: point.id, fixed });
+      const res = await voteFix({ pointId: point.id, orgId, fixed });
+      if (res.status === 'fixed') successHaptic();
     } catch (e) {
       showAlert("Couldn't save that", errorText(e));
     } finally {
@@ -188,13 +261,22 @@ function FixCheck({ point, uid }: { point: Point; uid?: string }) {
     }
   };
   return (
-    <Card>
-      <T variant="heading">Is it actually fixed?</T>
+    <Card style={entry.status === 'fixed' ? { borderWidth: 1.5, borderColor: theme.good } : undefined}>
+      {entry.status === 'fixed' ? (
+        <Row>
+          <Ionicons name="checkmark-circle" size={26} color={theme.good} />
+          <T variant="heading" color={theme.good} style={{ flex: 1 }}>
+            Fixed, say the people who raised it
+          </T>
+        </Row>
+      ) : (
+        <T variant="heading">{orgName} says it fixed this. Did it?</T>
+      )}
       <T variant="small">
-        {point.fixVotes.yes} supporter{point.fixVotes.yes === 1 ? '' : 's'} say yes, {point.fixVotes.no} say no. It only
-        shows as Fixed once supporters confirm.
+        {entry.yes} supporter{entry.yes === 1 ? '' : 's'} say yes, {entry.no} say no. It only shows as Fixed once people
+        who raised it before the claim confirm.
       </T>
-      {supporter || Object.keys(point.privateCounts ?? {}).length > 0 ? (
+      {canVote ? (
         <Row>
           <Button
             label={myVote === true ? 'Yes ✓' : 'Yes, fixed'}
@@ -212,7 +294,11 @@ function FixCheck({ point, uid }: { point: Point; uid?: string }) {
           />
         </Row>
       ) : (
-        <T variant="small">Support this point to have a say.</T>
+        <T variant="small">
+          {supportedAt
+            ? 'You said "Same here" after the fix was claimed, so the call is up to people who had the problem before.'
+            : 'People who said "Same here" before the fix was claimed decide.'}
+        </T>
       )}
     </Card>
   );
@@ -228,6 +314,8 @@ const RESPONSE_STATUSES: { key: PointStatus | 'none'; label: string }[] = [
 
 function RespondBox({ point, subjectId, subjectName }: { point: Point; subjectId: string; subjectName: string }) {
   const theme = useTheme();
+  const termsAccepted = useTermsAccepted();
+  const [agreed, setAgreed] = useState(false);
   const [text, setText] = useState('');
   const [status, setStatus] = useState<PointStatus | 'none'>('none');
   const [busy, setBusy] = useState(false);
@@ -239,6 +327,7 @@ function RespondBox({ point, subjectId, subjectName }: { point: Point; subjectId
         subjectId,
         text: text.trim() || undefined,
         status: status === 'none' ? null : status,
+        ...(agreed ? { acceptTerms: true } : {}),
       });
       setText('');
       setStatus('none');
@@ -252,11 +341,18 @@ function RespondBox({ point, subjectId, subjectName }: { point: Point; subjectId
     <Card style={{ borderWidth: 1.5, borderColor: theme.primary }}>
       <T variant="label">Respond for {subjectName}</T>
       <T variant="small">
-        Public, under your organization&apos;s name. Marking it fixed asks this point&apos;s supporters to confirm.
+        Public, under your organization&apos;s name. Marking it fixed asks the people who raised it to confirm; it only
+        counts once they do.
       </T>
       <Tabs options={RESPONSE_STATUSES} value={status} onChange={setStatus} />
       <Field multiline value={text} onChangeText={setText} placeholder="Your response" maxLength={4000} />
-      <Button label="Post response" onPress={send} busy={busy} disabled={!text.trim() && status === 'none'} />
+      <TermsCheck checked={agreed} onChange={setAgreed} />
+      <Button
+        label="Post response"
+        onPress={send}
+        busy={busy}
+        disabled={(!text.trim() && status === 'none') || (!termsAccepted && !agreed)}
+      />
     </Card>
   );
 }
