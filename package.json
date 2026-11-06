@@ -17,7 +17,7 @@
     "usage": "tsx scripts/usage.ts",
     "migrate": "tsx scripts/migrate.ts",
     "import": "tsx scripts/import.ts",
-    "publish-web": "npm run export-web && rsync -a --delete dist-web/ ../../Documents/GitHub/the-waldgrave/public/ucs/app/",
+    "publish-web": "npm run export-web && rm -rf ../../Documents/GitHub/the-waldgrave/public/ucs/app && cp -R dist-web ../../Documents/GitHub/the-waldgrave/public/ucs/app",
     "reviewer": "tsx scripts/reviewer.ts"
   },
   "dependencies": {
