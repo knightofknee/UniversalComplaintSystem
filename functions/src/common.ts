@@ -79,8 +79,10 @@ const IP_LIMITS: Record<keyof typeof LIMITS, { max: number; windowMs: number }> 
 
 /** A one-way hash of the caller's address: we never store the address itself. */
 function ipKey(req: CallableRequest): string | null {
+  // Google's front end APPENDS the connecting address, so only the last
+  // entry is trustworthy; anything before it is whatever the client sent.
   const forwarded = req.rawRequest?.headers['x-forwarded-for'];
-  const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() || req.rawRequest?.ip;
+  const ip = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded)?.split(',').pop()?.trim() || req.rawRequest?.ip;
   if (!ip) return null;
   return `ip_${createHash('sha256').update(`ucs:${ip}`).digest('hex').slice(0, 32)}`;
 }

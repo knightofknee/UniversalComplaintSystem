@@ -22,7 +22,8 @@ const CLAIM_STATUS: Record<Claim['status'], string> = {
 /**
  * Anyone with a verified email at an organization's domain can respond for
  * it. Known domains are approved at once; new ones are checked against the
- * organization's website once a day.
+ * organization's verified website once a day; anything that doesn't match is
+ * reviewed by a person.
  */
 export default function ClaimScreen() {
   const params = useLocalSearchParams<{ subjectId?: string }>();
@@ -74,7 +75,7 @@ export default function ClaimScreen() {
         res.status === 'approved' ? 'You can respond now' : 'Request received',
         res.status === 'approved'
           ? `Open any point about ${subject?.name} to respond.`
-          : `We check ${user?.email?.split('@')[1]} against ${subject?.name}'s website once a day and will notify you.`,
+          : `We check ${user?.email?.split('@')[1]} against ${subject?.name}'s website, and a person reviews anything that doesn't match. We'll notify you.`,
       );
       if (res.status === 'approved') router.replace('/company');
     } catch (e) {
@@ -124,7 +125,7 @@ export default function ClaimScreen() {
       {subject && (
         <>
           <Field
-            label="Organization's website"
+            label="Organization's website (helps us check)"
             value={website}
             onChangeText={setWebsite}
             autoCapitalize="none"

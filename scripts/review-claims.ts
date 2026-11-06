@@ -2,7 +2,11 @@
  * Organization access requests the daily check couldn't confirm.
  *
  *   npm run review-claims                    list held (and pending) requests
- *   npm run review-claims -- check <id>      run the website check again now
+ *   npm run review-claims -- website <subjectId> <url>
+ *                                            record an organization's real website,
+ *                                            after checking it yourself; claims whose
+ *                                            email domain matches it then auto-approve
+ *   npm run review-claims -- check <id>      run the check again now
  *   npm run review-claims -- approve <id>    approve by hand (you checked it yourself)
  *   npm run review-claims -- deny <id> "why" deny, with a reason the person sees
  *
@@ -22,13 +26,17 @@ async function main() {
     if (snap.empty) return console.log('Nothing waiting.');
     for (const d of snap.docs) {
       const c = d.data();
-      console.log(`${d.id}  [${c.status}]  ${c.email} -> ${c.subjectName}  site: ${c.website ?? '-'}`);
+      console.log(`${d.id}  [${c.status}]  ${c.email} -> ${c.subjectName} (${c.subjectId})  they say: ${c.suggestedWebsite ?? '-'}`);
       if (c.note) console.log(`    ${c.note}`);
     }
     return;
   }
-  if (!id) throw new Error('Which claim id?');
-  if (cmd === 'check') console.log(await checkClaim(id));
+  if (!id) throw new Error('Which id?');
+  if (cmd === 'website') {
+    const url = rest[0];
+    if (!url) throw new Error('Usage: website <subjectId> <url>');
+    await db.doc(`subjects/${id}`).update({ website: url, websiteVerified: true });
+  } else if (cmd === 'check') console.log(await checkClaim(id));
   else if (cmd === 'approve') await approveClaim(id, 'Approved by the operator.');
   else if (cmd === 'deny') {
     const reason = rest.join(' ') || 'We could not confirm this email belongs to the organization.';

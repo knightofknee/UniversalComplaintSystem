@@ -5,9 +5,12 @@
  * Access: anyone whose account has a VERIFIED email at an organization's
  * domain can ask to respond for it. If that domain is already known for the
  * organization, access is immediate. Otherwise the claim waits for the daily
- * check (`checkClaims`), which looks the domain up on the organization's own
- * website; anything it can't confirm is held for the operator
- * (`npm run review-claims`).
+ * check (`checkClaims`), which approves only when the email domain matches
+ * the organization's website AS VERIFIED BY THE OPERATOR
+ * (`subjects/{id}.websiteVerified`, set with `npm run review-claims --
+ * website`). Never the website the claimant typed, and never one the model
+ * guessed: either would let anyone claim any organization with a domain they
+ * own. Everything else is held for the operator.
  *
  * Restricted control: an organization can ask us to set
  * `subjects/{id}.restrictedTo` to a list of addresses; then only those can
@@ -92,7 +95,8 @@ export const requestAccess = onCall(CALLABLE, async (req) => {
       `${subject.get('name')} has limited who can respond for it. Ask your team to add ${email}.`,
     );
   }
-  const website = typeof req.data?.website === 'string' ? req.data.website.trim().slice(0, 300) : null;
+  // Only a hint for the operator; it never approves anything.
+  const suggestedWebsite = typeof req.data?.website === 'string' ? req.data.website.trim().slice(0, 300) : null;
   const ref = db.collection('claims').doc();
   await ref.set({
     uid,
@@ -100,7 +104,7 @@ export const requestAccess = onCall(CALLABLE, async (req) => {
     domain,
     subjectId,
     subjectName: subject.get('name'),
-    website: website || subject.get('website') || null,
+    suggestedWebsite,
     status: 'pending',
     note: null,
     createdAt: FieldValue.serverTimestamp(),
@@ -112,44 +116,29 @@ export const requestAccess = onCall(CALLABLE, async (req) => {
   return { status: 'pending' };
 });
 
-/** One claim against the organization's own website. */
+/** One claim against the organization's operator-verified website. */
 export async function checkClaim(claimId: string): Promise<'approved' | 'held'> {
   const ref = db.doc(`claims/${claimId}`);
-  const { domain, website } = (await ref.get()).data() as { domain: string; website: string | null };
+  const { domain, subjectId } = (await ref.get()).data() as { domain: string; subjectId: string };
+  const subject = await db.doc(`subjects/${subjectId}`).get();
   const hold = async (note: string) => {
     await ref.update({ status: 'held', note, checkedAt: FieldValue.serverTimestamp() });
     return 'held' as const;
   };
-  if (!website) return hold('No website on file to check the domain against.');
-  let url: URL;
+  const website = subject.get('websiteVerified') === true ? (subject.get('website') as string | null) : null;
+  if (!website) return hold("Needs a person to check: this organization's website hasn't been verified yet.");
+  let host: string;
   try {
-    url = new URL(website.startsWith('http') ? website : `https://${website}`);
+    host = new URL(website.startsWith('http') ? website : `https://${website}`).hostname;
   } catch {
-    return hold(`Website "${website}" is not a valid address.`);
+    return hold(`The verified website "${website}" is not a valid address.`);
   }
-  if (domainMatchesHost(domain, url.hostname)) {
-    await approveClaim(claimId, `Email domain matches the website ${url.hostname}.`);
-    return 'approved';
-  }
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'follow' });
-    const finalHost = new URL(res.url).hostname;
-    if (domainMatchesHost(domain, finalHost)) {
-      await approveClaim(claimId, `The website redirects to ${finalHost}, which matches.`);
-      return 'approved';
-    }
-    const html = (await res.text()).slice(0, 2_000_000).toLowerCase();
-    if (html.includes(`@${domain}`) || html.includes(`//${domain}`) || html.includes(`.${domain}/`)) {
-      await approveClaim(claimId, `${url.hostname} lists ${domain} on its homepage.`);
-      return 'approved';
-    }
-    return hold(`${url.hostname} does not mention ${domain}.`);
-  } catch (e) {
-    return hold(`Could not load ${url.hostname}: ${(e as Error).message}`);
-  }
+  if (!domainMatchesHost(domain, host)) return hold(`${domain} does not match ${host}.`);
+  await approveClaim(claimId, `Email domain matches the verified website ${host}.`);
+  return 'approved';
 }
 
-/** Daily: every pending claim is checked against the web. */
+/** Daily: every pending claim is checked against its organization's verified website. */
 export const checkClaims = onSchedule({ schedule: 'every day 06:00', timeZone: 'America/Chicago' }, async () => {
   const pending = await db.collection('claims').where('status', '==', 'pending').get();
   for (const d of pending.docs) await checkClaim(d.id);

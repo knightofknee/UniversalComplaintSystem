@@ -60,7 +60,10 @@ export const storage = getStorage(app);
  * function; only the token getter is async.
  */
 const RECAPTCHA_ENTERPRISE_SITE_KEY = '6LdL-BEuAAAAADlSKkadF-C2d9rMBP8UTDTgywZl';
-const debugToken = process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN;
+// Development only: in release bundles __DEV__ is false, so this whole
+// expression (and the token string) is compiled out. Never reference the
+// variable outside a __DEV__ check, or it ships inside the app.
+const debugToken = __DEV__ ? process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN : undefined;
 
 // The `document` check skips static rendering, where reCAPTCHA can't load.
 if (!usingEmulators && Platform.OS === 'web' && typeof document !== 'undefined') {
