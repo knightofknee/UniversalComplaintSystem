@@ -100,6 +100,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "73628e56-5158-4013-9591-721d5f784754"
+      }
+    },
+    "owner": "knightofknee"
   }
 }
