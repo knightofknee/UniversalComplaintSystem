@@ -8,8 +8,12 @@
  * - points get per-organization status (`orgStatus`) from the old single
  *   `fixClaimedBy` / `fixVotes` fields;
  * - `restrictedTo` moves off the public subject to `restricted/{id}`;
- * - subjects get `websiteVerified: false` where unset.
+ * - subjects get `websiteVerified: false` where unset;
+ * - CFPB public-record submissions read with the company's usual name, and
+ *   "on <date>" when every complaint came the same day (2026-11-06).
  */
+import { readableCompany } from './cfpb-names';
+
 process.env.GCLOUD_PROJECT ??= 'universal-complaint-system';
 
 async function main() {
@@ -26,6 +30,20 @@ async function main() {
     n++;
   }
   console.log(`${n} submissions linked to their authors.`);
+
+  const cfpb = await db.collection('submissions').where('source.shortName', '==', 'CFPB').get();
+  n = 0;
+  for (const d of cfpb.docs) {
+    const text = d.get('text') as string;
+    const next = text
+      .replace(/about (.+?) (between|on) /, (_, c: string, w: string) => `about ${readableCompany(c)} ${w} `)
+      .replace(/between (\w{3} \d{1,2}, \d{4}) and \1\./, 'on $1.');
+    if (next !== text) {
+      await d.ref.update({ text: next });
+      n++;
+    }
+  }
+  console.log(`${n} public-record complaints reworded.`);
 
   const points = await db.collection('points').get();
   n = 0;

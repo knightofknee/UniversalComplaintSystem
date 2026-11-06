@@ -22,6 +22,7 @@
  * Needs gcloud credentials (`gcloud auth application-default login`) and the
  * Anthropic key in functions/.secret.local (or ANTHROPIC_API_KEY).
  */
+import { readableCompany } from './cfpb-names';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
@@ -175,9 +176,11 @@ async function main() {
         const orgReply = [...replies.entries()].sort((a, b) => b[1] - a[1]).map(([r, n]) => `${n} ${r.toLowerCase()}`).join(', ');
         // The model files the problem itself; the record shows the count and dates.
         const text = `${company}, ${product}: ${what}.`;
+        const first = fmt(dates[0]);
+        const last = fmt(dates[dates.length - 1]);
         const display =
-          `${list.length} ${list.length === 1 ? 'person' : 'people'} complained to the Consumer Financial Protection Bureau about ${company} ` +
-          `between ${fmt(dates[0])} and ${fmt(dates[dates.length - 1])}. The problem: ${what} (${product}).`;
+          `${list.length} ${list.length === 1 ? 'person' : 'people'} complained to the Consumer Financial Protection Bureau about ${readableCompany(company)} ` +
+          `${first === last ? `on ${first}` : `between ${first} and ${last}`}. The problem: ${what} (${product}).`;
         const r = await record(
           `cfpb|${company}|${k}`,
           text,
