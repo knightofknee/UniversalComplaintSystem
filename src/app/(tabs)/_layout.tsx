@@ -4,12 +4,16 @@ import { Tabs, useRouter } from 'expo-router';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+/** The tabs open on Complaints: "new" is only a redirect, and as the initial tab it would bounce straight back. */
+export const unstable_settings = { initialRouteName: 'browse' };
+
 /** Everything past the complaint box. "New" (far left) opens the box over these tabs. */
 export default function TabsLayout() {
   const theme = useTheme();
   const router = useRouter();
   return (
     <Tabs
+      initialRouteName="browse"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.primary,
