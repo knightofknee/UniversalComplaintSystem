@@ -44,8 +44,12 @@ import type { Analysis, PointHit } from "@/lib/types";
 
 const MAX_PHOTOS = 4;
 const SEARCH_AFTER_CHARS = 15;
-/** Cosine distance under which a point "sounds familiar" (search itself goes to 0.45). */
-const FAMILIAR = 0.3;
+/**
+ * Cosine distance under which a point "sounds familiar" (search itself goes
+ * to 0.45). Measured 2026-11-07 with Gemini embeddings: the same complaint
+ * reads 0.07-0.15, anything unrelated 0.19 and up.
+ */
+const FAMILIAR = 0.17;
 
 type Photo = { uri: string; path: string | null };
 type Step =
