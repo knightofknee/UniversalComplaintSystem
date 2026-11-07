@@ -680,6 +680,8 @@ export async function recordPublic(args: {
     tone: result.tone,
     // "Best rants" ranks by this; only rants have one.
     rantScore: result.tone === 'rant' && !useRewrite ? Math.max(1, Math.min(10, Math.round(result.rantScore ?? 1))) : 0,
+    // Peppers. The rewrite is the calm version.
+    spice: useRewrite ? 1 : Math.max(1, Math.min(5, Math.round(result.spice ?? 1))),
     actionability: result.actionability,
     photos,
     source: source ?? null,
@@ -722,6 +724,10 @@ export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
     throw new HttpsError('failed-precondition', draft.result.safety.reason ?? 'This breaks the terms of use and can\'t be recorded.');
   }
   if (!draft.result.isComplaint) throw new HttpsError('failed-precondition', 'There is nothing to record in this one.');
+  // Five peppers is over the line: name-calling at people. Never posted, not even privately.
+  if ((draft.result.spice ?? 1) >= 5) {
+    throw new HttpsError('failed-precondition', draft.result.spiceReason ?? 'Too spicy: the name-calling has to go.');
+  }
   if (req.data?.visibility === 'private') {
     return submitPrivate(req, { draftRef: draftSnap.ref, ...draft, displayName: user.displayName });
   }

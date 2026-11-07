@@ -16,14 +16,22 @@ export default function HelpScreen() {
         button below the box only takes you to the next step.
       </T>
       <T>
-        While you type, the screen shows how heated the complaint reads and whether it includes the four things
+        While you type, the screen shows how spicy the complaint reads and whether it includes the four things
         that make a complaint fixable: who it is about, what happened, when, and what would make it right. It also
         lists similar complaints already on the record. If one of them is yours too, tap the arrow next to it.
       </T>
 
+      <T variant="heading">Spice</T>
+      <T>
+        Every complaint gets one to five peppers for how heated its language is, not how bad the problem is.
+        Swearing at a company or a situation is spicy and fine. Five peppers is over the line: insults or slurs
+        aimed at people, including the people who work there. A five is sent back with a few rewrites that keep
+        the heat and the facts but aim them at the problem. At least one of them tries to be funny.
+      </T>
+
       <T variant="heading">The next step</T>
       <T>
-        &quot;See how it posts&quot; sends your text to a model, which splits it into points: the specific things that are
+        &quot;Next&quot; sends your text to a model, which splits it into points: the specific things that are
         wrong. Each point is matched to a point already on the record, or added as a new one. You see all of this
         before anything is posted: which points will be added or joined, which companies and topics it is filed
         under, and whether personal details were found.

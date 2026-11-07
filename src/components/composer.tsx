@@ -39,7 +39,7 @@ import {
 import { storage } from "@/lib/firebase";
 import { successHaptic } from "@/lib/haptics";
 import { offerPush } from "@/lib/push";
-import { MIN_WORDS, readComplaint, type Read } from "@/lib/read";
+import { MIN_WORDS, SPICE_LABELS, readComplaint, type Read } from "@/lib/read";
 import type { Analysis, PointHit } from "@/lib/types";
 
 const MAX_PHOTOS = 4;
@@ -409,7 +409,9 @@ export function Composer({ home }: { home?: boolean }) {
   const reviewing = step.kind === "review";
   const analysis = reviewing ? step.analysis : null;
   const result = analysis?.result;
-  const blocked = !!result && (result.safety?.unsafe || !result.isComplaint);
+  const blocked =
+    !!result &&
+    (result.safety?.unsafe || !result.isComplaint || (result.spice ?? 1) >= 5);
   const orgIndexes = analysis
     ? analysis.subjects.flatMap((s, i) =>
         s.kind === "organization" && !untagged.has(i) ? [i] : [],
@@ -624,6 +626,10 @@ export function Composer({ home }: { home?: boolean }) {
           useRewrite={useRewrite}
           setUseRewrite={setUseRewrite}
           onEdit={() => setStep({ kind: "write" })}
+          onUseAlternative={(alt) => {
+            setText(alt);
+            setStep({ kind: "write" });
+          }}
         />
       )}
     </Page>
@@ -683,10 +689,27 @@ function Page({
   );
 }
 
-/** Heat and fixability, live. */
+/** One to five peppers; the ones past `n` are faded. */
+function Peppers({ n, size = 16 }: { n: number; size?: number }) {
+  return (
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: 1 }}
+      accessibilityLabel={`${n} of 5 peppers`}
+    >
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Text key={i} style={{ fontSize: size, opacity: i <= n ? 1 : 0.18 }}>
+          🌶️
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+/** Spice and fixability, live. */
 function ReadOut({ read }: { read: Read }) {
   const theme = useTheme();
-  const heatColors = [
+  const spiceColors = [
+    theme.textSecondary,
     theme.textSecondary,
     theme.primary,
     theme.warning,
@@ -706,24 +729,12 @@ function ReadOut({ read }: { read: Read }) {
     >
       <Row style={{ justifyContent: "space-between" }}>
         <Text style={[styles.readLabel, { color: theme.textSecondary }]}>
-          HEAT
+          SPICE
         </Text>
         <Row style={{ gap: 4 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[
-                styles.heatBar,
-                {
-                  backgroundColor:
-                    i < read.heat ? heatColors[read.heat] : theme.border,
-                },
-              ]}
-            />
-          ))}
-          <Text style={[styles.heatText, { color: heatColors[read.heat] }]}>
-            {read.heat >= 3 ? "🔥 " : ""}
-            {read.heatLabel}
+          <Peppers n={read.spice} />
+          <Text style={[styles.heatText, { color: spiceColors[read.spice] }]}>
+            {read.spiceLabel}
           </Text>
         </Row>
       </Row>
@@ -779,6 +790,8 @@ function ReviewSection(props: {
   useRewrite: boolean;
   setUseRewrite: (v: boolean) => void;
   onEdit: () => void;
+  /** Swap the text for one of the model's rewrites and go back to the box. */
+  onUseAlternative: (text: string) => void;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -794,6 +807,42 @@ function ReviewSection(props: {
           sexual content and posts aimed at private people never are.
         </T>
       </Section>
+    );
+  }
+  if ((result.spice ?? 1) >= 5) {
+    return (
+      <View style={{ gap: 18 }}>
+        <View style={{ gap: 6 }}>
+          <Peppers n={5} size={28} />
+          <T variant="title">Over the line</T>
+          <T>{result.spiceReason ?? "Name-calling at people doesn't go up."}</T>
+          <T variant="small">
+            Furious is fine. Swearing is fine. Insults at people get sent back,
+            and they never got anyone a refund anyway.
+          </T>
+        </View>
+        {(result.alternatives ?? []).length > 0 && (
+          <Section title="Same heat, aimed at the problem" hint="Tap one to use it, then edit it however you like.">
+            {result.alternatives!.map((alt, i) => (
+              <Pressable
+                key={i}
+                onPress={() => props.onUseAlternative(alt)}
+                accessibilityRole="button"
+                accessibilityLabel="Use this version"
+                style={({ pressed }) => [
+                  styles.option,
+                  { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <T>{alt}</T>
+                <T variant="small" color={theme.primary} style={{ fontWeight: "700" }}>
+                  Use this
+                </T>
+              </Pressable>
+            ))}
+          </Section>
+        )}
+      </View>
     );
   }
   if (!result.isComplaint) {
@@ -832,6 +881,10 @@ function ReviewSection(props: {
             color={theme.primary}
             bg={theme.primarySoft}
           />
+          <Row style={{ gap: 6 }}>
+            <Peppers n={result.spice ?? 1} size={14} />
+            <T variant="small">{SPICE_LABELS[result.spice ?? 1]}</T>
+          </Row>
         </Row>
         {result.coaching && <T>{result.coaching}</T>}
         {result.coaching && result.suggestedRewrite && (
@@ -1175,7 +1228,6 @@ const styles = StyleSheet.create({
   },
   read: { borderRadius: 16, padding: 14, gap: 10 },
   readLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  heatBar: { width: 16, height: 8, borderRadius: 4 },
   heatText: { fontFamily: Fonts.bold, fontSize: 14, marginLeft: 6 },
   bar: {
     paddingHorizontal: 20,

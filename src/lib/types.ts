@@ -80,6 +80,8 @@ export type Submission = {
   tone: 'constructive' | 'neutral' | 'rant';
   /** 1-10 for rants (how good a read it is), 0 otherwise; "Best rants" sorts by it. */
   rantScore?: number;
+  /** 1-5 peppers (the language, not the problem). */
+  spice?: number;
   actionability: number;
   photos: string[];
   createdAt: Timestamp | null;
@@ -145,6 +147,11 @@ export type IntakeResult = {
     subjectIndexes: number[];
   }[];
   tone: 'constructive' | 'neutral' | 'rant';
+  /** 1-5 peppers: how heated the language is. 5 is over the line (name-calling at people) and can't post. */
+  spice?: number;
+  spiceReason?: string | null;
+  /** For a 5: rewrites that keep the heat but drop the name-calling, at least one funny. */
+  alternatives?: string[];
   actionability: number;
   coaching: string | null;
   suggestedRewrite: string | null;

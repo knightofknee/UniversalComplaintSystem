@@ -56,6 +56,17 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
   (similar points, vote right there). "See how it posts" runs the model and
   the review appears inline on the same page; nothing posts until "Post it".
+  Spice (2026-11-07): every complaint gets 1-5 peppers for how heated the
+  LANGUAGE is (not the problem): on-device guess while typing
+  (src/lib/read.ts, name-calling regex = 5), the model's `spice` is final.
+  5 = insults/slurs at people (workers included) and never posts
+  (`submitComplaint` refuses, even privately); the review shows "Over the
+  line" with `spiceReason` and 2-3 `alternatives` (same heat, no
+  name-calling, one funny) the author can tap in. Swearing at a company is
+  3-4 and fine. `submissions.spice` is stored. The intake output schema
+  (functions/src/ai.ts) is near Anthropic's grammar size limit: keep
+  `.describe()` strings terse and put guidance in INTAKE_SYSTEM "Fields";
+  check with a 2-token parse call before deploying a schema change.
   Copy is fun and pushes toward improvement, not criticism. Errors are
   inline lines or toasts (`showToast`, src/components/toast.tsx), never
   pop-up alerts, never codes (`errorText` in src/lib/api.ts).

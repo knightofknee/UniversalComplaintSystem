@@ -1,14 +1,17 @@
 /**
- * The live read-out while someone types: how hot it is, and whether it has
- * what makes a complaint fixable (who, what, when, the fix). On the device,
- * free and instant; the model's own read comes when they check it.
+ * The live read-out while someone types: how spicy it is (peppers), and
+ * whether it has what makes a complaint fixable (who, what, when, the fix).
+ * On the device, free and instant; the model's own read, which is the one
+ * that counts, comes at "Next".
  */
 
 export type Read = {
   words: number;
-  /** 0 (ice cold) to 4 (volcanic). */
-  heat: number;
-  heatLabel: string;
+  /** 1 (mild) to 5 (over the line: name-calling at people). */
+  spice: number;
+  spiceLabel: string;
+  /** Name-calling spotted on the device. The model has the final say. */
+  overLine: boolean;
   who: boolean;
   what: boolean;
   when: boolean;
@@ -17,12 +20,15 @@ export type Read = {
   nudge: string;
 };
 
-export const HEAT_LABELS = ['ice cold', 'calm', 'simmering', 'boiling', 'volcanic'];
+export const SPICE_LABELS = ['', 'mild', 'medium', 'hot', 'extra hot', 'over the line'];
 export const MIN_WORDS = 5;
 
 const HOT_WORDS =
   /\b(never|always|worst|ridiculous|unacceptable|insane|useless|scam|hate|terrible|awful|disgusting|pathetic|joke|garbage|trash|nightmare|absurd|outrageous|furious|livid|sick of|fed up|done with)\b/gi;
-const SWEARS = /\b(fuck\w*|shit\w*|damn\w*|hell|crap\w*|bullshit|ass\w*|bastard\w*|wtf|ffs)\b/gi;
+const SWEARS = /\b(fuck\w*|shit\w*|damn\w*|hell|crap\w*|bullshit|ass|arse|wtf|ffs)\b/gi;
+/** Aimed at people. Swearing at a situation is spicy; this is over the line. */
+const NAME_CALLING =
+  /\b(bitch\w*|asshole\w*|idiot\w*|moron\w*|retard\w*|cunt\w*|whore\w*|slut\w*|bastard\w*|dumbass\w*|dipshit\w*|scumbag\w*|scum|douche\w*|twat\w*|prick\w*|jackass\w*|dickhead\w*|motherfucker\w*|loser\w*|pig\w*)\b/i;
 const ANGRY_EMOJI = /[😡🤬💢😤🙄🖕]/gu;
 const PLACE_WORDS =
   /\b(the|my|our|their|this|that)\s+(company|bank|airline|landlord|app|store|shop|website|site|city|school|hospital|carrier|provider|insurer|insurance|doctor|clinic|restaurant|boss|employer|government|dmv|post office|hotel|gym|phone|car|dealer|dealership|delivery|driver|service|support|customer service|isp|utility|council|county|airport|train|bus|subway|printer|laptop|tv|router)\b/i;
@@ -46,8 +52,10 @@ export function readComplaint(raw: string): Read {
   const hot = (text.match(HOT_WORDS) ?? []).length;
   const swears = (text.match(SWEARS) ?? []).length;
   const emoji = (text.match(ANGRY_EMOJI) ?? []).length;
-  const raw_ = (caps > 0.5 ? 2 : caps > 0.25 ? 1 : 0) + Math.min(bangs, 4) * 0.6 + hot * 0.6 + swears * 0.8 + emoji;
-  const heat = words === 0 ? 0 : Math.max(0, Math.min(4, Math.round(raw_)));
+  const heat = (caps > 0.5 ? 2 : caps > 0.25 ? 1 : 0) + Math.min(bangs, 4) * 0.6 + hot * 0.6 + swears * 0.8 + emoji;
+  const overLine = NAME_CALLING.test(text);
+  // 1-4 from how loud it is; 5 only for name-calling.
+  const spice = words === 0 ? 1 : overLine ? 5 : Math.max(1, Math.min(4, Math.round(heat) + 1));
 
   // A capitalized name that isn't just a word starting a sentence reads as who it's about.
   const named = text
@@ -65,12 +73,13 @@ export function readComplaint(raw: string): Read {
 
   let nudge: string;
   if (words < MIN_WORDS) nudge = 'Keep going. Say what happened.';
+  else if (overLine) nudge = 'Swear all you want. Calling people names gets it sent back.';
   else if (!who) nudge = 'Who is it about? Name the company, product or place.';
   else if (!what) nudge = 'What happened? A sentence or two does it.';
-  else if (!fix && heat >= 3) nudge = 'Love the fire. Now aim it: what should they change?';
+  else if (!fix && spice >= 3) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';
   else if (!when) nudge = 'When did it happen, or how often? Optional, but it helps.';
-  else nudge = heat >= 3 ? 'Loud and fixable. The best kind.' : 'That is a complaint someone can act on.';
+  else nudge = spice >= 3 ? 'Spicy and fixable. The best kind.' : 'That is a complaint someone can act on.';
 
-  return { words, heat, heatLabel: HEAT_LABELS[heat], who, what, when, fix, nudge };
+  return { words, spice, spiceLabel: SPICE_LABELS[spice], overLine, who, what, when, fix, nudge };
 }
