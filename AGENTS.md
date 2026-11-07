@@ -41,12 +41,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   tags; the author can untag or add EXISTING subjects at review ("Filed
   under"), never invent one. Tags are only ever added to an existing point.
 - Design (2026-11-06, the user's direction): COMPLAINING FIRST. `/` is the
-  composer (src/components/composer.tsx, `<Composer home />`), the FIRST
-  (far-left) tab and where the app opens: a bordered text box centered on
-  an otherwise empty screen (no logo, no wordmark), a "+" inside it for
-  photos (iOS action sheet: camera or library), one plain line under it,
-  and a small "?" to `/help`. Copy is plain and never prompts what the
-  complaint is about. The root Stack mounts only after the fonts load
+  composer (src/components/composer.tsx, `<Composer home />`), a screen of
+  its own with NO tab bar, where the app opens; the tabs sit under it
+  (`unstable_settings.initialRouteName = "(tabs)"`) so its menu button
+  (top left) goes back to wherever in the tabs they were, and the "New" tab
+  (far left, a plus) pushes it over the tabs again. On it: a bordered text
+  box centered on an empty screen (keyboard open, placeholder "What could
+  be better?"), a "+" inside it for photos (iOS action sheet: camera or
+  library), a "Next" button, a small "?" to `/help`. No logo, no blurb; the
+  help modal carries the explanation. Copy is plain and never prompts what
+  the complaint is about. The root Stack mounts only after the fonts load
   (tab labels measured in the fallback face truncate). As they type it fills
   in: the live read-out (src/lib/read.ts, on-device: heat calm..volcanic,
   fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
@@ -58,7 +62,7 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big "Same here"
   (`SupportButton`) is only on a point's own page.
-- Complaints (`/browse`, tabs: Complaints, Search, Complain → `/`, Me) sorts by
+- Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
   🔥 Hot (`weekSupport`, recounted every 6h by `recountRising`), 🤬 Best
   rants (rant submissions by `rantScore`, 1-10 from the model), 👥 Most
   shared (`supportCount`), ✅ Fixed, 🆕 New. No category browsing and no

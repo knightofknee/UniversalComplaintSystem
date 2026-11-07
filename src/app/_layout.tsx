@@ -16,6 +16,9 @@ import { loadAppearance, useScheme } from "@/lib/appearance";
 import { usePush } from "@/lib/push";
 
 SplashScreen.preventAutoHideAsync();
+
+/** The tabs sit under the complaint box, so its menu button always has somewhere to go back to. */
+export const unstable_settings = { initialRouteName: "(tabs)" };
 void loadAppearance();
 
 /** Holds the splash until the (anonymous) account and the fonts are ready. */
@@ -65,6 +68,10 @@ export default function RootLayout() {
           >
             <Stack.Screen
               name="(tabs)"
+              options={{ headerShown: false, title: "Complaints" }}
+            />
+            <Stack.Screen
+              name="index"
               options={{
                 headerShown: false,
                 title: "Universal Complaint System",

@@ -68,7 +68,7 @@ export default function RecordScreen() {
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="display">Complaints</T>
         <Pressable
-          onPress={() => router.navigate('/')}
+          onPress={() => router.push('/')}
           accessibilityRole="button"
           accessibilityLabel="Complain about something"
           style={({ pressed }) => [styles.plus, { backgroundColor: theme.primaryFill, opacity: pressed ? 0.8 : 1 }]}>

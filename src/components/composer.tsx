@@ -297,9 +297,27 @@ export function Composer({ home }: { home?: boolean }) {
       });
   };
 
-  // The main screen carries nothing but the box and a way to get help.
+  // Back to wherever in the tabs they were; the tabs sit under this screen, so there is always somewhere.
+  const leave = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/browse");
+  };
+
+  // The main screen carries nothing but the box: a menu button out, a way to get help.
   const top = home ? (
-    <Row style={{ justifyContent: "flex-end" }}>
+    <Row style={{ justifyContent: "space-between" }}>
+      <Pressable
+        onPress={leave}
+        accessibilityRole="button"
+        accessibilityLabel="Everything else: complaints, search, your account"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.help,
+          { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+        ]}
+      >
+        <Ionicons name="menu" size={22} color={theme.textSecondary} />
+      </Pressable>
       <Pressable
         onPress={() => router.push("/help")}
         accessibilityRole="button"
@@ -380,7 +398,7 @@ export function Composer({ home }: { home?: boolean }) {
           <Button
             label="See all complaints"
             kind="quiet"
-            onPress={() => router.push("/browse")}
+            onPress={leave}
           />
         )}
       </Page>
@@ -437,19 +455,10 @@ export function Composer({ home }: { home?: boolean }) {
         />
       </>
     )
-  ) : text.trim().length > 0 ? (
-    <Button
-      label={
-        ready
-          ? "See how it posts"
-          : `Keep going (${Math.max(0, MIN_WORDS - read.words)} more words)`
-      }
-      icon={ready ? "sparkles" : undefined}
-      onPress={check}
-      busy={busy}
-      disabled={!ready}
-    />
-  ) : null;
+  ) : (
+    // Always "Next": the next step shows similar complaints and how it posts.
+    <Button label="Next" onPress={check} busy={busy} disabled={!ready} />
+  );
 
   return (
     <Page
@@ -507,12 +516,13 @@ export function Composer({ home }: { home?: boolean }) {
               multiline
               value={text}
               onChangeText={setText}
+              autoFocus={home}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               placeholder={
                 params.subjectName
-                  ? `Your complaint about ${params.subjectName}`
-                  : "Your complaint"
+                  ? `What could be better about ${params.subjectName}?`
+                  : "What could be better?"
               }
               placeholderTextColor={theme.textSecondary}
               maxLength={4000}
@@ -568,12 +578,6 @@ export function Composer({ home }: { home?: boolean }) {
               )}
             </Row>
           </View>
-          {empty && (
-            <T variant="small" style={{ textAlign: "center" }}>
-              Nothing is submitted from here. The next step shows similar
-              complaints and a preview of your post.
-            </T>
-          )}
         </View>
       )}
 
@@ -665,8 +669,7 @@ function Page({
           style={[
             styles.bar,
             {
-              // Inside the tabs the tab bar already clears the home indicator.
-              paddingBottom: home ? 12 : Math.max(insets.bottom, 12),
+              paddingBottom: Math.max(insets.bottom, 12),
               backgroundColor: theme.background,
               borderTopColor: theme.border,
             },

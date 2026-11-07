@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Complain first (the main screen), then everything else. */
+/** Everything past the complaint box. "New" (far left) opens the box over these tabs. */
 export default function TabsLayout() {
   const theme = useTheme();
+  const router = useRouter();
   return (
     <Tabs
       screenOptions={{
@@ -18,10 +19,16 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
       }}>
       <Tabs.Screen
-        name="index"
+        name="new"
         options={{
-          title: 'Complain',
-          tabBarIcon: ({ color, size }) => <Ionicons name="create" size={size} color={color} />,
+          title: 'New',
+          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size + 4} color={color} />,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push('/');
+          },
         }}
       />
       <Tabs.Screen
