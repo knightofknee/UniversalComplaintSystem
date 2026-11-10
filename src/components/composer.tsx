@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { ref, uploadBytes } from "firebase/storage";
 import {
   useEffect,
@@ -56,7 +57,10 @@ const MAX_PHOTOS = 4;
 
 type Photo = { uri: string; path: string | null };
 /** The unfinished complaint in the main box, while the app is open. */
-let keptDraft = "";
+const kept = { draft: "" };
+const keepDraft = (text: string) => {
+  kept.draft = text;
+};
 
 type Step =
   | { kind: "write" }
@@ -77,10 +81,42 @@ type Step =
  * rather than assumed, so it is right with or without a navigation header
  * above the view (KeyboardAvoidingView needs to be told the header's height).
  */
-function useKeyboard(ref: RefObject<View | null>) {
-  const [state, setState] = useState({ overlap: 0, visible: false });
+/**
+ * How much of the screen the keyboard took the last time the box was open
+ * (keyboard plus its hide bar), remembered across launches. The box opens
+ * already laid out for it, so nothing resizes while the keyboard comes up:
+ * the screen and the keyboard rise together and land where they are.
+ */
+const KEYBOARD_KEY = "ucs.composerKeyboard";
+let rememberedOverlap: number | null = null;
+void AsyncStorage.getItem(KEYBOARD_KEY).then(
+  (v) => {
+    const n = Number(v);
+    if (n > 100) rememberedOverlap = n;
+  },
+  () => {},
+);
+/** Before it has ever been measured: about what an iPhone keyboard with its hide bar takes. */
+const expectedOverlap = () =>
+  rememberedOverlap ?? Math.round(Dimensions.get("window").height * 0.405);
+
+function useKeyboard(
+  ref: RefObject<View | null>,
+  opts: {
+    /** The keyboard opens with the screen: lay out for it from the first frame. */
+    expectOpen: boolean;
+    /** Set while the screen is leaving: the layout holds still as it goes. */
+    frozen: RefObject<boolean>;
+  },
+) {
+  const ios = Platform.OS === "ios";
+  const [state, setState] = useState(() =>
+    opts.expectOpen && ios
+      ? { overlap: expectedOverlap(), visible: true }
+      : { overlap: 0, visible: false },
+  );
+  const { expectOpen, frozen } = opts;
   useEffect(() => {
-    const ios = Platform.OS === "ios";
     const animate = (duration?: number) =>
       LayoutAnimation.configureNext({
         duration: duration || 250,
@@ -91,11 +127,22 @@ function useKeyboard(ref: RefObject<View | null>) {
       (e) => {
         const top = e.endCoordinates.screenY;
         const apply = (bottom: number) => {
-          animate(e.duration);
-          setState({ overlap: Math.max(0, bottom - top), visible: true });
+          const overlap = Math.max(0, Math.round(bottom - top));
+          if (expectOpen && ios && overlap > 100 && overlap !== rememberedOverlap) {
+            rememberedOverlap = overlap;
+            void AsyncStorage.setItem(KEYBOARD_KEY, String(overlap)).catch(() => {});
+          }
+          setState((was) => {
+            // Already laid out for it: nothing moves.
+            if (was.visible && Math.abs(was.overlap - overlap) < 1) return was;
+            animate(e.duration);
+            return { overlap, visible: true };
+          });
         };
         const node = ref.current;
-        if (!node) return apply(Dimensions.get("window").height);
+        // This screen runs to the bottom of the window. Measuring it while it
+        // is still sliding in would give a moving answer.
+        if (!node || expectOpen) return apply(Dimensions.get("window").height);
         node.measureInWindow((_x, y, _w, h) =>
           apply(h > 0 ? y + h : Dimensions.get("window").height),
         );
@@ -104,6 +151,7 @@ function useKeyboard(ref: RefObject<View | null>) {
     const hide = Keyboard.addListener(
       ios ? "keyboardWillHide" : "keyboardDidHide",
       (e) => {
+        if (frozen.current) return;
         animate(e?.duration);
         setState({ overlap: 0, visible: false });
       },
@@ -112,7 +160,7 @@ function useKeyboard(ref: RefObject<View | null>) {
       show.remove();
       hide.remove();
     };
-  }, [ref]);
+  }, [ref, ios, expectOpen, frozen]);
   return state;
 }
 
@@ -138,9 +186,9 @@ export function Composer({ home }: { home?: boolean }) {
   // What is typed in the main box survives leaving it (the menu button, a
   // tab, coming back later): closing a screen should never cost someone
   // their words. Kept for the session; cleared once it is posted.
-  const [text, setTextState] = useState(() => (home ? keptDraft : ""));
+  const [text, setTextState] = useState(() => (home ? kept.draft : ""));
   const setText = (next: string) => {
-    if (home) keptDraft = next;
+    if (home) keepDraft(next);
     setTextState(next);
   };
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -160,7 +208,12 @@ export function Composer({ home }: { home?: boolean }) {
   const [privateTo, setPrivateTo] = useState<number | null>(null);
   const wide = useWindowDimensions().width >= 700;
   const rootRef = useRef<View>(null);
-  const keyboard = useKeyboard(rootRef);
+  const leaving = useRef(false);
+  const keyboard = useKeyboard(rootRef, {
+    expectOpen: !!home,
+    frozen: leaving,
+  });
+  const navigation = useNavigation();
   const read = readComplaint(text);
 
   /** Resize, strip metadata (location included), upload. */
@@ -320,9 +373,11 @@ export function Composer({ home }: { home?: boolean }) {
       else {
         // Posted: the box is cleared and they land on their profile, with
         // the new complaint marked, so they know where it lives.
-        reset();
+        // The box goes away as it is (clearing it first would bring the
+        // keyboard back up on the way out); only the kept draft is dropped.
+        keepDraft("");
         setJustPosted(res.submissionId);
-        router.navigate("/me");
+        if (!leaveTo("me")) reset();
       }
     } catch (e) {
       setError(errorText(e));
@@ -331,8 +386,30 @@ export function Composer({ home }: { home?: boolean }) {
     }
   };
 
+  // Leaving the box for a tab. The box came up from the bottom over the
+  // tabs, so it goes back down the same way: the tab underneath is switched
+  // first (unseen, the box covers it), then the box drops away. Going
+  // "forward" to the tab instead would slide sideways and not match.
+  const leaveTo = (tab: "browse" | "me") => {
+    const state = navigation.getState();
+    const under = state ? state.routes[state.index - 1] : undefined;
+    if (home && under?.name === "(tabs)") {
+      leaving.current = true;
+      // Tell the tabs underneath which tab to show (they follow their
+      // `screen` param), then pop the box off them.
+      navigation.dispatch({
+        type: "SET_PARAMS",
+        payload: { params: { screen: tab } },
+        source: under.key,
+      });
+      router.back();
+      return true;
+    }
+    router.navigate(`/${tab}`);
+    return false;
+  };
   // The menu button always lands on the Complaints tab, whichever tab was open before.
-  const leave = () => router.navigate("/browse");
+  const leave = () => leaveTo("browse");
 
   // The main screen carries nothing but the box: a menu button out, a way to get help.
   const top = home ? (

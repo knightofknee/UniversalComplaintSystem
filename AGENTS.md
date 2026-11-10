@@ -129,8 +129,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - TRANSITIONS (2026-11-10): tabs switch with no animation (peers); going
   deeper slides sideways (the stack default); the complaint box is a task
   that covers the tab bar, so it rises from the bottom and drops back down
-  (`slide_from_bottom` on `index`), never sideways. What is typed in the
-  main box survives leaving it (`keptDraft` in composer.tsx).
+  (`slide_from_bottom` on `index`), never sideways. LEAVING MUST POP, not
+  navigate forward: `leaveTo` in composer.tsx sets the tabs' `screen` param
+  underneath (unseen) and then `router.back()`, so the box drops onto the
+  right tab; `router.navigate('/browse')` from the box pushes a second copy
+  of the tabs and slides sideways. The box opens ALREADY SIZED for the
+  keyboard (its height is remembered, `rememberedOverlap`), so nothing
+  resizes as the keyboard arrives, and its layout is frozen while leaving.
+  To check motion, record the simulator and read the frames (stills hide
+  it). What is typed in the
+  main box survives leaving it (`kept.draft` in composer.tsx).
 - Pop-ups (name change, report, "Your complaint is live") sit on a 72% dim
   with their own surface and border, so their words never run into the
   page's.
