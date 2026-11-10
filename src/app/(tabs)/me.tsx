@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { useEffect, useState, type ComponentProps } from 'react';
-import { Switch } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { NameChanger } from '@/components/name-changer';
 import { showAlert } from '@/components/point-card';
@@ -107,10 +107,45 @@ type Mine = {
   resolved?: boolean;
 };
 
+/**
+ * Right after posting without an account: the complaint is live either way,
+ * and signing in is what keeps the history. Said once per post, and easy to
+ * wave off.
+ */
+function KeepItPrompt({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const theme = useTheme();
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={[styles.sheet, { backgroundColor: theme.background }]} onPress={() => {}}>
+          <T variant="heading">Your complaint is live.</T>
+          <T>
+            It is posted without an account. To keep your history, sign in: until then your complaints stay with this
+            device only.
+          </T>
+          <Button
+            label="Sign in"
+            onPress={() => {
+              onClose();
+              router.push('/account');
+            }}
+          />
+          <Button label="Not now" kind="quiet" onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function MeScreen() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const theme = useTheme();
+  // Set when arriving straight from posting: that complaint is marked and scrolled to.
+  const { posted } = useLocalSearchParams<{ posted?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const [answered, setAnswered] = useState<string | null>(null);
   const blocked = useBlockedAuthors();
   const unread = useCollection<Notification>(
     user ? query(collection(db, `users/${user.uid}/notifications`), where('read', '==', false), limit(50)) : null,
@@ -164,7 +199,8 @@ export default function MeScreen() {
   const responder = (profile?.responderFor ?? []).length > 0;
   const anonymous = !!user?.isAnonymous;
   return (
-    <Screen topInset>
+    <Screen topInset scrollRef={scrollRef}>
+      <KeepItPrompt visible={!!posted && anonymous && answered !== posted} onClose={() => setAnswered(posted ?? null)} />
       <NameChanger name={profile?.displayName ?? 'You'} />
       <T variant="small">
         {anonymous ? 'Not signed in. Sign in to keep your history and to send private complaints.' : user?.email}
@@ -190,20 +226,31 @@ export default function MeScreen() {
       {complaints.length === 0 ? (
         <Empty text="Nothing yet." loading={mine.loading || threads.loading} />
       ) : (
-        complaints.map((c) => (
-          <Card key={c.key} onPress={() => router.push(c.href)}>
+        complaints.map((c) => {
+          const fresh = c.key === `s:${posted}`;
+          return (
+          <View
+            key={c.key}
+            // The one they just posted is brought into view. It is only a mark: the row works as any other.
+            onLayout={fresh ? (e) => scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - 120), animated: true }) : undefined}>
+          <Card
+            onPress={() => router.push(c.href)}
+            style={fresh ? { borderWidth: 1.5, borderColor: theme.primary } : undefined}>
             <Row style={{ flexWrap: 'wrap', gap: 6 }}>
               <Ionicons name={c.isPrivate ? 'lock-closed' : 'earth'} size={14} color={theme.textSecondary} />
               <T variant="small" style={{ flex: 1 }}>
                 {c.isPrivate ? 'Private' : 'Public'} · {timeAgo(c.at)}
               </T>
+              {fresh && <Chip label="Just posted" color={theme.primary} bg={theme.primarySoft} />}
               {c.unread && <Chip label="New reply" color={theme.primary} bg={theme.primarySoft} />}
               {c.resolved && <Chip label="Resolved" color={theme.good} bg={theme.goodSoft} />}
             </Row>
             <T numberOfLines={3}>{c.text}</T>
             {c.about ? <T variant="small">{c.about}</T> : null}
           </Card>
-        ))
+          </View>
+          );
+        })
       )}
 
       {blocked.list.length > 0 && (
@@ -230,3 +277,8 @@ export default function MeScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
+  sheet: { borderRadius: 18, padding: 18, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' },
+});

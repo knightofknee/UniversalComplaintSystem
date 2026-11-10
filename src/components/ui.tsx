@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, RefObject } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -25,17 +25,21 @@ export function Screen({
   topInset,
   onRefresh,
   refreshing,
+  scrollRef,
 }: {
   children: ReactNode;
   /** Tab screens have no header, so they pad below the status bar. */
   topInset?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
+  /** To scroll the screen from outside (to something just added, say). */
+  scrollRef?: RefObject<ScrollView | null>;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <ScrollView
+      ref={scrollRef}
       style={{ backgroundColor: theme.background }}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[

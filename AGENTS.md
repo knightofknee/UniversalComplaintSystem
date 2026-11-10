@@ -61,7 +61,8 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   composer (src/components/composer.tsx, `<Composer home />`), a screen of
   its own with NO tab bar, where the app opens; the tabs sit under it
   (`unstable_settings.initialRouteName = "(tabs)"`) so its menu button
-  (top left) goes back to wherever in the tabs they were, and the "New" tab
+  (top left) always lands on the Complaints tab (2026-11-10; it used to go
+  back to whichever tab was open), and the "New" tab
   (far left, a plus) pushes it over the tabs again. THE SCREEN IS THE BOX
   (2026-11-09): two bare icons (menu, "?" to `/help`), then one bordered
   text box that runs down to the keyboard (keyboard open on arrival; to the
@@ -148,6 +149,12 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   🆕 New (`imported`, `createdAt`). A sort is its name and nothing else: no
   line of description under it. Empty lists say "Nothing here yet." with
   no joke and no finger pointed at anyone (2026-11-10).
+- AFTER POSTING (2026-11-10) there is no "Posted" screen: the box clears
+  and they land on Me with `?posted=<id>`, where that complaint is scrolled
+  to and marked "Just posted" (a mark only; the row works as any other).
+  Signed out, a prompt says the complaint is live without an account and
+  that signing in keeps the history (once per post). Private and queued
+  complaints keep their own after-screens.
 - Me lists "Your complaints" as ONE list, public and private in the same
   row form (a globe or lock label), newest activity first; there is no
   separate private-complaints screen. No category browsing and no

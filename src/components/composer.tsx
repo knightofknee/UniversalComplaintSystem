@@ -14,7 +14,6 @@ import {
 import {
   ActionSheetIOS,
   ActivityIndicator,
-  Animated,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -58,7 +57,6 @@ type Step =
   | { kind: "write" }
   | { kind: "queued" }
   | { kind: "review"; analysis: Analysis }
-  | { kind: "done"; analysis: Analysis; matched: string[]; added: string[] }
   | {
       kind: "sent";
       orgId: string;
@@ -268,6 +266,19 @@ export function Composer({ home }: { home?: boolean }) {
     }
   };
 
+  const reset = () => {
+    setText("");
+    setPhotos([]);
+    setError(null);
+    setStep({ kind: "write" });
+    if (params.subjectId || params.draft)
+      router.setParams({
+        subjectId: undefined,
+        subjectName: undefined,
+        draft: undefined,
+      });
+  };
+
   const post = async (analysis: Analysis) => {
     setError(null);
     setBusy(true);
@@ -288,18 +299,20 @@ export function Composer({ home }: { home?: boolean }) {
         ...(agreed ? { acceptTerms: true } : {}),
       });
       successHaptic();
-      if (res.visibility === "private") setStep({ kind: "sent", ...res });
-      else
-        setStep({
-          kind: "done",
-          analysis,
-          matched: res.matchedPointIds,
-          added: res.addedPointIds,
-        });
       void offerPush(
         res.visibility === "private" ? "private" : "posted",
         !!profile?.pushOn,
       );
+      if (res.visibility === "private") setStep({ kind: "sent", ...res });
+      else {
+        // Posted: the box is cleared and they land on their profile, with
+        // the new complaint marked, so they know where it lives.
+        reset();
+        router.navigate({
+          pathname: "/me",
+          params: { posted: res.submissionId },
+        });
+      }
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -307,24 +320,8 @@ export function Composer({ home }: { home?: boolean }) {
     }
   };
 
-  const reset = () => {
-    setText("");
-    setPhotos([]);
-    setError(null);
-    setStep({ kind: "write" });
-    if (params.subjectId || params.draft)
-      router.setParams({
-        subjectId: undefined,
-        subjectName: undefined,
-        draft: undefined,
-      });
-  };
-
-  // Back to wherever in the tabs they were; the tabs sit under this screen, so there is always somewhere.
-  const leave = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/browse");
-  };
+  // The menu button always lands on the Complaints tab, whichever tab was open before.
+  const leave = () => router.navigate("/browse");
 
   // The main screen carries nothing but the box: a menu button out, a way to get help.
   const top = home ? (
@@ -357,7 +354,7 @@ export function Composer({ home }: { home?: boolean }) {
   ) : null;
 
   // ---- After posting -------------------------------------------------------
-  if (step.kind === "queued" || step.kind === "sent" || step.kind === "done") {
+  if (step.kind === "queued" || step.kind === "sent") {
     return (
       <Page top={top} insets={insets} home={home}>
         {step.kind === "queued" && (
@@ -411,7 +408,6 @@ export function Composer({ home }: { home?: boolean }) {
             />
           </>
         )}
-        {step.kind === "done" && <Done step={step} dropped={dropped} />}
         <Button
           label="Complain about something else"
           kind="secondary"
@@ -1161,93 +1157,6 @@ function Section({
   );
 }
 
-function Done({
-  step,
-  dropped,
-}: {
-  step: Extract<Step, { kind: "done" }>;
-  dropped: Set<number>;
-}) {
-  const theme = useTheme();
-  const router = useRouter();
-  const total = step.matched.length + step.added.length;
-  const fresh = step.analysis.result.points
-    .filter((p, i) => !dropped.has(i) && !p.matchedPointId)
-    .map((p) => p.statement);
-  return (
-    <>
-      <Stamp />
-      <T variant="title">Posted.</T>
-      <T>
-        {step.matched.length === 0
-          ? total === 1
-            ? "Nobody had raised this yet. You're the first."
-            : "Nobody had raised these yet. You're the first."
-          : step.added.length === 0
-            ? total === 1
-              ? "Other people already raised this. Yours now counts with theirs."
-              : "Other people already raised these. Yours now counts with theirs."
-            : "Some of this was already here, so yours counts with theirs. The rest is new."}{" "}
-        We&apos;ll tell you when someone joins in or an organization answers.
-      </T>
-      <View>
-        {step.matched.map((id) => (
-          <Pressable
-            key={id}
-            onPress={() => router.push(`/point/${id}`)}
-            style={[styles.pointRow, { borderTopColor: theme.border }]}
-          >
-            <Ionicons name="people" size={20} color={theme.primary} />
-            <T style={{ flex: 1 }}>{step.analysis.matched[id]?.text}</T>
-          </Pressable>
-        ))}
-        {step.added.map((id, i) => (
-          <Pressable
-            key={id}
-            onPress={() => router.push(`/point/${id}`)}
-            style={[styles.pointRow, { borderTopColor: theme.border }]}
-          >
-            <Ionicons name="sparkles" size={20} color={theme.new} />
-            <T style={{ flex: 1 }}>{fresh[i]}</T>
-          </Pressable>
-        ))}
-      </View>
-    </>
-  );
-}
-
-/** The "on the record" moment: a rubber stamp that lands. */
-function Stamp() {
-  const theme = useTheme();
-  const [anim] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    Animated.spring(anim, {
-      toValue: 1,
-      friction: 5,
-      tension: 120,
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [anim]);
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [2.2, 1] });
-  return (
-    <Animated.View
-      accessibilityLabel="On the record"
-      style={[
-        styles.stamp,
-        {
-          borderColor: theme.good,
-          opacity: anim,
-          transform: [{ rotate: "-8deg" }, { scale }],
-        },
-      ]}
-    >
-      <Text style={[styles.stampText, { color: theme.good }]}>
-        ON THE RECORD
-      </Text>
-    </Animated.View>
-  );
-}
-
 const styles = StyleSheet.create({
   page: {
     paddingHorizontal: 20,
@@ -1333,13 +1242,4 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   bigEmoji: { fontSize: 48 },
-  stamp: {
-    alignSelf: "flex-start",
-    borderWidth: 3,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginVertical: 8,
-  },
-  stampText: { fontFamily: Fonts.display, fontSize: 24, letterSpacing: 2 },
 });
