@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getDownloadURL, ref } from 'firebase/storage';
 import { useEffect, useState } from 'react';
-import { Alert, Animated, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
@@ -12,7 +12,7 @@ import { Button, Card, Chip, Field, Notice, Row, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { addDetail, errorText, loveRant } from '@/lib/api';
+import { addDetail, deleteComplaint, errorText, loveRant } from '@/lib/api';
 import { blockAuthor, unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db, storage } from '@/lib/firebase';
 import { tapHaptic } from '@/lib/haptics';
@@ -24,8 +24,21 @@ export function PublicPhoto({ path, size = 96 }: { path: string; size?: number }
   useEffect(() => {
     getDownloadURL(ref(storage, path)).then(setUrl, () => setUrl(null));
   }, [path]);
+  const [open, setOpen] = useState(false);
   if (!url) return null;
-  return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: 10 }} contentFit="cover" />;
+  return (
+    <>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="imagebutton" accessibilityLabel="Open photo">
+        <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: 10 }} contentFit="cover" />
+      </Pressable>
+      {/* Tap anywhere to close: a photo is something to look at, then put away. */}
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.viewer} onPress={() => setOpen(false)} accessibilityLabel="Close photo">
+          <Image source={{ uri: url }} style={styles.viewerImage} contentFit="contain" />
+        </Pressable>
+      </Modal>
+    </>
+  );
 }
 
 /**
@@ -180,6 +193,19 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
   );
 }
 
+function confirmDelete(onYes: () => void) {
+  const title = 'Delete this complaint?';
+  const msg = "Its words and photos are removed, and the support it gave is withdrawn. This can't be undone.";
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${msg}`)) onYes();
+    return;
+  }
+  Alert.alert(title, msg, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: onYes },
+  ]);
+}
+
 function confirmHide(name: string, onYes: () => void) {
   const msg = `Complaints by ${name} get folded shut: you'll see that one is there and can open it if you want. They won't know. Undo it in Me > Hidden authors.`;
   if (Platform.OS === 'web') {
@@ -278,7 +304,25 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
       ) : (
         <Row style={{ gap: 4 }}>
           <BestRantButton submissionId={s.id} count={loves} />
-          <ReportButton target={{ kind: 'submission', id: s.id }} compact />
+          {own ? (
+            <Pressable
+              onPress={() =>
+                confirmDelete(() =>
+                  deleteComplaint({ submissionId: s.id }).then(
+                    () => showToast('Complaint deleted', undefined, 'info'),
+                    (e) => showToast("Couldn't delete it", errorText(e)),
+                  ),
+                )
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Delete this complaint"
+              hitSlop={6}
+              style={styles.icon}>
+              <Ionicons name="trash-outline" size={19} color={theme.textSecondary} />
+            </Pressable>
+          ) : (
+            <ReportButton target={{ kind: 'submission', id: s.id }} compact />
+          )}
           {user && s.authorId && !own && (
             <Pressable
               onPress={() =>
@@ -325,6 +369,8 @@ const styles = StyleSheet.create({
   missing: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
   missingRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },
   dismiss: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center' },
+  viewerImage: { width: '100%', height: '100%' },
   folded: {
     flexDirection: 'row',
     alignItems: 'center',

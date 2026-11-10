@@ -34,6 +34,10 @@ export type Point = {
   orgStatus?: Record<string, OrgStatus>;
   seenBy: Record<string, Timestamp>;
   respondedBy: Record<string, Timestamp>;
+  /** When each organization first responded (how long people waited). */
+  firstRespondedBy?: Record<string, Timestamp>;
+  /** Fixes people proposed on this point. */
+  solutionCount?: number;
   /** Private complaint counts, only for organizations that chose to publish them. */
   privateCounts?: Record<string, number>;
   canonical: { submissionId: string; authorName: string; actionability: number };

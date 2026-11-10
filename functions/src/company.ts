@@ -278,6 +278,8 @@ export const respondToPoint = onCall(CALLABLE, async (req) => {
   await db.doc(`authors/r_${response.id}`).set({ uid });
   const update: Record<string, unknown> = {
     [`respondedBy.${subjectId}`]: FieldValue.serverTimestamp(),
+    // Kept from the first response only: how long people waited (the dashboard's response time).
+    ...(firstResponse ? { [`firstRespondedBy.${subjectId}`]: FieldValue.serverTimestamp() } : {}),
     lastActivityAt: FieldValue.serverTimestamp(),
   };
   if (!point.get(`seenBy.${subjectId}`)) update[`seenBy.${subjectId}`] = FieldValue.serverTimestamp();

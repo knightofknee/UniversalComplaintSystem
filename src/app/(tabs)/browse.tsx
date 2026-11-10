@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PointCard, PointList } from '@/components/point-card';
-import { Empty, Row, Screen, T } from '@/components/ui';
+import { Button, Empty, Row, Screen, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useBlockedAuthors } from '@/lib/blocks';
@@ -14,6 +14,7 @@ import { useCollection } from '@/lib/hooks';
 import type { Point, Submission } from '@/lib/types';
 
 type Feed = 'hot' | 'rants' | 'top' | 'fixed' | 'new';
+/** A page of the list; "Show more" adds another. */
 const LIST = 40;
 /**
  * Best rants is readers' votes. Until this many rants have a vote, the list
@@ -38,7 +39,12 @@ const EMPTY = 'Nothing here yet.';
 export default function RecordScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const [feed, setFeed] = useState<Feed>('hot');
+  const [feed, setFeedState] = useState<Feed>('hot');
+  const [count, setCount] = useState(LIST);
+  const setFeed = (f: Feed) => {
+    setFeedState(f);
+    setCount(LIST);
+  };
   const points = collection(db, 'points');
   const live = where('removed', '==', false);
 
@@ -59,9 +65,9 @@ export default function RecordScreen() {
               : feed === 'fixed'
                 ? [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]
                 : [orderBy('imported', 'asc'), orderBy('createdAt', 'desc')]),
-          limit(LIST),
+          limit(count),
         ),
-    `record:${feed}`,
+    `record:${feed}:${count}`,
   );
   const rants = useCollection<Submission>(
     feed === 'rants'
@@ -126,11 +132,16 @@ export default function RecordScreen() {
       ) : shownPoints.length === 0 ? (
         <Empty loading={pointList.loading} text={EMPTY} />
       ) : (
-        <PointList>
-          {shownPoints.map((p, i) => (
-            <PointCard key={p.id} point={p} rank={feed === 'new' ? undefined : i + 1} />
-          ))}
-        </PointList>
+        <>
+          <PointList>
+            {shownPoints.map((p, i) => (
+              <PointCard key={p.id} point={p} rank={feed === 'new' ? undefined : i + 1} />
+            ))}
+          </PointList>
+          {pointList.items.length >= count && (
+            <Button kind="secondary" label="Show more" onPress={() => setCount(count + LIST)} />
+          )}
+        </>
       )}
     </Screen>
   );

@@ -24,16 +24,18 @@ const SORT_FIELDS: Record<Sort, string[]> = {
   new: ['imported', 'createdAt'],
 };
 
-function usePoints(subjectId: string, sort: Sort) {
+const PAGE = 50;
+
+function usePoints(subjectId: string, sort: Sort, count = 100) {
   return useCollection<Point>(
     query(
       collection(db, 'points'),
       where('removed', '==', false),
       where('subjectIds', 'array-contains', subjectId),
       ...SORT_FIELDS[sort].map((f) => orderBy(f, f === 'imported' ? 'asc' : 'desc')),
-      limit(100),
+      limit(count),
     ),
-    `subject:${subjectId}:${sort}`,
+    `subject:${subjectId}:${sort}:${count}`,
   );
 }
 
@@ -106,7 +108,8 @@ const SORTS: { key: Sort; label: string }[] = [
 /** Hot, top, new: the same sorts as the Complaints tab. */
 function SubjectFeed({ subject }: { subject: Subject }) {
   const [sort, setSort] = useState<Sort>('top');
-  const points = usePoints(subject.id, sort);
+  const [count, setCount] = useState(PAGE);
+  const points = usePoints(subject.id, sort, count);
   const shown = sort === 'rising' ? points.items.filter((p) => (p.weekSupport ?? 0) > 0) : points.items;
   return (
     <>
@@ -120,6 +123,7 @@ function SubjectFeed({ subject }: { subject: Subject }) {
           ))}
         </PointList>
       )}
+      {points.items.length >= count && <Button kind="secondary" label="Show more" onPress={() => setCount(count + PAGE)} />}
     </>
   );
 }
