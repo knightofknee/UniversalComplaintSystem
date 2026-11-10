@@ -38,6 +38,7 @@ import {
 } from './common';
 import { badSubjectName, photoIsSafe } from './moderation';
 import { promotePrivatePoint, submitPrivate } from './private';
+import { flagDuplicates } from './duplicates';
 import { announceJoin } from './points';
 import { rantRank } from './rants';
 
@@ -885,6 +886,8 @@ export async function recordPublic(args: {
   await db.doc(`authors/${submission.id}`).set({ uid });
   // The author's own index of what they posted, with what the model thought
   // was missing: shown only to them, as suggestions (details.ts).
+  // Two points saying the same thing: nominated for the operator to merge (duplicates.ts).
+  if (!imported) await flagDuplicates(db, [...addedPointIds, ...matchedPointIds]);
   if (!imported) {
     await db.doc(`users/${uid}/mine/${submission.id}`).set({
       at: FieldValue.serverTimestamp(),

@@ -7,7 +7,7 @@ import { showAlert } from '@/components/point-card';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, operatorClaim, resolveReport } from '@/lib/api';
+import { errorText, operatorClaim, resolveDuplicate, resolveReport } from '@/lib/api';
 import { db } from '@/lib/firebase';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
 import { isOperator } from '@/lib/operator';
@@ -67,7 +67,7 @@ function ask(message: string): string | null {
  */
 export default function OperatorScreen() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<'claims' | 'reports' | 'spend'>('claims');
+  const [tab, setTab] = useState<'claims' | 'reports' | 'duplicates' | 'spend'>('claims');
   const op = isOperator(user);
   const claims = useCollection<Claim>(
     op ? query(collection(db, 'claims'), where('status', 'in', ['held', 'pending']), orderBy('createdAt', 'desc'), limit(100)) : null,
@@ -76,6 +76,11 @@ export default function OperatorScreen() {
   const reports = useCollection<Report>(
     op ? query(collection(db, 'reports'), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(100)) : null,
     'op:reports',
+  );
+  // Pairs of points that may say the same thing (functions/src/duplicates.ts).
+  const duplicates = useCollection<Duplicate>(
+    op ? query(collection(db, 'duplicates'), where('status', '==', 'open'), limit(50)) : null,
+    'op:duplicates',
   );
   if (!op) {
     return (
@@ -90,6 +95,7 @@ export default function OperatorScreen() {
         options={[
           { key: 'claims', label: `Organizations · ${claims.items.length}` },
           { key: 'reports', label: `Reports · ${reports.items.length}` },
+          { key: 'duplicates', label: `Duplicates · ${duplicates.items.length}` },
           { key: 'spend', label: 'AI spend' },
         ]}
         value={tab}
@@ -107,8 +113,57 @@ export default function OperatorScreen() {
         ) : (
           reports.items.map((r) => <ReportCard key={r.id} r={r} />)
         ))}
+      {tab === 'duplicates' &&
+        (duplicates.items.length === 0 ? (
+          <Empty loading={duplicates.loading} text="No likely duplicates." />
+        ) : (
+          duplicates.items.map((d) => <DuplicateCard key={d.id} d={d} />)
+        ))}
       {tab === 'spend' && <Spend />}
     </Screen>
+  );
+}
+
+type Duplicate = {
+  id: string;
+  a: string;
+  b: string;
+  texts: Record<string, string>;
+  people: Record<string, number>;
+  distance: number;
+};
+
+/** Two points that read alike. Merging folds the smaller into the larger; it can't be undone. */
+function DuplicateCard({ d }: { d: Duplicate }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<'merge' | 'dismiss' | null>(null);
+  const act = async (action: 'merge' | 'dismiss') => {
+    setBusy(action);
+    try {
+      await resolveDuplicate({ id: d.id, action });
+    } catch (e) {
+      showAlert("Couldn't do that", errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Card>
+      {[d.a, d.b].map((id) => (
+        <Card key={id} onPress={() => router.push(`/point/${id}`)}>
+          <T>{d.texts[id]}</T>
+          <T variant="small">{(d.people[id] ?? 0).toLocaleString()} people</T>
+        </Card>
+      ))}
+      <T variant="small">
+        Closeness {d.distance} (under 0.12 is usually the same complaint). Merging keeps the one with more people and
+        moves the other's supporters, complaints, responses and fixes into it.
+      </T>
+      <Row>
+        <Button label="Not the same" kind="secondary" onPress={() => act('dismiss')} busy={busy === 'dismiss'} style={{ flex: 1 }} />
+        <Button label="Merge" onPress={() => act('merge')} busy={busy === 'merge'} style={{ flex: 1 }} />
+      </Row>
+    </Card>
   );
 }
 

@@ -12,6 +12,7 @@ export { linkPreview } from './share';
 export { proposeFix, rateFix } from './solutions';
 export { nameOptions, setName } from './names';
 export { addDetail } from './details';
+export { resolveDuplicate } from './duplicates';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';

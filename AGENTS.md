@@ -156,6 +156,14 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   the organization's points, what is waiting on it (each number opens that
   list), response rate and time (`firstRespondedBy`), what the complaints
   are about (topics), and exports the table. NOT YET TESTED BY THE USER.
+- Duplicate points (functions/src/duplicates.ts): intake already matches
+  against the 15 nearest points, so duplicates are a corner case (the model
+  missed a match). They are caught with NO model call: when a person's
+  complaint is posted, each point it touched gets one vector lookup, and a
+  neighbour closer than 0.12 is nominated in `duplicates/{a}_{b}`. Nothing
+  merges on its own: the operator queue's Duplicates tab offers "Merge"
+  (`resolveDuplicate` -> `mergePoints`: the smaller folds into the larger,
+  counts recounted from the documents) or "Not the same".
 - RUDY THE RED PEPPER (2026-11-10, the user's direction): the icon is a
   character, not an object: a grinning red chili with eyes, in the spirit
   of VeggieTales. Never a chat bubble, never a plain pepper. Drawn in code:

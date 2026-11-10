@@ -1,5 +1,5 @@
 /**
- * Proposed fixes, names, added details and account merging, tested against the LOCAL EMULATORS only (never
+ * Proposed fixes, names, added details, account merging and duplicate points, tested against the LOCAL EMULATORS only (never
  * the live record): who may rate a fix, how the tallies move, and when a
  * point becomes Fixed or stops being so.
  *
@@ -141,6 +141,44 @@ async function main() {
   const fixNow = await both.collection('solutions').doc(authorIdOf(member.uid)).get();
   check('the proposed fix moves over', fixNow.exists && fixNow.get('authorName') === memberName && !(await both.collection('solutions').doc(authorIdOf(guest.uid)).get()).exists);
   check('the signed-out account is gone', !(await db.doc(`users/${guest.uid}`).get()).exists && !(await mine1.collection('supports').doc(guest.uid).get()).exists);
+
+  // Two points that say the same thing: nominated at posting, merged by the operator (duplicates.ts).
+  const { flagDuplicates, mergePoints } = await import('../functions/src/duplicates');
+  const { FieldValue: AdminFV } = await import('../functions/src/common');
+  const rnd = (seed: number) => Array.from({ length: 768 }, (_, i) => Math.sin(seed * 1000 + i * 12.9898) * 43758.5453 % 1);
+  const baseVec = rnd(1);
+  const nearVec = baseVec.map((v, i) => v + (i % 7 === 0 ? 0.02 : 0));
+  const topicA = db.collection('subjects').doc();
+  const topicB = db.collection('subjects').doc();
+  await topicA.set({ name: 'Lost luggage', kind: 'topic', removed: false, stats: { points: 2, supporters: 5 } });
+  await topicB.set({ name: 'Baggage claims', kind: 'topic', removed: false, stats: { points: 1, supporters: 2 } });
+  const [big, small, unrelated] = [db.collection('points').doc(), db.collection('points').doc(), db.collection('points').doc()];
+  const pt = { removed: false, status: 'open', submissionCount: 1, rantCount: 0, imported: false };
+  await big.set({ ...pt, text: 'The airline loses bags.', supportCount: 3, people: 3, subjectIds: [topicA.id], subjectNames: ['Lost luggage'], topicIds: [topicA.id], embedding: AdminFV.vector(baseVec) });
+  await small.set({ ...pt, text: 'Bags get lost by the airline.', supportCount: 2, people: 2, subjectIds: [topicA.id, topicB.id], subjectNames: ['Lost luggage', 'Baggage claims'], topicIds: [topicA.id, topicB.id], embedding: AdminFV.vector(nearVec) });
+  await unrelated.set({ ...pt, text: 'The parking app double charges.', supportCount: 1, people: 1, subjectIds: [], subjectNames: [], embedding: AdminFV.vector(rnd(99)) });
+  for (const u of ['u1', 'u2', 'u3']) await big.collection('supports').doc(u).set({ uid: u, at: hourAgo });
+  for (const u of ['u3', 'u4']) await small.collection('supports').doc(u).set({ uid: u, at: hourAgo });
+  const smallSub = db.collection('submissions').doc();
+  await smallSub.set({ text: 'They lost my bag.', removed: false, tone: 'rant', matchedPointIds: [], addedPointIds: [small.id] });
+  await small.collection('responses').doc('r1').set({ text: 'We are looking into it.', removed: false });
+
+  await flagDuplicates(db, [small.id, unrelated.id]);
+  const [pa, pb] = [big.id, small.id].sort();
+  const nominated = await db.doc(`duplicates/${pa}_${pb}`).get();
+  check('a near-identical pair is nominated', nominated.exists && nominated.get('status') === 'open', nominated.data());
+  const others = await db.collection('duplicates').get();
+  check('an unrelated point is not', others.docs.every((d) => d.get('a') !== unrelated.id && d.get('b') !== unrelated.id), others.docs.map((d) => d.id));
+  await mergePoints(big.id, small.id);
+  const kept = (await big.get()).data()!;
+  check('supporters are combined, once each', kept.supportCount === 4 && kept.people === 4, kept);
+  check('complaints and the rant count come along', kept.submissionCount === 2 && kept.rantCount === 1 && (await smallSub.get()).get('matchedPointIds').includes(big.id), kept);
+  check('it gains the other point\'s topic', kept.subjectIds.includes(topicB.id) && kept.subjectNames.includes('Baggage claims'), kept.subjectNames);
+  check('responses move over', (await big.collection('responses').doc('r1').get()).exists);
+  check('the merged point leaves the record', (await small.get()).get('removed') === true && (await small.get()).get('mergedInto') === big.id);
+  const ta = (await topicA.get()).get('stats');
+  const tb = (await topicB.get()).get('stats');
+  check('page totals follow', ta.points === 1 && ta.supporters === 4 && tb.points === 1 && tb.supporters === 4, { ta, tb });
 
   console.log(failed ? `\n${failed} FAILED` : '\nAll checks pass');
     process.exit(failed ? 1 : 0);

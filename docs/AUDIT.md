@@ -143,14 +143,13 @@ fix, follow up, sign in, leave. Fixed in this pass:
 - Proposed fixes from anyone, rated by the people with the problem.
 - "Potentially missing" details, with a re-read when one is added.
 - Keyboard hide bar; modal transitions for the complaint box.
-- New icon (a chili pepper).
+- New icon: Rudy the red pepper, who also sits beside the spice meter.
+- Likely duplicate points are nominated at posting for the operator to merge.
 
 Still open for regular users, honestly:
 
 - **Language (L)**: complaints in any language are read and translated, but
   the app's own words are English only. The biggest gap against "Universal".
-- **Near-duplicate merging (M)**: the model matches at intake; nothing merges
-  two points that slipped through later.
 - **Sign in with Apple on the web (S)**: needs a Services ID and key from the
   Apple developer account. iPhone works.
 - **Android (S, blocked on the first Play build)**: release SHA-256 for App

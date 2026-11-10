@@ -131,6 +131,10 @@ export const operatorClaim = call<
   { claimId: string; action: 'approve' | 'deny' | 'website'; reason?: string; website?: string },
   { status: string }
 >('operatorClaim');
+/** Operator: fold two points that say the same thing into one, or mark them different. */
+export const resolveDuplicate = call<{ id: string; action: 'merge' | 'dismiss' }, { merged: string | null }>(
+  'resolveDuplicate',
+);
 export const resolveReport = call<
   { reportId: string; action: 'remove' | 'dismiss' | 'suspend'; reason?: string },
   { ok: boolean }

@@ -106,6 +106,10 @@ service cloud.firestore {
     match /reports/{id} {
       allow read: if isOperator();
     }
+    // Pairs of points that may say the same thing, for the operator to merge.
+    match /duplicates/{id} {
+      allow read: if isOperator();
+    }
     match /usage/{day} {
       allow read: if isOperator();
     }
