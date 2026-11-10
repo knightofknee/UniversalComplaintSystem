@@ -20,6 +20,8 @@ export type Read = {
   overLine: boolean;
   /** False only when the target is clearly missing ("they", "my bank"). */
   who: boolean;
+  /** A thing they own with no make or model on it ("my laptop"); null when named or not about one. */
+  product: string | null;
   what: boolean;
   when: boolean;
   fix: boolean;
@@ -51,6 +53,18 @@ const CARD = /(?<![\d-])(?:\d[ -]?){12,15}\d(?![\d-])/;
 /** A kind of organization with no name on it: "my bank", "the worst airline". */
 const ORG_KIND =
   /\b(?:the|my|our|this|that)\s+(?:[a-z]+\s+)?(insurance company|phone company|cable company|power company|credit card company|airline|bank|credit union|store|shop|app|website|carrier|insurer|gym|restaurant|hotel|dealership|pharmacy|hospital|clinic|school|university|company|city|county|utility|isp)\b/i;
+/**
+ * A thing of their own with no make or model on it: "my laptop", "our new
+ * dishwasher". Only "my"/"our": "the printer" in a gripe about printers in
+ * general has no model to ask for. And only when the thing itself is the
+ * subject ("my phone died"), never part of another noun ("my phone bill").
+ */
+const PRODUCT =
+  /\b(?:my|our)\s+(?:(?:new|old|brand new|first|second|work|other)\s+)?(laptop|computer|pc|desktop|phone|smartphone|tablet|tv|television|printer|router|modem|car|truck|suv|van|fridge|refrigerator|freezer|washer|washing machine|dryer|dishwasher|oven|stove|microwave|vacuum|headphones|earbuds|smartwatch|watch|camera|console|monitor|keyboard|thermostat|speaker|e-?bike|scooter|mattress|blender|air fryer|coffee maker|air conditioner|water heater|furnace|doorbell)(?!\s+(?:bills?|plans?|shows?|payments?|loans?|compan(?:y|ies)|carriers?|dealers?|dealerships?|numbers?|services?|providers?|subscriptions?|contracts?|warrant(?:y|ies)|stores?|shops?|apps?|cases?|chargers?|insurance|seats?|keys?|tires?|games?|channels?)\b)(?=$|[.,;:!?]|['’]s\b|\s+(?:is|was|has|had|keeps?|kept|won['’]?t|doesn['’]?t|does|did|didn['’]?t|gets?|got|will|would|can['’]?t|cannot|could|never|always|just|still|and|that|which|since|after|when|from|with|for|in|on|at|[a-z]+(?:ed|s))\b)/i;
+/** Makes people write in lowercase, and anything that looks like a model number ("xps13", "s23"). */
+const MAKE_OR_MODEL =
+  /\b(apple|iphone|ipad|macbook|imac|mac|samsung|galaxy|pixel|dell|hp|lenovo|thinkpad|asus|acer|msi|surface|microsoft|sony|lg|vizio|tcl|roku|bose|canon|epson|brother|netgear|toyota|honda|ford|chevy|chevrolet|tesla|nissan|hyundai|kia|subaru|bmw|jeep|whirlpool|maytag|bosch|ge|kitchenaid|frigidaire|dyson|shark|roomba|nest|ring|garmin|fitbit|playstation|ps[45]|xbox|switch|nintendo|keurig|ninja|instant pot)\b|\b(?=[a-z-]*\d)(?=\d*[a-z])[a-z0-9-]{2,}\b/i;
+
 /** Opens on someone unnamed: "They charged me twice", "I hate them". */
 const VAGUE_LEAD = /^(?:\W*[\w'’]+\W+){0,2}(?:they|them|their|theirs|he|she|him)\b/i;
 /** Capitalized only because they start a sentence. */
@@ -120,6 +134,8 @@ export function readComplaint(raw: string): Read {
   const kind = named ? null : (ORG_KIND.exec(text)?.[1].toLowerCase() ?? null);
   const vague = !named && !kind && VAGUE_LEAD.test(text);
   const who = !kind && !vague;
+  // Their own product with nothing saying which one. Recommended, never required.
+  const product = named || MAKE_OR_MODEL.test(text) ? null : (PRODUCT.exec(text)?.[1].toLowerCase() ?? null);
   // Enough said to ask the next question: a finished sentence, or eight words. Never mid-thought.
   const what = words >= 8 || (words >= MIN_WORDS && /[.!?]$/.test(text));
   const quiet = words >= 6 && !ENGLISH.test(text) && !overLine;
@@ -136,9 +152,10 @@ export function readComplaint(raw: string): Read {
   else if (!what) nudge = 'Keep going.';
   else if (!fix && hotHeaded) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';
+  else if (product) nudge = `Which ${product}? The make and model help, if you know them.`;
   else if (!when && EVENT.test(text) && !SUGGESTION.test(text)) nudge = 'When did it happen, or how often? Optional, but it helps.';
   else if (words >= 120) nudge = 'Long ones get skimmed. Lead with the main thing.';
   else nudge = hotHeaded ? 'Spicy and fixable. The best kind. Hit Next.' : 'Someone can act on that. Hit Next.';
 
-  return { words, spice, spiceLabel: SPICE_LABELS[spice], overLine, who, what, when, fix, nudge, quiet };
+  return { words, spice, spiceLabel: SPICE_LABELS[spice], overLine, who, product, what, when, fix, nudge, quiet };
 }

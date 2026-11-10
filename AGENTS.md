@@ -94,6 +94,18 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   Copy is fun and pushes toward improvement, not criticism. Errors are
   inline lines or toasts (`showToast`, src/components/toast.tsx), never
   pop-up alerts, never codes (`errorText` in src/lib/api.ts).
+- POTENTIALLY MISSING (2026-11-10): recommended, never required, in three
+  places. (1) While typing, src/lib/read.ts asks for a product's make and
+  model ("Which laptop? The make and model help, if you know them.") only
+  for a thing of their own with none on it ("my laptop", never "my phone
+  bill" or "the printer"), after the fix question. (2) At Next the model
+  returns `missing` (up to three absent details; it REPLACED `coaching`,
+  because the output grammar had no room for both) and the review lists
+  them with "Go back and add". (3) After posting they are kept on
+  `users/{uid}/mine/{id}.missing`, shown only to the author on their own
+  complaint, where each can be answered in one line (`addDetail`,
+  functions/src/details.ts; `submissions.details`, shown as "Added: ...")
+  or dismissed. No model reads a detail: one filtered line, 5 at most.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS

@@ -32,6 +32,8 @@ const SAMPLES = [
   'my bank closed my account with no warning and kept the balance for two weeks',
   'Mi banco me cobró una comisión que nadie me explicó',
   'my card 4111 1111 1111 1111 was charged twice by the gym',
+  'my laptop gets too hot to use on my lap and the fan never stops, they should fix the cooling',
+  'My Dell XPS 13 gets too hot to use on my lap, they should fix the cooling',
 ];
 
 for (const sample of SAMPLES) {
@@ -83,6 +85,17 @@ const CHECKS: Check[] = [
   { text: 'you bitch', want: says(/names/), why: 'the line comes first, even at two words' },
   { text: 'my card 4111 1111 1111 1111 was charged twice', want: says(/card number/), why: 'card numbers' },
   { text: 'call me on 415 555 0134 about my order please', want: (r) => !/card number/.test(r.nudge), why: 'a phone number is not a card' },
+  // Products: ask for the make and model only of a thing they own that has none on it.
+  { text: 'my laptop overheats every day, they should fix the fan', want: says(/Which laptop\? The make and model/), why: 'an unnamed laptop' },
+  { text: 'my laptop overheats every day and burns my legs', want: says(/make it right/), why: 'the fix is asked before the model' },
+  { text: 'my Dell laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a named make' },
+  { text: 'my dell laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a lowercase make' },
+  { text: 'my xps13 laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a model number' },
+  { text: 'our new dishwasher leaves everything wet, it should dry them', want: says(/Which dishwasher/), why: 'an unnamed appliance' },
+  { text: 'printer ink costs more than the printer does', want: (r) => r.product === null, why: 'printers in general have no model' },
+  { text: 'my phone bill went up again, they should warn people first', want: (r) => r.product === null, why: 'a phone bill is not a phone' },
+  { text: 'my car insurance doubled this year, they should explain why', want: (r) => r.product === null, why: 'car insurance is not a car' },
+  { text: 'my phone dies by noon every day, they should fix the battery', want: says(/Which phone/), why: 'the phone itself' },
 ];
 
 let failed = 0;

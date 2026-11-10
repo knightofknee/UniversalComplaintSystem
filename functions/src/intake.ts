@@ -697,6 +697,8 @@ export async function recordPublic(args: {
     spice: useRewrite ? 1 : Math.max(1, Math.min(5, Math.round(result.spice ?? 1))),
     actionability: result.actionability,
     photos,
+    // Details the author adds after posting (details.ts).
+    details: [],
     source: source ?? null,
     removed: false,
     createdAt: source ? source.date : FieldValue.serverTimestamp(),
@@ -704,7 +706,14 @@ export async function recordPublic(args: {
   // Who wrote it stays server-side: for deleting an account and for
   // suspending an abusive one, never shown.
   await db.doc(`authors/${submission.id}`).set({ uid });
-  if (!imported) await db.doc(`users/${uid}/mine/${submission.id}`).set({ at: FieldValue.serverTimestamp() });
+  // The author's own index of what they posted, with what the model thought
+  // was missing: shown only to them, as suggestions (details.ts).
+  if (!imported) {
+    await db.doc(`users/${uid}/mine/${submission.id}`).set({
+      at: FieldValue.serverTimestamp(),
+      missing: useRewrite ? [] : (result.missing ?? []).slice(0, 3),
+    });
+  }
   return { submissionId: submission.id, matchedPointIds, addedPointIds };
 }
 

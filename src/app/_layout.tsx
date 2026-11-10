@@ -4,14 +4,17 @@ import {
   BricolageGrotesque_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/bricolage-grotesque";
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Platform, Pressable } from "react-native";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { Toaster } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { loadAppearance, useScheme } from "@/lib/appearance";
 import { usePush } from "@/lib/push";
 
@@ -30,6 +33,28 @@ function SplashGate({ fontsReady }: { fontsReady: boolean }) {
   }, [loading, fontsReady]);
   return null;
 }
+
+/** A visible way out of a sheet: nobody should have to know it can be dragged down. */
+function CloseButton() {
+  const router = useRouter();
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+      accessibilityRole="button"
+      accessibilityLabel="Close"
+      hitSlop={12}
+    >
+      <Ionicons name="close" size={26} color={theme.text} />
+    </Pressable>
+  );
+}
+
+/** Screens that open as a sheet. Only iOS shows them as one; elsewhere the header already has a back arrow. */
+const SHEET = {
+  presentation: "modal" as const,
+  ...(Platform.OS === "ios" ? { headerRight: () => <CloseButton /> } : {}),
+};
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -80,7 +105,7 @@ export default function RootLayout() {
             <Stack.Screen name="complain" options={{ title: "" }} />
             <Stack.Screen
               name="help"
-              options={{ title: "Help", presentation: "modal" }}
+              options={{ title: "Help", ...SHEET }}
             />
             <Stack.Screen name="point/[id]" options={{ title: "" }} />
             <Stack.Screen name="subject/[id]" options={{ title: "" }} />
@@ -90,7 +115,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="account"
-              options={{ title: "Sign in", presentation: "modal" }}
+              options={{ title: "Sign in", ...SHEET }}
             />
             <Stack.Screen
               name="delete-account"
@@ -105,7 +130,7 @@ export default function RootLayout() {
               name="company/claim"
               options={{
                 title: "Respond for an organization",
-                presentation: "modal",
+                ...SHEET,
               }}
             />
             <Stack.Screen name="about" options={{ title: "How UCS works" }} />

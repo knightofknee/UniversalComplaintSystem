@@ -3,20 +3,20 @@ import { Image } from 'expo-image';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getDownloadURL, ref } from 'firebase/storage';
 import { useEffect, useState } from 'react';
-import { Alert, Animated, Linking, Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { Alert, Animated, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
 import { showToast } from '@/components/toast';
-import { Card, Chip, Notice, Row, T } from '@/components/ui';
+import { Button, Card, Chip, Field, Notice, Row, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { loveRant } from '@/lib/api';
+import { addDetail, errorText, loveRant } from '@/lib/api';
 import { blockAuthor, unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db, storage } from '@/lib/firebase';
 import { tapHaptic } from '@/lib/haptics';
-import { timeAgo, useVote } from '@/lib/hooks';
+import { timeAgo, useDoc, useVote } from '@/lib/hooks';
 import type { Submission } from '@/lib/types';
 
 export function PublicPhoto({ path, size = 96 }: { path: string; size?: number }) {
@@ -77,6 +77,88 @@ export function BestRantButton({ submissionId, count }: { submissionId: string; 
         {shown > 0 && <Text style={[styles.loveCount, { color: ink }]}>{shown.toLocaleString()}</Text>}
       </Pressable>
     </Animated.View>
+  );
+}
+
+/**
+ * On your own complaint, and only for you: what the model thought was
+ * missing when you posted (the make and model of a product, which store,
+ * when). Suggestions, never required: answer one in a line and it is added
+ * under the complaint, or wave it away.
+ */
+function MissingDetails({ uid, submissionId }: { uid: string; submissionId: string }) {
+  const theme = useTheme();
+  const { data } = useDoc<{ missing?: string[] }>(`users/${uid}/mine/${submissionId}`);
+  const [answering, setAnswering] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const missing = data?.missing ?? [];
+  if (missing.length === 0) return null;
+  const send = async (item: string, detail?: string) => {
+    setBusy(item);
+    try {
+      await addDetail({ submissionId, item, ...(detail ? { text: detail } : {}) });
+      setAnswering(null);
+      setText('');
+    } catch (e) {
+      showToast("That didn't save", errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <View style={[styles.missing, { borderColor: theme.border }]}>
+      <T variant="label">Potentially missing</T>
+      <T variant="small">Optional, and only you see this list. What you add shows under your complaint.</T>
+      {missing.map((m) =>
+        answering === m ? (
+          <View key={m} style={{ gap: 8 }}>
+            <Field autoFocus value={text} onChangeText={setText} placeholder={m} maxLength={200} />
+            <Row>
+              <Button
+                label="Cancel"
+                kind="quiet"
+                onPress={() => {
+                  setAnswering(null);
+                  setText('');
+                }}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Add"
+                onPress={() => send(m, text.trim())}
+                busy={busy === m}
+                disabled={text.trim().length < 2}
+                style={{ flex: 1 }}
+              />
+            </Row>
+          </View>
+        ) : (
+          <Row key={m} style={{ gap: 6 }}>
+            <Pressable
+              onPress={() => {
+                setAnswering(m);
+                setText('');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${m}`}
+              style={({ pressed }) => [styles.missingRow, pressed && { opacity: 0.7 }]}>
+              <Ionicons name="add-circle-outline" size={18} color={theme.primary} />
+              <T style={{ flex: 1 }}>{m.charAt(0).toUpperCase() + m.slice(1)}</T>
+            </Pressable>
+            <Pressable
+              onPress={() => send(m)}
+              disabled={busy === m}
+              accessibilityRole="button"
+              accessibilityLabel={`Dismiss: ${m}`}
+              hitSlop={8}
+              style={styles.dismiss}>
+              <Ionicons name="close" size={18} color={theme.textSecondary} />
+            </Pressable>
+          </Row>
+        ),
+      )}
+    </View>
   );
 }
 
@@ -157,6 +239,15 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
           </Pressable>
         </Notice>
       )}
+      {(s.details ?? []).map((d) => (
+        <T key={d} variant="small" color={theme.text}>
+          <T variant="small" style={{ fontWeight: '700' }}>
+            Added:{' '}
+          </T>
+          {d}
+        </T>
+      ))}
+      {own && user && <MissingDetails uid={user.uid} submissionId={s.id} />}
       {s.photos.length > 0 && (
         <Row style={{ flexWrap: 'wrap' }}>
           {s.photos.map((p) => (
@@ -213,6 +304,9 @@ const styles = StyleSheet.create({
   loveLabel: { fontFamily: Fonts.bold, fontSize: 16 },
   loveCount: { fontFamily: Fonts.medium, fontSize: 16 },
   icon: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
+  missing: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
+  missingRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },
+  dismiss: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   folded: {
     flexDirection: 'row',
     alignItems: 'center',

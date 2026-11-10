@@ -81,6 +81,12 @@ export const rateFix = call<
   { rating: FixRating | null; status: PointStatus }
 >('rateFix');
 
+/**
+ * Add a one-line detail to your own complaint, and/or clear one of the
+ * model's "potentially missing" suggestions (`item`, as listed).
+ */
+export const addDetail = call<{ submissionId: string; item?: string; text?: string }, { ok: boolean }>('addDetail');
+
 /** Random public names to shuffle through; only `setName` changes anything. */
 export const nameOptions = call<Record<string, never>, { names: string[] }>('nameOptions');
 export const setName = call<{ name: string }, { name: string }>('setName');

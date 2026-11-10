@@ -85,6 +85,8 @@ export type Submission = {
   tone: 'constructive' | 'neutral' | 'rant';
   /** The model's 1-10 for rants (how good a read it is), 0 otherwise. */
   rantScore?: number;
+  /** One-line details the author added after posting. */
+  details?: string[];
   /** Readers' "Best rant" votes. */
   loves?: number;
   /** Sort key of "Best rants": votes, then written by a person, then the model's score. 0 = not listed. */
@@ -176,7 +178,8 @@ export type IntakeResult = {
   /** For a 5: rewrites that keep the heat but drop the name-calling, at least one funny. */
   alternatives?: string[];
   actionability: number;
-  coaching: string | null;
+  /** Up to three details the complaint doesn't give that would help. Suggestions, never required. */
+  missing?: string[];
   suggestedRewrite: string | null;
   photos: { index: number; ok: boolean; containsPersonalData: boolean }[];
 };

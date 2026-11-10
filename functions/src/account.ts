@@ -117,7 +117,15 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
     const snap = await sub.get();
     if (!snap.exists) continue;
     // The words are gone, so it leaves "Best rants" too.
-    await sub.update({ text: '[deleted]', englishText: null, photos: [], authorName: DELETED, rantScore: 0, rantRank: 0 });
+    await sub.update({
+      text: '[deleted]',
+      englishText: null,
+      photos: [],
+      details: [],
+      authorName: DELETED,
+      rantScore: 0,
+      rantRank: 0,
+    });
     await bucket().deleteFiles({ prefix: `public/${m.id}/` });
     for (const pid of [...(snap.get('addedPointIds') as string[]), ...(snap.get('matchedPointIds') as string[])]) {
       const point = await db.doc(`points/${pid}`).get();

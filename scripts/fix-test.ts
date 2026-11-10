@@ -1,5 +1,5 @@
 /**
- * Proposed fixes and names, tested against the LOCAL EMULATORS only (never
+ * Proposed fixes, names and added details, tested against the LOCAL EMULATORS only (never
  * the live record): who may rate a fix, how the tallies move, and when a
  * point becomes Fixed or stops being so.
  *
@@ -76,6 +76,20 @@ async function main() {
   check('a typed name is refused', !!(await fails(proposer.call('setName', { name: 'Elon Musk' }))));
   await proposer.call('setName', { name: names[0] });
   check('the fix carries the new name', (await fix.get()).get('authorName') === names[0], (await fix.get()).get('authorName'));
+
+  // Adding a detail to your own complaint (details.ts).
+  const sub = db.collection('submissions').doc();
+  await sub.set({ text: 'My laptop overheats.', authorName: 'x', removed: false, details: [] });
+  await db.doc(`authors/${sub.id}`).set({ uid: a.uid });
+  const mineRef = db.doc(`users/${a.uid}/mine/${sub.id}`);
+  await mineRef.set({ missing: ['the make and model of your laptop', 'when it happened'] });
+  check('only the author can add a detail', /Only the author/.test((await fails(b.call('addDetail', { submissionId: sub.id, text: 'Dell XPS 13' }))) ?? ''));
+  check('a detail with a link is refused', /links and contact/.test((await fails(a.call('addDetail', { submissionId: sub.id, text: 'see www.example.com' }))) ?? ''));
+  await a.call('addDetail', { submissionId: sub.id, item: 'the make and model of your laptop', text: 'Dell XPS 13 9310' });
+  check('the detail is added under the complaint', JSON.stringify((await sub.get()).get('details')) === '["Dell XPS 13 9310"]', (await sub.get()).get('details'));
+  check('and its suggestion is cleared', JSON.stringify((await mineRef.get()).get('missing')) === '["when it happened"]', (await mineRef.get()).get('missing'));
+  await a.call('addDetail', { submissionId: sub.id, item: 'when it happened' });
+  check('a suggestion can be dismissed without adding anything', (await mineRef.get()).get('missing').length === 0 && (await sub.get()).get('details').length === 1);
 
   console.log(failed ? `\n${failed} FAILED` : '\nAll checks pass');
     process.exit(failed ? 1 : 0);

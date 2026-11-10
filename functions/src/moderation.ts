@@ -84,6 +84,9 @@ const NAME_CALLING =
   /\b(bitch(es|y)?|assholes?|idiots?|morons?|retard(s|ed)?|cunts?|whores?|sluts?|bastards?|dumbass(es)?|dipshits?|scumbags?|douche(bag)?s?|twats?|pricks?|jackass(es)?|dickheads?|motherfuckers?)\b/i;
 export const nameCalling = (text: string) => NAME_CALLING.test(text);
 
+/** A link, a handle, an email address or a phone number. */
+export const hasContact = (text: string) => CONTACT.test(text);
+
 /** Null when the name can be a subject; else why not. */
 export function badSubjectName(name: string): string | null {
   const n = name.trim();

@@ -920,8 +920,7 @@ function ReviewSection(props: {
             <T variant="small">{SPICE_LABELS[result.spice ?? 1]}</T>
           </Row>
         </Row>
-        {result.coaching && <T>{result.coaching}</T>}
-        {result.coaching && result.suggestedRewrite && (
+        {result.suggestedRewrite && (
           <Pressable
             onPress={() => props.setUseRewrite(!props.useRewrite)}
             accessibilityRole="switch"
@@ -959,6 +958,30 @@ function ReviewSection(props: {
           </Pressable>
         )}
       </Section>
+
+      {(result.missing ?? []).length > 0 && (
+        <Section
+          title="Potentially missing"
+          hint="Optional. These would make it easier to act on."
+        >
+          <View style={{ gap: 6 }}>
+            {(result.missing ?? []).map((m) => (
+              <Row key={m} style={{ alignItems: "flex-start", gap: 8 }}>
+                <Ionicons
+                  name="add-circle-outline"
+                  size={18}
+                  color={theme.textSecondary}
+                  style={{ marginTop: 2 }}
+                />
+                <T style={{ flex: 1 }}>
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
+                </T>
+              </Row>
+            ))}
+          </View>
+          <Button kind="secondary" label="Go back and add" onPress={props.onEdit} />
+        </Section>
+      )}
 
       {result.supportTicket.isTicket && orgIndexes.length > 0 && !isPrivate && (
         <View style={[styles.tip, { backgroundColor: theme.warningSoft }]}>
