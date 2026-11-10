@@ -7,6 +7,7 @@ import { showAlert } from '@/components/point-card';
 import { Button, Screen, T } from '@/components/ui';
 import { deleteAccount, errorText } from '@/lib/api';
 import { auth } from '@/lib/firebase';
+import { revokeAppleBeforeDelete } from '@/lib/sso';
 
 function confirmDelete(): Promise<boolean> {
   const title = 'Delete your account?';
@@ -33,6 +34,8 @@ export default function DeleteAccountScreen() {
     if (!(await confirmDelete())) return;
     setBusy(true);
     try {
+      // Signed in with Apple: Apple's token is revoked along with the account.
+      if (!(await revokeAppleBeforeDelete())) return;
       await deleteAccount({ confirm: true });
       // The sign-in is gone; signing out starts a fresh anonymous account.
       await signOut(auth).catch(() => {});

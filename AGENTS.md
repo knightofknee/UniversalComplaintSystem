@@ -29,7 +29,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   deleted). Every path that signs in to an existing account must go through
   `switchAccount`, or a just-posted complaint is stranded. Google and Apple are enabled in Firebase Auth; Google client ids
   are in sso.ts and the config files; Apple works on iOS only (the web
-  needs an Apple Services ID and key, not set up). The native modules
+  needs an Apple Services ID and key; the steps for the user are
+  docs/STORE-SETUP.md 1h, then flip `APPLE_ON_WEB` in sso.ts). Deleting an
+  account that signed in with Apple revokes its Apple token first
+  (`revokeAppleBeforeDelete`), as App Review 5.1.1(v) requires. The native modules
   (expo-apple-authentication, @react-native-google-signin) need a build
   made after 2026-11-10. A VERIFIED email is what lets someone respond for
   an organization. Me says "Not signed in." plainly. Deleting an account is

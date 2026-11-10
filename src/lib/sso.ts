@@ -3,6 +3,7 @@ import {
   linkWithCredential,
   linkWithPopup,
   OAuthProvider,
+  revokeAccessToken,
   signInWithCredential,
   type AuthCredential,
   type AuthProvider,
@@ -27,8 +28,13 @@ import { auth } from '@/lib/firebase';
 const GOOGLE_WEB_CLIENT_ID = '331431699365-ncvmkp2tu0rughge3vsgq1q5vqnn00ks.apps.googleusercontent.com';
 const GOOGLE_IOS_CLIENT_ID = '331431699365-kpe37b62dlo7ij9bes558hogd85l5emo.apps.googleusercontent.com';
 
-/** Apple on the web needs a Services ID and key from the Apple developer account, which isn't set up. */
-export const appleAvailable = Platform.OS === 'ios';
+/**
+ * Apple on the web needs a Services ID and key from the Apple developer
+ * account, entered in Firebase (docs/STORE-SETUP.md 1h). Flip this once
+ * that is done; until then the web shows Google and email only.
+ */
+const APPLE_ON_WEB = false;
+export const appleAvailable = Platform.OS === 'ios' || (Platform.OS === 'web' && APPLE_ON_WEB);
 export const googleAvailable = true;
 
 /** The person closed the sheet or popup: not an error worth showing. */
@@ -127,4 +133,27 @@ export async function continueWithApple() {
   }
   if (!identityToken) throw new Error("Apple didn't finish signing you in. Try again.");
   await applyCredential(new OAuthProvider('apple.com').credential({ idToken: identityToken, rawNonce }), fromError);
+}
+
+/**
+ * Before deleting an account that signed in with Apple: revoke its Apple
+ * token, which Apple requires of any app offering Sign in with Apple
+ * (App Review 5.1.1(v)). Apple hands out the code for that only at a
+ * sign-in, so the person confirms with Apple once more. Returns false if
+ * they backed out of that sheet (so the deletion should stop too); any
+ * other failure is logged and the deletion goes ahead. Needs the Apple key
+ * in Firebase (docs/STORE-SETUP.md 1h).
+ */
+export async function revokeAppleBeforeDelete(): Promise<boolean> {
+  const user = auth.currentUser;
+  if (Platform.OS !== 'ios' || !user?.providerData.some((p) => p.providerId === 'apple.com')) return true;
+  try {
+    const Apple = await import('expo-apple-authentication');
+    const { authorizationCode } = await Apple.signInAsync({ requestedScopes: [] });
+    if (authorizationCode) await revokeAccessToken(auth, authorizationCode);
+  } catch (e) {
+    if (codeOf(e) === 'ERR_REQUEST_CANCELED') return false;
+    console.warn('Could not revoke the Apple token', e);
+  }
+  return true;
 }

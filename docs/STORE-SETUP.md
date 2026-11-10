@@ -199,6 +199,65 @@ complaining works on a real device (that's App Attest's first real test).
 
 ---
 
+### 1h. Sign in with Apple (about ten minutes, once)
+
+The app offers Google sign-in, so Apple requires Sign in with Apple beside
+it. The app side is built. Three things are needed in your Apple developer
+account, then one paste into Firebase. Do A before the build you submit;
+B to D can be done any time before submitting.
+
+**A. Turn the capability on for the app**
+
+1. developer.apple.com → Account → Certificates, Identifiers & Profiles →
+   **Identifiers** → `com.waldgrave.ucs`.
+2. Tick **Sign In with Apple** (leave "Enable as a primary App ID") → **Save**.
+3. Build again (`eas build -p ios`). The build picks the capability up.
+
+**B. Make a Services ID** (this is what the web version and Firebase use)
+
+1. Identifiers → **+** → **Services IDs** → Continue.
+2. Description `Universal Complaint System`, Identifier
+   `com.waldgrave.ucs.web` → Continue → Register.
+3. Open it again → tick **Sign In with Apple** → **Configure**:
+   - Primary App ID: `com.waldgrave.ucs`
+   - Domains and Subdomains: `universal-complaint-system.firebaseapp.com`
+   - Return URLs: `https://universal-complaint-system.firebaseapp.com/__/auth/handler`
+4. Next → Done → Continue → **Save**.
+
+**C. Make a key**
+
+1. **Keys** → **+** → Key Name `UCS Sign in with Apple`.
+2. Tick **Sign In with Apple** → **Configure** → Primary App ID
+   `com.waldgrave.ucs` → Save → Continue → **Register**.
+3. **Download** the `.p8` file (Apple lets you download it once) and note
+   the **Key ID** shown on that page. Keep the file out of the repo.
+
+**D. Give Firebase the Services ID and key**
+
+1. console.firebase.google.com → universal-complaint-system →
+   Authentication → Sign-in method → **Apple** (already enabled).
+2. Services ID: `com.waldgrave.ucs.web`
+3. Under "OAuth code flow configuration": Apple team ID `R3H7M2M4F5`, the
+   Key ID from C, and the whole contents of the `.p8` file as Private key.
+4. **Save**.
+
+**E. Tell Claude it is done.** It switches Apple on for the web version
+(`APPLE_ON_WEB` in src/lib/sso.ts) and checks the popup.
+
+What D buys: Apple sign-in on the web, and deleting an account revokes its
+Apple token (Apple's rule 5.1.1(v); the app already does this, and it needs
+the key to work). Without B to D, iPhone sign-in still works.
+
+In App Store Connect itself nothing is switched on for Sign in with Apple.
+Two things to state there:
+
+- **App Privacy** (1d): Email Address is collected, linked to the person,
+  for App Functionality only. Apple and Google sign-in give the app the
+  email and nothing else.
+- **App Review notes** (1f): "Sign in with Apple and Google are optional;
+  the app works without an account. Delete account is at Me > Delete
+  account, and deleting revokes the Apple sign-in."
+
 ## 2. Google Play
 
 ### 2a. Create the app
