@@ -12,6 +12,7 @@ import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/compon
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, markSeen, respondToPoint, voteFix } from '@/lib/api';
+import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { successHaptic } from '@/lib/haptics';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
@@ -48,6 +49,7 @@ export default function PointScreen() {
     ),
     `added:${id}`,
   );
+  const blocked = useBlockedAuthors();
   // Authors the reader hid stay in the list, folded shut (SubmissionCard).
   const submissions = useMemo(
     () =>
@@ -56,6 +58,10 @@ export default function PointScreen() {
       ),
     [added.items, matched.items],
   );
+
+  // A hidden author's name shows nowhere until their complaint is opened, the headline's credit included.
+  const headlineBy = submissions.find((s) => s.id === point?.canonical.submissionId)?.authorId;
+  const headlineHidden = !!headlineBy && blocked.ids.has(headlineBy);
 
   // Organizations this person responds for that this point is about.
   const myOrgs = useMemo(
@@ -136,7 +142,9 @@ export default function PointScreen() {
           <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
             {point.canonical.authorName.endsWith('public record')
               ? point.canonical.authorName
-              : `${point.canonical.authorName}'s complaint`}
+              : headlineHidden
+                ? 'a complaint you hid'
+                : `${point.canonical.authorName}'s complaint`}
           </T>{' '}
           · {point.submissionCount} complaint{point.submissionCount === 1 ? '' : 's'} · first raised{' '}
           {timeAgo(point.createdAt?.toMillis())}

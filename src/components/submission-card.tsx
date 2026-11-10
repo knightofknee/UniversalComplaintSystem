@@ -186,7 +186,11 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
                       () => showAlert("Couldn't change that"),
                     )
                   : confirmHide(s.authorName, () =>
-                      blockAuthor(user.uid, s.authorId!, s.authorName).catch(() => showAlert("Couldn't hide them")),
+                      blockAuthor(user.uid, s.authorId!, s.authorName).then(
+                        // Fold it even if it had been opened before.
+                        () => setOpened(false),
+                        () => showAlert("Couldn't hide them"),
+                      ),
                     )
               }
               accessibilityRole="button"
