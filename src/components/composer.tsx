@@ -4,10 +4,19 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ref, uploadBytes } from "firebase/storage";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Animated,
+  Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
   Linking,
@@ -18,12 +27,13 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FiledUnder, type Tag } from "@/components/filed-under";
-import { PointCard, PointList, shortCount } from "@/components/point-card";
+import { shortCount } from "@/components/point-card";
 import { TermsCheck, useTermsAccepted } from "@/components/terms-check";
 import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
@@ -33,23 +43,15 @@ import {
   analyzeComplaint,
   errorText,
   getDraft,
-  searchPoints,
   submitComplaint,
 } from "@/lib/api";
 import { storage } from "@/lib/firebase";
 import { successHaptic } from "@/lib/haptics";
 import { offerPush } from "@/lib/push";
-import { MIN_WORDS, SPICE_LABELS, readComplaint, type Read } from "@/lib/read";
-import type { Analysis, PointHit } from "@/lib/types";
+import { MIN_WORDS, SPICE_LABELS, readComplaint } from "@/lib/read";
+import type { Analysis } from "@/lib/types";
 
 const MAX_PHOTOS = 4;
-const SEARCH_AFTER_CHARS = 15;
-/**
- * Cosine distance under which a point "sounds familiar" (search itself goes
- * to 0.45). Measured 2026-11-07 with Gemini embeddings: the same complaint
- * reads 0.07-0.15, anything unrelated 0.19 and up.
- */
-const FAMILIAR = 0.17;
 
 type Photo = { uri: string; path: string | null };
 type Step =
@@ -66,6 +68,50 @@ type Step =
       website: string | null;
       pointCount: number;
     };
+
+/**
+ * How much of `ref`'s view the keyboard covers, and whether it is up. Measured
+ * rather than assumed, so it is right with or without a navigation header
+ * above the view (KeyboardAvoidingView needs to be told the header's height).
+ */
+function useKeyboard(ref: RefObject<View | null>) {
+  const [state, setState] = useState({ overlap: 0, visible: false });
+  useEffect(() => {
+    const ios = Platform.OS === "ios";
+    const animate = (duration?: number) =>
+      LayoutAnimation.configureNext({
+        duration: duration || 250,
+        update: { type: ios ? "keyboard" : "easeInEaseOut" },
+      });
+    const show = Keyboard.addListener(
+      ios ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        const top = e.endCoordinates.screenY;
+        const apply = (bottom: number) => {
+          animate(e.duration);
+          setState({ overlap: Math.max(0, bottom - top), visible: true });
+        };
+        const node = ref.current;
+        if (!node) return apply(Dimensions.get("window").height);
+        node.measureInWindow((_x, y, _w, h) =>
+          apply(h > 0 ? y + h : Dimensions.get("window").height),
+        );
+      },
+    );
+    const hide = Keyboard.addListener(
+      ios ? "keyboardWillHide" : "keyboardDidHide",
+      (e) => {
+        animate(e?.duration);
+        setState({ overlap: 0, visible: false });
+      },
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [ref]);
+  return state;
+}
 
 /**
  * The first thing anyone sees: a nearly empty page and a place to type. As
@@ -90,8 +136,6 @@ export function Composer({ home }: { home?: boolean }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [similar, setSimilar] = useState<PointHit[]>([]);
-  const [raisedPrivately, setRaisedPrivately] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "write" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,34 +147,10 @@ export function Composer({ home }: { home?: boolean }) {
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   /** Index into the analysis's subjects: which organization a private complaint goes to. */
   const [privateTo, setPrivateTo] = useState<number | null>(null);
-  const searchSeq = useRef(0);
+  const wide = useWindowDimensions().width >= 700;
+  const rootRef = useRef<View>(null);
+  const keyboard = useKeyboard(rootRef);
   const read = readComplaint(text);
-  const searching = text.trim().length >= SEARCH_AFTER_CHARS;
-  const empty = text.trim().length === 0 && photos.length === 0;
-
-  // The box sits in the middle of an empty screen and moves up as content appears below it.
-  useEffect(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  }, [empty]);
-
-  // Who already said it, while typing.
-  useEffect(() => {
-    if (step.kind !== "write" || text.trim().length < SEARCH_AFTER_CHARS)
-      return;
-    const seq = ++searchSeq.current;
-    const timer = setTimeout(async () => {
-      try {
-        const res = await searchPoints({ query: text.trim() });
-        if (seq !== searchSeq.current) return;
-        // Only close matches here: "Sounds familiar" should mean it.
-        setSimilar(res.points.filter((p) => (p.distance ?? 0) < FAMILIAR).slice(0, 5));
-        setRaisedPrivately(res.raisedPrivately);
-      } catch {
-        // Search is a convenience; a failure just shows nothing.
-      }
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [text, step.kind]);
 
   /** Resize, strip metadata (location included), upload. */
   const ingest = async (uri: string) => {
@@ -290,7 +310,6 @@ export function Composer({ home }: { home?: boolean }) {
   const reset = () => {
     setText("");
     setPhotos([]);
-    setSimilar([]);
     setError(null);
     setStep({ kind: "write" });
     if (params.subjectId || params.draft)
@@ -309,7 +328,7 @@ export function Composer({ home }: { home?: boolean }) {
 
   // The main screen carries nothing but the box: a menu button out, a way to get help.
   const top = home ? (
-    <Row style={{ justifyContent: "space-between" }}>
+    <Row style={{ justifyContent: "space-between", marginHorizontal: -6 }}>
       <Pressable
         onPress={leave}
         accessibilityRole="button"
@@ -320,7 +339,7 @@ export function Composer({ home }: { home?: boolean }) {
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Ionicons name="menu" size={22} color={theme.textSecondary} />
+        <Ionicons name="menu" size={26} color={theme.textSecondary} />
       </Pressable>
       <Pressable
         onPress={() => router.push("/help")}
@@ -332,7 +351,7 @@ export function Composer({ home }: { home?: boolean }) {
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Ionicons name="help" size={20} color={theme.textSecondary} />
+        <Ionicons name="help-circle-outline" size={26} color={theme.textSecondary} />
       </Pressable>
     </Row>
   ) : null;
@@ -461,10 +480,194 @@ export function Composer({ home }: { home?: boolean }) {
         />
       </>
     )
-  ) : (
-    // Always "Next": the next step shows similar complaints and how it posts.
-    <Button label="Next" onPress={check} busy={busy} disabled={!ready} />
-  );
+  ) : null;
+
+  // ---- Writing: the screen is the box --------------------------------------
+  // It runs from the two icons to the keyboard. Everything about the
+  // complaint lives inside it: the text, photos, one live line, and Next.
+  if (!reviewing) {
+    return (
+      <View
+        ref={rootRef}
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+          paddingBottom: keyboard.overlap,
+        }}
+      >
+        <View
+          style={[
+            styles.write,
+            {
+              paddingTop: (home ? insets.top : 0) + 6,
+              paddingBottom: keyboard.visible
+                ? 10
+                : Math.max(insets.bottom, 12),
+            },
+          ]}
+        >
+          {top}
+          {params.subjectName && (
+            <Chip
+              label={`About ${params.subjectName}`}
+              color={theme.primary}
+              bg={theme.primarySoft}
+            />
+          )}
+          <InlineError text={error} onDismiss={() => setError(null)} />
+          <View
+            style={[
+              styles.box,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: focused ? theme.primary : theme.border,
+                // A phone gives it the whole screen; a wide window stops it here.
+                maxHeight: wide ? 460 : undefined,
+              },
+            ]}
+          >
+            <TextInput
+              multiline
+              value={text}
+              onChangeText={setText}
+              autoFocus={home}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder="What could be better?"
+              placeholderTextColor={theme.textSecondary}
+              maxLength={4000}
+              accessibilityLabel="Your complaint"
+              style={[styles.input, { color: theme.text }]}
+            />
+            {photos.length > 0 && (
+              <Row style={{ flexWrap: "wrap", gap: 10 }}>
+                {photos.map((p, i) => (
+                  <View key={i}>
+                    <Image source={{ uri: p.uri }} style={styles.thumb} />
+                    {!p.path && (
+                      <View
+                        style={[
+                          styles.uploading,
+                          { backgroundColor: theme.background },
+                        ]}
+                      />
+                    )}
+                    <Pressable
+                      accessibilityLabel="Remove photo"
+                      hitSlop={8}
+                      onPress={() =>
+                        setPhotos((ps) => ps.filter((x) => x !== p))
+                      }
+                      style={[styles.remove, { backgroundColor: theme.text }]}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={14}
+                        color={theme.background}
+                      />
+                    </Pressable>
+                  </View>
+                ))}
+              </Row>
+            )}
+            {read.words > 0 && (
+              <View
+                style={styles.live}
+                accessibilityLiveRegion="polite"
+              >
+                <Peppers n={read.spice} size={13} />
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    lineHeight: 17,
+                    color: read.overLine ? theme.danger : theme.textSecondary,
+                  }}
+                >
+                  {read.nudge}
+                </Text>
+              </View>
+            )}
+            <Row style={{ justifyContent: "space-between" }}>
+              <Row style={{ gap: 14 }}>
+                {photos.length < MAX_PHOTOS && (
+                  <Pressable
+                    onPress={choosePhoto}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a photo"
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.tool,
+                      { opacity: pressed ? 0.6 : 1 },
+                    ]}
+                  >
+                    <Ionicons
+                      name="add"
+                      size={26}
+                      color={theme.textSecondary}
+                    />
+                  </Pressable>
+                )}
+                {photoMenu && (
+                  <>
+                    <Pressable
+                      onPress={() => addPhoto("camera")}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.toolText, { color: theme.primary }]}>
+                        Take photo
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => addPhoto("library")}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.toolText, { color: theme.primary }]}>
+                        Choose photo
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </Row>
+              <Row style={{ gap: 12 }}>
+                {text.length >= 3500 && (
+                  <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    {4000 - text.length}
+                  </Text>
+                )}
+                <Pressable
+                  onPress={check}
+                  disabled={!ready || busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Next"
+                  accessibilityState={{ disabled: !ready || busy, busy }}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.next,
+                    {
+                      backgroundColor: theme.primaryFill,
+                      opacity: !ready ? 0.35 : pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  {busy ? (
+                    <ActivityIndicator color={theme.onPrimary} />
+                  ) : (
+                    <Text style={[styles.nextText, { color: theme.onPrimary }]}>
+                      Next
+                    </Text>
+                  )}
+                </Pressable>
+              </Row>
+            </Row>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Page
@@ -475,15 +678,7 @@ export function Composer({ home }: { home?: boolean }) {
       error={error}
       onDismissError={() => setError(null)}
     >
-      {params.subjectName && !reviewing && (
-        <Chip
-          label={`About ${params.subjectName}`}
-          color={theme.primary}
-          bg={theme.primarySoft}
-        />
-      )}
-
-      {reviewing ? (
+      {reviewing && (
         <Pressable
           onPress={() => setStep({ kind: "write" })}
           accessibilityRole="button"
@@ -507,106 +702,6 @@ export function Composer({ home }: { home?: boolean }) {
             </Text>
           </View>
         </Pressable>
-      ) : (
-        <View style={[styles.boxWrap, empty && styles.boxWrapEmpty]}>
-          <View
-            style={[
-              styles.box,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderColor: focused ? theme.primary : theme.border,
-              },
-            ]}
-          >
-            <TextInput
-              multiline
-              value={text}
-              onChangeText={setText}
-              autoFocus={home}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder={
-                params.subjectName
-                  ? `What could be better about ${params.subjectName}?`
-                  : "What could be better?"
-              }
-              placeholderTextColor={theme.textSecondary}
-              maxLength={4000}
-              accessibilityLabel="Your complaint"
-              style={[styles.input, { color: theme.text }]}
-            />
-            {photos.length > 0 && (
-              <Row style={{ flexWrap: "wrap", gap: 10 }}>
-                {photos.map((p, i) => (
-                  <View key={i}>
-                    <Image source={{ uri: p.uri }} style={styles.thumb} />
-                    {!p.path && (
-                      <View style={[styles.uploading, { backgroundColor: theme.background }]} />
-                    )}
-                    <Pressable
-                      accessibilityLabel="Remove photo"
-                      hitSlop={8}
-                      onPress={() => setPhotos((ps) => ps.filter((x) => x !== p))}
-                      style={[styles.remove, { backgroundColor: theme.text }]}
-                    >
-                      <Ionicons name="close" size={14} color={theme.background} />
-                    </Pressable>
-                  </View>
-                ))}
-              </Row>
-            )}
-            <Row style={{ justifyContent: "space-between" }}>
-              <Row style={{ gap: 14 }}>
-                {photos.length < MAX_PHOTOS && (
-                  <Pressable
-                    onPress={choosePhoto}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add a photo"
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.tool, { opacity: pressed ? 0.6 : 1 }]}
-                  >
-                    <Ionicons name="add" size={24} color={theme.textSecondary} />
-                  </Pressable>
-                )}
-                {photoMenu && (
-                  <>
-                    <Pressable onPress={() => addPhoto("camera")} hitSlop={8} accessibilityRole="button">
-                      <Text style={[styles.toolText, { color: theme.primary }]}>Take photo</Text>
-                    </Pressable>
-                    <Pressable onPress={() => addPhoto("library")} hitSlop={8} accessibilityRole="button">
-                      <Text style={[styles.toolText, { color: theme.primary }]}>Choose photo</Text>
-                    </Pressable>
-                  </>
-                )}
-              </Row>
-              {text.length >= 3500 && (
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{4000 - text.length}</Text>
-              )}
-            </Row>
-          </View>
-        </View>
-      )}
-
-      {!reviewing && read.words > 0 && <ReadOut read={read} />}
-
-      {!reviewing && searching && similar.length > 0 && (
-        <View style={{ gap: 4 }}>
-          <T variant="heading">Sounds familiar</T>
-          <T variant="small">
-            Already on the record? Hit the arrow to add your voice
-            {read.words >= MIN_WORDS ? ", or post yours too" : ""}.
-          </T>
-          <PointList>
-            {similar.map((p) => (
-              <PointCard key={p.id} point={p} />
-            ))}
-          </PointList>
-        </View>
-      )}
-      {!reviewing && searching && raisedPrivately && (
-        <T variant="small">
-          Others have raised something like this privately too.
-        </T>
       )}
 
       {reviewing && result && analysis && (
@@ -705,71 +800,6 @@ function Peppers({ n, size = 16 }: { n: number; size?: number }) {
           🌶️
         </Text>
       ))}
-    </View>
-  );
-}
-
-/** Spice and fixability, live. */
-function ReadOut({ read }: { read: Read }) {
-  const theme = useTheme();
-  const spiceColors = [
-    theme.textSecondary,
-    theme.textSecondary,
-    theme.primary,
-    theme.warning,
-    theme.rant,
-    theme.danger,
-  ];
-  const parts: [keyof Read, string][] = [
-    ["who", "who"],
-    ["what", "what"],
-    ["when", "when"],
-    ["fix", "the fix"],
-  ];
-  return (
-    <View
-      style={[styles.read, { backgroundColor: theme.backgroundElement }]}
-      accessibilityLiveRegion="polite"
-    >
-      <Row style={{ justifyContent: "space-between" }}>
-        <Text style={[styles.readLabel, { color: theme.textSecondary }]}>
-          SPICE
-        </Text>
-        <Row style={{ gap: 4 }}>
-          <Peppers n={read.spice} />
-          <Text style={[styles.heatText, { color: spiceColors[read.spice] }]}>
-            {read.spiceLabel}
-          </Text>
-        </Row>
-      </Row>
-      <Row style={{ justifyContent: "space-between" }}>
-        <Text style={[styles.readLabel, { color: theme.textSecondary }]}>
-          FIXABLE
-        </Text>
-        <Row style={{ gap: 10 }}>
-          {parts.map(([k, label]) => (
-            <Row key={k} style={{ gap: 4 }}>
-              <Ionicons
-                name={read[k] ? "checkmark-circle" : "ellipse-outline"}
-                size={15}
-                color={read[k] ? theme.good : theme.textSecondary}
-              />
-              <Text
-                style={{
-                  color: read[k] ? theme.text : theme.textSecondary,
-                  fontSize: 13,
-                  fontWeight: "600",
-                }}
-              >
-                {label}
-              </Text>
-            </Row>
-          ))}
-        </Row>
-      </Row>
-      <Text style={{ color: theme.text, fontSize: 15, lineHeight: 20 }}>
-        {read.nudge}
-      </Text>
     </View>
   );
 }
@@ -1190,30 +1220,45 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 999,
   },
-  boxWrap: { gap: 10 },
-  // An empty screen: the box in the middle of it.
-  boxWrapEmpty: { flex: 1, justifyContent: "center", paddingBottom: 48 },
+  // The writing screen: two icons, then the box down to the keyboard.
+  write: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    gap: 8,
+    justifyContent: "center",
+  },
   box: {
+    flex: 1,
     borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 10,
     gap: 10,
   },
   input: {
+    flex: 1,
     fontFamily: Fonts.medium,
     fontSize: 20,
     lineHeight: 28,
-    minHeight: 120,
-    maxHeight: 360,
     textAlignVertical: "top",
     padding: 0,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
   },
+  live: { flexDirection: "row", alignItems: "center", gap: 8 },
+  next: {
+    height: 40,
+    minWidth: 88,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nextText: { fontFamily: Fonts.bold, fontSize: 16 },
   tool: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
   toolText: { fontSize: 14, fontWeight: "700" },
   quote: { borderLeftWidth: 3, paddingLeft: 12, gap: 6 },
@@ -1230,9 +1275,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  read: { borderRadius: 16, padding: 14, gap: 10 },
-  readLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  heatText: { fontFamily: Fonts.bold, fontSize: 14, marginLeft: 6 },
   bar: {
     paddingHorizontal: 20,
     paddingTop: 10,

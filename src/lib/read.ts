@@ -52,9 +52,9 @@ export function readComplaint(raw: string): Read {
   const hot = (text.match(HOT_WORDS) ?? []).length;
   const swears = (text.match(SWEARS) ?? []).length;
   const emoji = (text.match(ANGRY_EMOJI) ?? []).length;
-  const heat = (caps > 0.5 ? 2 : caps > 0.25 ? 1 : 0) + Math.min(bangs, 4) * 0.6 + hot * 0.6 + swears * 0.8 + emoji;
+  const heat = (caps > 0.5 ? 2 : caps > 0.25 ? 1 : 0) + Math.min(bangs, 4) * 0.6 + hot * 0.6 + swears * 1.5 + emoji;
   const overLine = NAME_CALLING.test(text);
-  // 1-4 from how loud it is; 5 only for name-calling.
+  // 1-4 from how loud it is (one swear is already hot); 5 only for name-calling.
   const spice = words === 0 ? 1 : overLine ? 5 : Math.max(1, Math.min(4, Math.round(heat) + 1));
 
   // A capitalized name that isn't just a word starting a sentence reads as who it's about.

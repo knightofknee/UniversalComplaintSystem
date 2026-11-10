@@ -12,13 +12,12 @@ export default function HelpScreen() {
 
       <T variant="heading">Writing a complaint</T>
       <T>
-        Type your complaint in the box. Nothing is submitted from that screen: Return adds a new line, and the
-        button below the box only takes you to the next step.
+        Type your complaint in the box. Nothing is submitted from that screen: Return adds a new line, and Next
+        only takes you to the next step.
       </T>
       <T>
-        While you type, the screen shows how spicy the complaint reads and whether it includes the four things
-        that make a complaint fixable: who it is about, what happened, when, and what would make it right. It also
-        lists similar complaints already on the record. If one of them is yours too, tap the arrow next to it.
+        While you type, a line at the bottom of the box shows how spicy the complaint reads and the one thing
+        that would make it easier to fix: who it is about, what happened, when, or what would make it right.
       </T>
 
       <T variant="heading">Spice</T>
@@ -32,7 +31,7 @@ export default function HelpScreen() {
       <T variant="heading">The next step</T>
       <T>
         &quot;Next&quot; sends your text to a model, which splits it into points: the specific things that are
-        wrong. Each point is matched to a point already on the record, or added as a new one. You see all of this
+        wrong. Each point is matched to a similar complaint already on the record, or added as a new one. You see all of this
         before anything is posted: which points will be added or joined, which companies and topics it is filed
         under, and whether personal details were found.
       </T>

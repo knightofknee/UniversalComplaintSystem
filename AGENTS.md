@@ -45,17 +45,21 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   its own with NO tab bar, where the app opens; the tabs sit under it
   (`unstable_settings.initialRouteName = "(tabs)"`) so its menu button
   (top left) goes back to wherever in the tabs they were, and the "New" tab
-  (far left, a plus) pushes it over the tabs again. On it: a bordered text
-  box centered on an empty screen (keyboard open, placeholder "What could
-  be better?"), a "+" inside it for photos (iOS action sheet: camera or
-  library), a "Next" button, a small "?" to `/help`. No logo, no blurb; the
-  help modal carries the explanation. Copy is plain and never prompts what
-  the complaint is about. The root Stack mounts only after the fonts load
-  (tab labels measured in the fallback face truncate). As they type it fills
-  in: the live read-out (src/lib/read.ts, on-device: heat calm..volcanic,
-  fixable who/what/when/the fix, one productive nudge) and "Sounds familiar"
-  (similar points, vote right there). "See how it posts" runs the model and
-  the review appears inline on the same page; nothing posts until "Post it".
+  (far left, a plus) pushes it over the tabs again. THE SCREEN IS THE BOX
+  (2026-11-09): two bare icons (menu, "?" to `/help`), then one bordered
+  text box that runs down to the keyboard (keyboard open on arrival; to the
+  bottom of the screen when it is down; capped at 460pt only in windows
+  700pt+ wide). Everything else is INSIDE the box: placeholder "What could
+  be better?", photo thumbnails, one live line (peppers + the single nudge
+  from src/lib/read.ts), a "+" for photos (iOS action sheet: camera or
+  library) and the "Next" pill. No bottom bar, no logo, no blurb, no lists
+  on this screen: similar complaints show after Next, as the matches in the
+  review. The keyboard overlap is measured (`useKeyboard`), not
+  KeyboardAvoidingView, so it is right with or without a header. Copy is
+  plain and never prompts what the complaint is about. The root Stack
+  mounts only after the fonts load (tab labels measured in the fallback
+  face truncate). Next runs the model and the review replaces the box on
+  the same route; nothing posts until "Post it".
   Spice (2026-11-07): every complaint gets 1-5 peppers for how heated the
   LANGUAGE is (not the problem): on-device guess while typing
   (src/lib/read.ts, name-calling regex = 5), the model's `spice` is final.
@@ -80,9 +84,7 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   "biggest topics" grid: topics are tags on points, reachable from them.
   Topic and organization pages use the same sorts. Search opens on "Most
   complained about" (subjects by supporters) with a small Companies /
-  Topics / Both pick that also filters search results. Composer copy is
-  neutral ("Your complaint", "Enter your complaint to see if any similar
-  complaints have been made"): never prompt what the complaint is about.
+  Topics / Both pick that also filters search results.
 - Type: Bricolage Grotesque (`Fonts` in src/constants/theme.ts) for titles,
   the complaint box and counts; the system face for reading.
 - Intake is two calls: `analyzeComplaint` writes a private draft and shows
