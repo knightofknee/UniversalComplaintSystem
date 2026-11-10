@@ -105,7 +105,17 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `users/{uid}/mine/{id}.missing`, shown only to the author on their own
   complaint, where each can be answered in one line (`addDetail`,
   functions/src/details.ts; `submissions.details`, shown as "Added: ...")
-  or dismissed. No model reads a detail: one filtered line, 5 at most.
+  or dismissed (dismissed ones are never suggested again). EVERY ADDED
+  DETAIL HAS THE MODEL RE-READ THE WHOLE COMPLAINT (`rereadWithDetail` in
+  intake.ts): the detail is checked and personal data taken out of it; the
+  complaint's points gain the subjects it names (tags only added); a point
+  that is this complaint's alone is reworded to the sharper statement, while
+  a point other people share keeps its headline unless the usual rule
+  allows; `missing` is worked out afresh. It never creates a point or moves
+  support: the model's "new angle" statement is folded into the closest of
+  the complaint's own points (REREAD_SAME_POINT). If the model can't run,
+  the detail is still added after plain filters. `npm run fix-test` covers
+  the callable; one line, 5 details at most.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS

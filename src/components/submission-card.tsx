@@ -86,6 +86,9 @@ export function BestRantButton({ submissionId, count }: { submissionId: string; 
  * when). Suggestions, never required: answer one in a line and it is added
  * under the complaint, or wave it away.
  */
+/** The last row: a detail nobody suggested. */
+const OTHER = 'Something else';
+
 function MissingDetails({ uid, submissionId }: { uid: string; submissionId: string }) {
   const theme = useTheme();
   const { data } = useDoc<{ missing?: string[] }>(`users/${uid}/mine/${submissionId}`);
@@ -93,13 +96,16 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const missing = data?.missing ?? [];
-  if (missing.length === 0) return null;
+  // Shown once the list has loaded, even when it is empty: there is always "something else".
+  if (!data) return null;
   const send = async (item: string, detail?: string) => {
     setBusy(item);
     try {
-      await addDetail({ submissionId, item, ...(detail ? { text: detail } : {}) });
+      const res = await addDetail({ submissionId, ...(item === OTHER ? {} : { item }), ...(detail ? { text: detail } : {}) });
       setAnswering(null);
       setText('');
+      // The model read the complaint again with the detail in it.
+      if (res.filedUnder.length) showToast('Added', `Now also filed under ${res.filedUnder.join(', ')}.`, 'info');
     } catch (e) {
       showToast("That didn't save", errorText(e));
     } finally {
@@ -108,12 +114,22 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
   };
   return (
     <View style={[styles.missing, { borderColor: theme.border }]}>
-      <T variant="label">Potentially missing</T>
-      <T variant="small">Optional, and only you see this list. What you add shows under your complaint.</T>
-      {missing.map((m) =>
+      <T variant="label">{missing.length ? 'Potentially missing' : 'Add to it'}</T>
+      <T variant="small">
+        Optional, and only you see this. What you add shows under your complaint, and it is read again so it is filed
+        and worded to match.
+      </T>
+      {[...missing, OTHER].map((m) =>
         answering === m ? (
           <View key={m} style={{ gap: 8 }}>
-            <Field autoFocus value={text} onChangeText={setText} placeholder={m} maxLength={200} />
+            <Field
+              autoFocus
+              value={text}
+              onChangeText={setText}
+              placeholder={m === OTHER ? 'One more detail' : m}
+              maxLength={200}
+            />
+            {busy === m && <T variant="small">Reading your complaint again with this in it…</T>}
             <Row>
               <Button
                 label="Cancel"
@@ -146,15 +162,17 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
               <Ionicons name="add-circle-outline" size={18} color={theme.primary} />
               <T style={{ flex: 1 }}>{m.charAt(0).toUpperCase() + m.slice(1)}</T>
             </Pressable>
-            <Pressable
-              onPress={() => send(m)}
-              disabled={busy === m}
-              accessibilityRole="button"
-              accessibilityLabel={`Dismiss: ${m}`}
-              hitSlop={8}
-              style={styles.dismiss}>
-              <Ionicons name="close" size={18} color={theme.textSecondary} />
-            </Pressable>
+            {m !== OTHER && (
+              <Pressable
+                onPress={() => send(m)}
+                disabled={busy === m}
+                accessibilityRole="button"
+                accessibilityLabel={`Dismiss: ${m}`}
+                hitSlop={8}
+                style={styles.dismiss}>
+                <Ionicons name="close" size={18} color={theme.textSecondary} />
+              </Pressable>
+            )}
           </Row>
         ),
       )}

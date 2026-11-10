@@ -478,6 +478,178 @@ async function addSupporters(subjectIds: string[], n: number) {
   );
 }
 
+/**
+ * On a re-read, a statement this close to one of the complaint's own points
+ * is that point said again (measured: the same complaint reworded sits at
+ * 0.07-0.15, unrelated ones at 0.19 and up; a version with a make and model
+ * added lands a little further out than a plain rewording).
+ */
+const REREAD_SAME_POINT = 0.25;
+
+/** What marks the detail being added in the text the model re-reads (so its cleaned-up copy can be picked back out). */
+const ADDING = 'Added now: ';
+
+/**
+ * The model reads a posted complaint again, with a detail its author is
+ * adding ("Dell XPS 13 9310" on a complaint about "my laptop"). A complaint
+ * that is now more specific should be filed and worded that way:
+ *
+ * - the detail itself is checked like the complaint was: refused if it
+ *   crosses the line, and personal data is taken out of it;
+ * - the points this complaint raised gain the subjects the model now sees
+ *   (the maker, the product). Tags are only ever added;
+ * - a point that is this complaint's alone is reworded freely. A point other
+ *   people share changes its headline only under the usual rule: same
+ *   meaning, clearly more actionable;
+ * - what is still missing is worked out afresh.
+ *
+ * It never moves support between points and never creates a new point: the
+ * candidates the model is shown are this complaint's own points, and a
+ * statement it writes fresh is folded into the closest of them.
+ */
+export async function rereadWithDetail(args: { displayName: string; submissionId: string; detail: string }) {
+  const { submissionId, displayName } = args;
+  const subRef = db.doc(`submissions/${submissionId}`);
+  const sub = await subRef.get();
+  if (!sub.exists || sub.get('removed')) throw new HttpsError('not-found', 'That complaint is gone.');
+  const earlier = (sub.get('details') as string[] | undefined) ?? [];
+  const text = [sub.get('text') as string, ...earlier.map((d) => `Added later: ${d}`), `${ADDING}${args.detail}`].join('\n');
+
+  const ownIds = [
+    ...new Set([
+      ...((sub.get('addedPointIds') as string[] | undefined) ?? []),
+      ...((sub.get('matchedPointIds') as string[] | undefined) ?? []),
+    ]),
+  ];
+  const [vector] = await embed([text]);
+  const [nearSubjects, nearTopics, pointSnaps, currentSubjects] = await Promise.all([
+    nearest<SubjectDoc>(db, 'subjects', vector, 10),
+    nearest<SubjectDoc>(db, 'subjects', vector, 10, 'topic'),
+    Promise.all(ownIds.map((id) => db.doc(`points/${id}`).get())),
+    Promise.all(((sub.get('subjectIds') as string[]) ?? []).map((id) => db.doc(`subjects/${id}`).get())),
+  ]);
+  const points = pointSnaps.filter((p) => p.exists && !p.get('removed'));
+  const candidateSubjects = new Map<string, { id: string; kind: string; name: string; description: string }>();
+  for (const c of currentSubjects) {
+    if (c.exists && !c.get('removed')) {
+      candidateSubjects.set(c.id, { id: c.id, kind: c.get('kind'), name: c.get('name'), description: c.get('description') ?? '' });
+    }
+  }
+  for (const n of [...nearSubjects, ...nearTopics]) {
+    if (!candidateSubjects.has(n.id)) candidateSubjects.set(n.id, { id: n.id, kind: n.kind, name: n.name, description: n.description });
+  }
+
+  const result = await runIntake({
+    text,
+    candidateSubjects: [...candidateSubjects.values()],
+    candidatePoints: points.map((p) => ({
+      id: p.id,
+      text: p.get('text') as string,
+      subjects: p.get('subjectNames') as string[],
+      supportCount: p.get('supportCount') as number,
+    })),
+    photos: [],
+  });
+  if (result.safety?.unsafe) {
+    throw new HttpsError('failed-precondition', result.safety.reason ?? 'That breaks the terms of use and can\'t be added.');
+  }
+  if ((result.spice ?? 1) >= 5) {
+    throw new HttpsError('failed-precondition', result.spiceReason ?? 'Leave the name-calling out and add it again.');
+  }
+  // The detail as the model cleaned it: personal data out, the rest untouched.
+  const cleaned = (result.pii.redactedText ?? result.pii.sensitiveRemovedText ?? '').split(ADDING)[1]?.trim();
+  const detail = cleaned && cleaned.length <= 200 ? cleaned : args.detail;
+
+  // Subjects the model may use: ones it was shown, or new ones with a clean name.
+  const usable = (i: number) => {
+    const t = result.subjects[i];
+    if (!t) return false;
+    return t.existingId ? candidateSubjects.has(t.existingId) : !!t.newSubject && !badSubjectName(t.newSubject.name);
+  };
+  const resolved = new Map<number, ResolvedSubject>();
+  const subjectAt = async (i: number) => {
+    if (!resolved.has(i)) resolved.set(i, await resolveSubject(result.subjects[i]));
+    return resolved.get(i)!;
+  };
+
+  // Which of this complaint's points each statement belongs to. The model
+  // matches a point it recognizes and then, as it does at intake, writes the
+  // now more specific version as a separate "new angle" statement. Here that
+  // is the same complaint said better, so it goes with the closest of this
+  // complaint's own points instead of becoming a point of its own.
+  const statementVectors = await embed(result.points.map((p) => p.statement));
+  const vectorOfPoint = (p: FirebaseFirestore.DocumentSnapshot) => (p.get('embedding') as VectorValue | undefined)?.toArray();
+  const belongsTo = result.points.map((p, i) => {
+    if (p.matchedPointId && points.some((x) => x.id === p.matchedPointId)) return p.matchedPointId;
+    let best: { id: string; distance: number } | null = null;
+    for (const x of points) {
+      const v = vectorOfPoint(x);
+      if (!v) continue;
+      const distance = cosineDistance(v, statementVectors[i]);
+      if (!best || distance < best.distance) best = { id: x.id, distance };
+    }
+    return best && best.distance < REREAD_SAME_POINT ? best.id : null;
+  });
+
+  const gained: ResolvedSubject[] = [];
+  for (const point of points) {
+    // A point other people share is theirs too: only what the model itself
+    // matched to it counts there. The folded-in, more specific wording (and
+    // the tags that came with it) applies only to a point that is this
+    // complaint's alone, or one person could narrow what twelve people said.
+    const alone = point.get('submissionCount') === 1 && point.get('canonical.submissionId') === submissionId;
+    const mine = result.points
+      .map((p, i) => ({ p, i }))
+      .filter(({ p, i }) => belongsTo[i] === point.id && (alone || p.matchedPointId === point.id));
+    if (mine.length === 0) continue;
+    const update: Record<string, unknown> = {};
+
+    const current = point.get('subjectIds') as string[];
+    const indexes = [...new Set(mine.flatMap(({ p }) => p.subjectIndexes))].filter(usable);
+    const wanted = capFiling(await Promise.all(indexes.map(subjectAt)));
+    const extra = wanted.filter((x) => !current.includes(x.id)).slice(0, Math.max(0, MAX_SUBJECTS_PER_POINT - current.length));
+    if (extra.length) {
+      const f = filing(extra);
+      update.subjectIds = FieldValue.arrayUnion(...f.subjectIds);
+      update.subjectNames = FieldValue.arrayUnion(...f.subjectNames);
+      if (f.topicIds.length) update.topicIds = FieldValue.arrayUnion(...f.topicIds);
+      if (f.categories.length) update.categories = FieldValue.arrayUnion(...f.categories);
+      for (const x of extra) await db.doc(`subjects/${x.id}`).update({ 'stats.points': FieldValue.increment(1) });
+      await addSupporters(f.subjectIds, point.get('supportCount') as number);
+      gained.push(...extra);
+    }
+
+    // The most actionable way this point is now said.
+    const best = mine.reduce((a, b) => (b.p.actionability > a.p.actionability ? b : a));
+    if (best.p.statement !== point.get('text')) {
+      const pointVector = vectorOfPoint(point);
+      const better =
+        best.p.actionability >= (point.get('canonical.actionability') as number) + HEADLINE_MIN_GAIN &&
+        !!pointVector &&
+        cosineDistance(pointVector, statementVectors[best.i]) < HEADLINE_MAX_DISTANCE;
+      if (alone || better) {
+        update.text = best.p.statement;
+        update.canonical = { submissionId, authorName: displayName, actionability: best.p.actionability };
+        update.embedding = AdminFieldValue.vector(statementVectors[best.i]);
+      }
+    }
+    if (Object.keys(update).length) await point.ref.update({ ...update, lastActivityAt: FieldValue.serverTimestamp() });
+  }
+
+  const unique = gained.filter((x, i) => gained.findIndex((y) => y.id === x.id) === i);
+  await subRef.update({
+    details: FieldValue.arrayUnion(detail),
+    actionability: result.actionability,
+    ...(unique.length
+      ? {
+          subjectIds: FieldValue.arrayUnion(...unique.map((x) => x.id)),
+          subjectNames: FieldValue.arrayUnion(...unique.map((x) => x.name)),
+        }
+      : {}),
+  });
+  return { detail, missing: result.missing ?? [], filedUnder: unique.map((x) => x.name) };
+}
+
 export type DraftData = {
   text: string;
   photoPaths: string[];

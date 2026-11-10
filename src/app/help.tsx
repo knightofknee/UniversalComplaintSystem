@@ -39,7 +39,9 @@ export default function HelpScreen() {
       <T>
         If something would help that you left out, such as the make and model of a product, it is listed as
         potentially missing. It is a suggestion, never a requirement. After posting, the same list sits on your own
-        complaint, where only you see it, and you can add any of them in a line.
+        complaint, where only you see it, and you can add any of them in a line. When you do, your complaint is read
+        again with the new detail: it is filed under what you named, and if the point is yours alone its wording is
+        updated to match.
       </T>
 
       <T variant="heading">After posting</T>

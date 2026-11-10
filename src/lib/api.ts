@@ -82,10 +82,15 @@ export const rateFix = call<
 >('rateFix');
 
 /**
- * Add a one-line detail to your own complaint, and/or clear one of the
- * model's "potentially missing" suggestions (`item`, as listed).
+ * Add a one-line detail to your own complaint (the model then re-reads the
+ * whole complaint), or dismiss one of its "potentially missing" suggestions
+ * (`item`, as listed, with no text).
  */
-export const addDetail = call<{ submissionId: string; item?: string; text?: string }, { ok: boolean }>('addDetail');
+export const addDetail = call<
+  { submissionId: string; item?: string; text?: string },
+  /** `reread`: the model read the complaint again with the detail; `filedUnder`: pages its points gained. */
+  { ok: boolean; reread: boolean; filedUnder: string[] }
+>('addDetail');
 
 /** Random public names to shuffle through; only `setName` changes anything. */
 export const nameOptions = call<Record<string, never>, { names: string[] }>('nameOptions');

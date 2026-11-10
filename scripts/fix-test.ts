@@ -79,17 +79,30 @@ async function main() {
 
   // Adding a detail to your own complaint (details.ts).
   const sub = db.collection('submissions').doc();
-  await sub.set({ text: 'My laptop overheats.', authorName: 'x', removed: false, details: [] });
+  await sub.set({
+    text: 'My laptop overheats.',
+    authorName: 'x',
+    removed: false,
+    details: [],
+    subjectIds: [],
+    subjectNames: [],
+    addedPointIds: [],
+    matchedPointIds: [],
+  });
   await db.doc(`authors/${sub.id}`).set({ uid: a.uid });
   const mineRef = db.doc(`users/${a.uid}/mine/${sub.id}`);
   await mineRef.set({ missing: ['the make and model of your laptop', 'when it happened'] });
   check('only the author can add a detail', /Only the author/.test((await fails(b.call('addDetail', { submissionId: sub.id, text: 'Dell XPS 13' }))) ?? ''));
   check('a detail with a link is refused', /links and contact/.test((await fails(a.call('addDetail', { submissionId: sub.id, text: 'see www.example.com' }))) ?? ''));
-  await a.call('addDetail', { submissionId: sub.id, item: 'the make and model of your laptop', text: 'Dell XPS 13 9310' });
+  // Adding has the model read the complaint again (a real call, like intake in the emulators).
+  const added = (await a.call('addDetail', { submissionId: sub.id, item: 'the make and model of your laptop', text: 'Dell XPS 13 9310' })) as { reread: boolean };
   check('the detail is added under the complaint', JSON.stringify((await sub.get()).get('details')) === '["Dell XPS 13 9310"]', (await sub.get()).get('details'));
-  check('and its suggestion is cleared', JSON.stringify((await mineRef.get()).get('missing')) === '["when it happened"]', (await mineRef.get()).get('missing'));
+  check('the complaint was read again with it', added.reread === true, added);
+  check('what it answered is no longer listed', !((await mineRef.get()).get('missing') as string[]).some((m) => /make and model/.test(m)), (await mineRef.get()).get('missing'));
+  await mineRef.update({ missing: ['when it happened'] });
   await a.call('addDetail', { submissionId: sub.id, item: 'when it happened' });
   check('a suggestion can be dismissed without adding anything', (await mineRef.get()).get('missing').length === 0 && (await sub.get()).get('details').length === 1);
+  check('and stays dismissed', JSON.stringify((await mineRef.get()).get('dismissed')) === '["when it happened"]', (await mineRef.get()).get('dismissed'));
 
   console.log(failed ? `\n${failed} FAILED` : '\nAll checks pass');
     process.exit(failed ? 1 : 0);
