@@ -144,6 +144,12 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Pop-ups (name change, report, "Your complaint is live") sit on a 72% dim
   with their own surface and border, so their words never run into the
   page's.
+- ICON (2026-11-10, the user's direction): a red chili pepper with a curled
+  tip on the dark background, for the spice meter and "constructive heat".
+  Drawn in code: `python3 scripts/icon-gen.py` writes the SVGs,
+  scripts/icon-render.swift turns them into the PNGs in assets/images
+  (icon has no alpha channel, as the App Store requires). The website's copy
+  is the-waldgrave/public/ucs/icon.png. Never a chat bubble.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
