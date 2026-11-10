@@ -15,10 +15,17 @@ import type { Point, Submission } from '@/lib/types';
 
 type Feed = 'hot' | 'rants' | 'shared' | 'fixed' | 'new';
 const LIST = 40;
+/**
+ * Best rants is readers' votes. Until this many rants have a vote, the list
+ * is topped up with ones the model scored this high (1-10, how good a read:
+ * vivid, specific, funny), labeled as the model's pick.
+ */
+const ENOUGH_VOTED = 10;
+const MODEL_PICK = 7;
 
 const FEEDS: { key: Feed; label: string; blurb: string; empty: string }[] = [
   { key: 'hot', label: '🔥 Hot', blurb: 'Picking up the most voices this week.', empty: 'Nothing heating up this week. Yet.' },
-  { key: 'rants', label: '🤬 Best rants', blurb: 'Voted best by readers. Open one and vote.', empty: 'No great rants yet. The box is right there.' },
+  { key: 'rants', label: '🤬 Best rants', blurb: 'Voted best by readers. Open one and vote.', empty: 'No great rants yet. Vote for one, or write it.' },
   { key: 'shared', label: '👥 Most shared', blurb: 'The problems the most people have.', empty: "Nothing's broken here yet. Suspicious." },
   { key: 'fixed', label: '✅ Fixed', blurb: 'Fixes the complainers themselves confirmed.', empty: 'Nothing confirmed fixed yet. Organizations, your move.' },
   { key: 'new', label: '🆕 New', blurb: 'Fresh off the record.', empty: 'Quiet. Too quiet.' },
@@ -67,6 +74,14 @@ export default function RecordScreen() {
       : null,
     'record:rants',
   );
+  const voted = rants.items.filter((s) => (s.loves ?? 0) > 0);
+  const shownRants =
+    voted.length >= ENOUGH_VOTED
+      ? voted
+      : [...voted, ...rants.items.filter((s) => !(s.loves ?? 0) && (s.rantScore ?? 0) >= MODEL_PICK)].slice(
+          0,
+          ENOUGH_VOTED,
+        );
   const shownPoints = feed === 'hot' ? pointList.items.filter((p) => (p.weekSupport ?? 0) > 0) : pointList.items;
 
   return (
@@ -102,10 +117,10 @@ export default function RecordScreen() {
       <T variant="small">{spec.blurb}</T>
 
       {feed === 'rants' ? (
-        rants.items.length === 0 ? (
+        shownRants.length === 0 ? (
           <Empty loading={rants.loading} text={spec.empty} />
         ) : (
-          rants.items.map((s, i) => <RantCard key={s.id} s={s} rank={i + 1} />)
+          shownRants.map((s, i) => <RantCard key={s.id} s={s} rank={i + 1} />)
         )
       ) : shownPoints.length === 0 ? (
         <Empty loading={pointList.loading} text={spec.empty} />
@@ -134,13 +149,11 @@ function RantCard({ s, rank }: { s: Submission; rank: number }) {
       style={({ pressed }) => [styles.rant, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.85 : 1 }]}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={[styles.rantRank, { color: theme.rant }]}>#{rank}</Text>
-        <Text style={{ color: theme.rant, fontFamily: Fonts.bold, fontSize: 14 }}>
-          {loves > 0
-            ? `🤬 ${loves.toLocaleString()}`
-            : score > 0
-              ? `${'🔥'.repeat(Math.max(1, Math.round(score / 3.4)))} ${score}/10`
-              : ''}
-        </Text>
+        {loves > 0 ? (
+          <Text style={{ color: theme.rant, fontFamily: Fonts.bold, fontSize: 14 }}>🤬 {loves.toLocaleString()}</Text>
+        ) : (
+          <Text style={{ color: theme.new, fontFamily: Fonts.bold, fontSize: 14 }}>✨ Model&apos;s pick · {score}/10</Text>
+        )}
       </Row>
       {hidden ? (
         <T variant="small">Hidden by you. Tap to open it anyway.</T>

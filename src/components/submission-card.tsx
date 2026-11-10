@@ -12,11 +12,11 @@ import { Card, Chip, Notice, Row, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, loveRant } from '@/lib/api';
+import { loveRant } from '@/lib/api';
 import { blockAuthor, unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db, storage } from '@/lib/firebase';
 import { tapHaptic } from '@/lib/haptics';
-import { timeAgo } from '@/lib/hooks';
+import { timeAgo, useVote } from '@/lib/hooks';
 import type { Submission } from '@/lib/types';
 
 export function PublicPhoto({ path, size = 96 }: { path: string; size?: number }) {
@@ -36,7 +36,6 @@ export function BestRantButton({ submissionId, count }: { submissionId: string; 
   const theme = useTheme();
   const { user } = useAuth();
   const [mine, setMine] = useState<boolean | null>(null);
-  const [pending, setPending] = useState<boolean | null>(null);
   const [scale] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (!user) return;
@@ -47,23 +46,15 @@ export function BestRantButton({ submissionId, count }: { submissionId: string; 
     );
   }, [submissionId, user]);
 
-  const on = pending ?? mine ?? false;
-  const shown = Math.max(0, count + (pending === null || pending === mine ? 0 : pending ? 1 : -1));
-  const toggle = async () => {
-    const next = !on;
-    setPending(next);
-    if (next) {
+  const vote = useVote(mine, count, (love) => loveRant({ submissionId, love }));
+  const { on, shown } = vote;
+  const toggle = () => {
+    if (!on) {
       tapHaptic();
       scale.setValue(0.94);
       Animated.spring(scale, { toValue: 1, friction: 3, tension: 240, useNativeDriver: Platform.OS !== 'web' }).start();
     }
-    try {
-      await loveRant({ submissionId, love: next });
-    } catch (e) {
-      showToast("That didn't save", errorText(e));
-    } finally {
-      setPending(null);
-    }
+    void vote.toggle();
   };
   const ink = on ? theme.background : theme.rant;
   return (

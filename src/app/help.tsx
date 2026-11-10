@@ -48,7 +48,8 @@ export default function HelpScreen() {
       <T>
         The up arrow on a point means you have that problem too. Best rant, on a complaint, means you loved reading
         it. They are counted separately: one says how many people share a problem, the other picks the rants worth
-        reading.
+        reading. Until enough rants have votes, Best rants also lists ones the model rated highly, each labeled as
+        the model&apos;s pick.
       </T>
 
       <T variant="heading">Photos</T>

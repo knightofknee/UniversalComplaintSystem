@@ -1,6 +1,9 @@
 import { doc, onSnapshot, type DocumentReference, type Query } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 
+import { showToast } from '@/components/toast';
+import { errorText } from '@/lib/api';
+
 import { db } from '@/lib/firebase';
 
 /**
@@ -43,6 +46,33 @@ export function useDoc<T>(path: string | null) {
   }, [path]);
   const current = path && snap?.path === path ? snap : null;
   return { data: current?.data ?? null, loading: !!path && !current };
+}
+
+/**
+ * A vote that shows the instant it is tapped. `mine` and `count` are the
+ * server's, from two separate listeners that catch up at different moments
+ * after the call returns; switching back to them one at a time is a visible
+ * flicker (off and on again, or the count jumping by two). So what was tapped
+ * stays on screen until both have had time to arrive.
+ */
+export function useVote(mine: boolean | null, count: number, send: (on: boolean) => Promise<unknown>) {
+  const [held, setHeld] = useState<{ on: boolean; count: number } | null>(null);
+  const on = held?.on ?? mine ?? false;
+  const shown = held?.count ?? count;
+  const toggle = async () => {
+    const next = { on: !on, count: Math.max(0, shown + (on ? -1 : 1)) };
+    setHeld(next);
+    let settle = 1500;
+    try {
+      await send(next.on);
+    } catch (e) {
+      settle = 0;
+      showToast("That didn't save", errorText(e));
+    }
+    // Only if nothing was tapped since.
+    setTimeout(() => setHeld((h) => (h === next ? null : h)), settle);
+  };
+  return { on, shown, toggle };
 }
 
 export function timeAgo(ms: number | undefined | null): string {

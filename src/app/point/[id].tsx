@@ -16,7 +16,7 @@ import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { successHaptic } from '@/lib/haptics';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
-import { pointShareText, shareLink } from '@/lib/share';
+import { shareLink } from '@/lib/share';
 import type { OrgStatus, Point, PointStatus, Response, Submission } from '@/lib/types';
 
 const FIX_STATES: PointStatus[] = ['fix_claimed', 'fixed', 'not_fixed'];
@@ -92,7 +92,7 @@ export default function PointScreen() {
         options={{
           headerRight: () => (
             <Pressable
-              onPress={() => shareLink(pointShareText(point), `/point/${point.id}`)}
+              onPress={() => shareLink(`/point/${point.id}`)}
               accessibilityLabel="Share this point"
               hitSlop={10}>
               <Ionicons name="share-outline" size={22} color={theme.primary} />

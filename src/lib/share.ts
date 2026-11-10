@@ -12,31 +12,23 @@ export const WEB_APP = 'https://www.waldgrave.com/ucs/app';
 export const webUrl = (path: string) => `${WEB_APP}${path.startsWith('/') ? path : `/${path}`}`;
 
 /**
- * One piece of text with the link on its own last line, on every platform:
- * whatever the person does with it (send, post, Copy then paste somewhere)
- * carries the words and the link together. A separate `url` gets dropped or
- * pasted alone by half the places it can go.
+ * Sharing sends the link and nothing else. No message is written for the
+ * person: text that arrives in someone's own chat reads as them talking, and
+ * they didn't say it. The link's preview card (the complaint as its title,
+ * see functions/src/share.ts) carries the content.
  */
-export async function shareLink(message: string, path: string) {
+export async function shareLink(path: string) {
   const url = webUrl(path);
-  const text = `${message}\n${url}`;
   if (Platform.OS === 'web') {
     const nav = globalThis.navigator as Navigator | undefined;
     if (nav?.share) {
-      await nav.share({ text }).catch(() => {});
+      await nav.share({ url }).catch(() => {});
       return;
     }
-    await nav?.clipboard?.writeText(text);
-    showToast('Copied', 'The words and the link are on your clipboard.', 'info');
+    await nav?.clipboard?.writeText(url);
+    showToast('Link copied', undefined, 'info');
     return;
   }
-  await Share.share({ message: text }).catch(() => {});
-}
-
-const APP_NAME = 'Universal Complaint System';
-
-/** What a shared point reads as wherever it is pasted. */
-export function pointShareText(point: { text: string; supportCount: number }) {
-  const n = point.supportCount;
-  return `“${point.text}”\n${n.toLocaleString()} ${n === 1 ? 'person has' : 'people have'} this problem · ${APP_NAME}`;
+  // iOS takes a url (and shows it as a link card); Android only takes a message.
+  await Share.share(Platform.OS === 'ios' ? { url } : { message: url }).catch(() => {});
 }

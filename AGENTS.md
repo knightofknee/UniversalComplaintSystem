@@ -98,7 +98,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   sorts by real people first, then person-raised before imported, then the
   old count. `rantRank` on submissions does the same for Best rants
   (votes x1000, +100 if a person wrote it, + the model's `rantScore`; 0 =
-  not listed). New fields on old data: `npm run migrate ranks`.
+  not listed). Best rants shows voted rants; until 10 have a vote it is
+  topped up with rants the model scored 7+ (`rantScore`, 1-10, only rants
+  get one), labeled "Model's pick". New fields on old data:
+  `npm run migrate ranks`.
 - Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
   🔥 Hot (`weekPeople`, `imported`, `weekSupport`; recounted every 6h by
   `recountRising`), 🤬 Best rants (submissions by `rantRank`), 👥 Most
@@ -215,9 +218,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   - Shared links are `https://www.waldgrave.com/ucs/app/...` (src/lib/share.ts);
     `+native-intent.ts` strips the prefix; `npm run publish-web` copies the
     web export into ../../Documents/GitHub/the-waldgrave/public/ucs/app.
-  - Sharing (`shareLink`) sends ONE piece of text with the link on its own
-    last line, so Copy then paste carries the words and the link together
-    (`pointShareText`). Link previews: the site sends /ucs/app/point|subject|
+  - Sharing (`shareLink`) sends THE LINK AND NOTHING ELSE (2026-11-09, the
+    user's direction): never write a message for the person, because pasted
+    text reads as them talking. The preview card carries the content. Link previews: the site sends /ucs/app/point|subject|
     submission/<id> through the-waldgrave/pages/api/ucs/share.js, which asks
     the public `linkPreview` function (functions/src/share.ts, no App Check)
     for a title and description and writes them into the page for preview

@@ -61,14 +61,7 @@ function Header({ subject }: { subject: Subject }) {
           title: subject.name,
           headerRight: () => (
             <Pressable
-              onPress={() =>
-                shareLink(
-                  org
-                    ? `What people say is wrong with ${subject.name}, and what it did about it`
-                    : `${subject.name}: what people say is wrong`,
-                  `/subject/${subject.id}`,
-                )
-              }
+              onPress={() => shareLink(`/subject/${subject.id}`)}
               accessibilityLabel="Share this page"
               hitSlop={10}>
               <Ionicons name="share-outline" size={22} color={theme.primary} />

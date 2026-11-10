@@ -9,9 +9,10 @@ import { Chip, Row, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, supportPoint } from '@/lib/api';
+import { supportPoint } from '@/lib/api';
 import { db } from '@/lib/firebase';
 import { tapHaptic } from '@/lib/haptics';
+import { useVote } from '@/lib/hooks';
 import type { PointHit, PointStatus } from '@/lib/types';
 
 export const STATUS_LABEL: Record<PointStatus, string> = {
@@ -52,7 +53,6 @@ export function shortCount(n: number) {
 function useSupport(pointId: string, count: number) {
   const { user } = useAuth();
   const [mine, setMine] = useState<boolean | null>(null);
-  const [pending, setPending] = useState<boolean | null>(null);
   const [scale] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
@@ -60,25 +60,16 @@ function useSupport(pointId: string, count: number) {
     return onSnapshot(doc(db, `points/${pointId}/supports/${user.uid}`), (s) => setMine(s.exists()));
   }, [pointId, user]);
 
-  const on = pending ?? mine ?? false;
-  const shown = count + (pending === null || pending === mine ? 0 : pending ? 1 : -1);
-  const toggle = async () => {
-    const nextOn = !on;
-    setPending(nextOn);
-    if (nextOn) {
+  const vote = useVote(mine, count, (support) => supportPoint({ pointId, support }));
+  const toggle = () => {
+    if (!vote.on) {
       tapHaptic();
       scale.setValue(0.82);
       Animated.spring(scale, { toValue: 1, friction: 3, tension: 240, useNativeDriver: Platform.OS !== 'web' }).start();
     }
-    try {
-      await supportPoint({ pointId, support: nextOn });
-    } catch (e) {
-      showToast("That didn't save", errorText(e));
-    } finally {
-      setPending(null);
-    }
+    void vote.toggle();
   };
-  return { on, shown, toggle, scale };
+  return { on: vote.on, shown: vote.shown, toggle, scale };
 }
 
 /**
