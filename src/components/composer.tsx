@@ -38,7 +38,6 @@ import { TermsCheck, useTermsAccepted } from "@/components/terms-check";
 import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
-import { useKeyboardBar } from "@/components/keyboard-bar";
 import { setJustPosted } from "@/lib/just-posted";
 import { useTheme } from "@/hooks/use-theme";
 import {
@@ -194,7 +193,6 @@ export function Composer({ home }: { home?: boolean }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [focused, setFocused] = useState(false);
-  const keyboardBar = useKeyboardBar();
   const [step, setStep] = useState<Step>({ kind: "write" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -621,10 +619,8 @@ export function Composer({ home }: { home?: boolean }) {
               placeholderTextColor={theme.textSecondary}
               maxLength={4000}
               accessibilityLabel="Your complaint"
-              inputAccessoryViewID={keyboardBar.id}
               style={[styles.input, { color: theme.text }]}
             />
-            {keyboardBar.element}
             {photos.length > 0 && (
               <Row style={{ flexWrap: "wrap", gap: 10 }}>
                 {photos.map((p, i) => (

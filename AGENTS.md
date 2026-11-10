@@ -124,7 +124,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - KEYBOARDS (2026-11-10): every text field has an obvious way to put the
   keyboard away: a bar on top of it with a hide button
   (`useKeyboardBar`, src/components/keyboard-bar.tsx; `Field` has it built
-  in, any bare TextInput must add it). One bar per field: a shared one only
+  in, any bare TextInput must add it). THE ONE EXCEPTION is the complaint
+  box: everything about the complaint is already visible with the keyboard
+  up, so a hide bar there only costs a line of space. One bar per field: a shared one only
   attaches to the first field. Scrolling a `Screen` dismisses it too.
 - TRANSITIONS (2026-11-10): tabs switch with no animation (peers); going
   deeper slides sideways (the stack default); the complaint box is a task
