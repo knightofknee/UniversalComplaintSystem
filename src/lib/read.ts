@@ -74,7 +74,7 @@ export function readComplaint(raw: string): Read {
   let nudge: string;
   if (words < MIN_WORDS) nudge = 'Keep going. Say what happened.';
   else if (overLine) nudge = 'Swear all you want. Calling people names gets it sent back.';
-  else if (!who) nudge = 'Who is it about? Name the company, product or place.';
+  else if (!who) nudge = 'Name the target of your complaint.';
   else if (!what) nudge = 'What happened? A sentence or two does it.';
   else if (!fix && spice >= 3) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';
