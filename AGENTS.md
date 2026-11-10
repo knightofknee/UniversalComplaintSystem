@@ -144,6 +144,15 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Pop-ups (name change, report, "Your complaint is live") sit on a 72% dim
   with their own surface and border, so their words never run into the
   page's.
+- An author can delete one complaint (`deleteComplaint`, account.ts; the
+  bin icon on their own card): its support is withdrawn and a point that
+  was its alone goes too. A point's followers are told when others join,
+  at milestones only (`announceJoin`, points.ts). Lists page with "Show
+  more"; photos open full size; the Me tab carries an unread badge.
+- Company dashboard (src/app/company/index.tsx): `Summary` works out, from
+  the organization's points, what is waiting on it (each number opens that
+  list), response rate and time (`firstRespondedBy`), what the complaints
+  are about (topics), and exports the table. NOT YET TESTED BY THE USER.
 - ICON (2026-11-10, the user's direction): a red chili pepper with a curled
   tip on the dark background, for the spice meter and "constructive heat".
   Drawn in code: `python3 scripts/icon-gen.py` writes the SVGs,

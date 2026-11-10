@@ -50,6 +50,10 @@ export default function HelpScreen() {
         can respond to a point; they can never edit or remove anything. When a company says a point is fixed, the
         people who raised it confirm before it counts.
       </T>
+      <T>
+        You can delete a complaint of yours with the bin icon on it. When more people join a point you raised, you
+        are told.
+      </T>
 
       <T variant="heading">Two ways to back a complaint</T>
       <T>

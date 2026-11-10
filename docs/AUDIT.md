@@ -85,7 +85,6 @@ flame; empty states have some voice.
   operator queue for model-created organizations. (M)
 - **Language**: UI translations, and points shown in the reader's language.
   "Universal" needs this. (L)
-- **Accounts that survive a reinstall**: Sign in with Apple and Google. (M)
 - **Organization tools from the spec**: median time to first response, CSV
   export, internal notes, embed. (M)
 - **Scale**: sharded counters for `usage/{date}` and supporter totals;
@@ -127,6 +126,43 @@ personality without clutter:
   "Nothing here yet."
 - **Rants** get their own warm color and a little heat, so venting feels
   welcome and the constructive points still lead.
+
+---
+
+## Complete-product audit (2026-11-10)
+
+Walked every regular-user journey: write, review, post, find, support, vote,
+fix, follow up, sign in, leave. Fixed in this pass:
+
+- Delete one of your own complaints (was: only the whole account).
+- Lists paged with "Show more" (was: cut off at 40 / 100).
+- People on a point are told when others join it, at milestones.
+- Photos open full size; unread badge on the Me tab.
+- Signing in to an existing account brings the device's complaints with it.
+- Sign in with Apple and Google; shuffle your public name.
+- Proposed fixes from anyone, rated by the people with the problem.
+- "Potentially missing" details, with a re-read when one is added.
+- Keyboard hide bar; modal transitions for the complaint box.
+- New icon (a chili pepper).
+
+Still open for regular users, honestly:
+
+- **Language (L)**: complaints in any language are read and translated, but
+  the app's own words are English only. The biggest gap against "Universal".
+- **Near-duplicate merging (M)**: the model matches at intake; nothing merges
+  two points that slipped through later.
+- **Sign in with Apple on the web (S)**: needs a Services ID and key from the
+  Apple developer account. iPhone works.
+- **Android (S, blocked on the first Play build)**: release SHA-256 for App
+  Check, push, app links and Google sign-in.
+- **Fake support at scale (M)**: support from brand-new anonymous accounts
+  counts in full.
+- Not exercised end to end with real accounts: a real Google / Apple sign-in,
+  posting a fix on the live record, the account merge.
+
+Organizations: the dashboard gained a summary, response rate and time, topic
+breakdown, two more filters and an export. Untested by the owner; outreach
+email and weekly digests still need an email provider.
 
 ---
 
