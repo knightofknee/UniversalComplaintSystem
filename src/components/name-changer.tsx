@@ -83,7 +83,9 @@ export function NameChanger({ name }: { name: string }) {
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={[styles.sheet, { backgroundColor: theme.background }]} onPress={() => {}}>
+          <Pressable
+          style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          onPress={() => {}}>
             <T variant="small">{candidate ? 'How about' : 'Your name'}</T>
             <Text style={[styles.candidate, { color: theme.text }]}>{candidate ?? name}</Text>
             <Button label="Shuffle" icon="shuffle" kind="secondary" onPress={shuffle} busy={busy === 'shuffle'} />
@@ -98,7 +100,8 @@ export function NameChanger({ name }: { name: string }) {
 
 const styles = StyleSheet.create({
   name: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
-  sheet: { borderRadius: 18, padding: 18, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' },
+  // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 420, alignSelf: 'center' },
   candidate: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 36 },
 });

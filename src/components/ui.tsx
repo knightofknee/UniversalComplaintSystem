@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps, ReactNode, RefObject } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
+import { useKeyboardBar } from '@/components/keyboard-bar';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Scrolling page, centered and capped in width on wide (web) screens. */
@@ -42,6 +44,8 @@ export function Screen({
       ref={scrollRef}
       style={{ backgroundColor: theme.background }}
       keyboardShouldPersistTaps="handled"
+      // Dragging the page also puts the keyboard away.
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       contentContainerStyle={[
         styles.screen,
         { paddingTop: (topInset ? insets.top : 0) + 16, paddingBottom: insets.bottom + 40 },
@@ -159,11 +163,14 @@ export function Chip({ label, color, bg }: { label: string; color: string; bg: s
 export function Field(props: TextInputProps & { label?: string }) {
   const theme = useTheme();
   const { label, style, ...rest } = props;
+  const bar = useKeyboardBar();
   return (
     <View style={{ gap: 6 }}>
       {label && <T variant="label">{label}</T>}
       <TextInput
         placeholderTextColor={theme.textSecondary}
+        // Every field gets the bar with the hide-keyboard button.
+        inputAccessoryViewID={bar.id}
         {...rest}
         style={[
           styles.field,
@@ -172,6 +179,7 @@ export function Field(props: TextInputProps & { label?: string }) {
           style,
         ]}
       />
+      {bar.element}
     </View>
   );
 }
@@ -181,27 +189,36 @@ export function Tabs<K extends string>({
   options,
   value,
   onChange,
+  fill,
 }: {
   options: { key: K; label: string }[];
   value: K;
   onChange: (k: K) => void;
+  /** Equal segments across the full width, for a choice that sits in a column of full-width controls. */
+  fill?: boolean;
 }) {
   const theme = useTheme();
+  const tabs = options.map((o) => {
+    const on = o.key === value;
+    return (
+      <Pressable
+        key={o.key}
+        onPress={() => onChange(o.key)}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: on }}
+        style={[
+          styles.tab,
+          fill && { flex: 1, alignItems: 'center' },
+          { backgroundColor: on ? theme.text : theme.backgroundElement },
+        ]}>
+        <Text style={{ color: on ? theme.background : theme.text, fontWeight: '600' }}>{o.label}</Text>
+      </Pressable>
+    );
+  });
+  if (fill) return <View style={{ flexDirection: 'row', gap: 8 }}>{tabs}</View>;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-      {options.map((o) => {
-        const on = o.key === value;
-        return (
-          <Pressable
-            key={o.key}
-            onPress={() => onChange(o.key)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
-            style={[styles.tab, { backgroundColor: on ? theme.text : theme.backgroundElement }]}>
-            <Text style={{ color: on ? theme.background : theme.text, fontWeight: '600' }}>{o.label}</Text>
-          </Pressable>
-        );
-      })}
+      {tabs}
     </ScrollView>
   );
 }

@@ -95,11 +95,17 @@ export default function RootLayout() {
               name="(tabs)"
               options={{ headerShown: false, title: "Complaints" }}
             />
+            {/* Writing a complaint is a task of its own that covers the tab
+                bar, so it comes and goes as one: up from the bottom, and back
+                down. (A sideways slide says "one level deeper", which it is
+                not.) No swipe to close: the menu button is the way out. */}
             <Stack.Screen
               name="index"
               options={{
                 headerShown: false,
                 title: "Universal Complaint System",
+                animation: "slide_from_bottom",
+                gestureEnabled: false,
               }}
             />
             <Stack.Screen name="complain" options={{ title: "" }} />

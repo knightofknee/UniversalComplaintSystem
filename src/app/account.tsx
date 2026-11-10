@@ -111,6 +111,7 @@ export default function AccountScreen() {
         <View style={[styles.line, { backgroundColor: theme.border }]} />
       </View>
       <Tabs
+        fill
         options={[
           { key: 'signup', label: 'Sign up' },
           { key: 'signin', label: 'I have an account' },

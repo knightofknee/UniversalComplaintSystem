@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
@@ -13,6 +13,7 @@ import { errorText } from '@/lib/api';
 import { unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { timeAgo, useCollection } from '@/lib/hooks';
+import { useJustPosted } from '@/lib/just-posted';
 import { isOperator } from '@/lib/operator';
 import { type AppearancePref, setAppearance, useAppearancePref } from '@/lib/appearance';
 import { pushSupported, turnOffPush, turnOnPush } from '@/lib/push';
@@ -118,7 +119,9 @@ function KeepItPrompt({ visible, onClose }: { visible: boolean; onClose: () => v
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: theme.background }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          onPress={() => {}}>
           <T variant="heading">Your complaint is live.</T>
           <T>
             It is posted without an account. To keep your history, sign in: until then your complaints stay with this
@@ -143,7 +146,7 @@ export default function MeScreen() {
   const router = useRouter();
   const theme = useTheme();
   // Set when arriving straight from posting: that complaint is marked and scrolled to.
-  const { posted } = useLocalSearchParams<{ posted?: string }>();
+  const posted = useJustPosted();
   const scrollRef = useRef<ScrollView>(null);
   const [answered, setAnswered] = useState<string | null>(null);
   const blocked = useBlockedAuthors();
@@ -279,6 +282,7 @@ export default function MeScreen() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
-  sheet: { borderRadius: 18, padding: 18, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' },
+  // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 420, alignSelf: 'center' },
 });

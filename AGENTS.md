@@ -121,6 +121,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   the complaint's own points (REREAD_SAME_POINT). If the model can't run,
   the detail is still added after plain filters. `npm run fix-test` covers
   the callable; one line, 5 details at most.
+- KEYBOARDS (2026-11-10): every text field has an obvious way to put the
+  keyboard away: a bar on top of it with a hide button
+  (`useKeyboardBar`, src/components/keyboard-bar.tsx; `Field` has it built
+  in, any bare TextInput must add it). One bar per field: a shared one only
+  attaches to the first field. Scrolling a `Screen` dismisses it too.
+- TRANSITIONS (2026-11-10): tabs switch with no animation (peers); going
+  deeper slides sideways (the stack default); the complaint box is a task
+  that covers the tab bar, so it rises from the bottom and drops back down
+  (`slide_from_bottom` on `index`), never sideways. What is typed in the
+  main box survives leaving it (`keptDraft` in composer.tsx).
+- Pop-ups (name change, report, "Your complaint is live") sit on a 72% dim
+  with their own surface and border, so their words never run into the
+  page's.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
@@ -154,8 +167,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   line of description under it. Empty lists say "Nothing here yet." with
   no joke and no finger pointed at anyone (2026-11-10).
 - AFTER POSTING (2026-11-10) there is no "Posted" screen: the box clears
-  and they land on Me with `?posted=<id>`, where that complaint is scrolled
-  to and marked "Just posted" (a mark only; the row works as any other).
+  and they land on Me, where that complaint is scrolled
+  to and marked "Just posted" (a mark only; the row works as any other;
+  the id is held in src/lib/just-posted.ts, never in the address).
   Signed out, a prompt says the complaint is live without an account and
   that signing in keeps the history (once per post). Private and queued
   complaints keep their own after-screens.

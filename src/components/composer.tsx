@@ -37,6 +37,8 @@ import { TermsCheck, useTermsAccepted } from "@/components/terms-check";
 import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
+import { useKeyboardBar } from "@/components/keyboard-bar";
+import { setJustPosted } from "@/lib/just-posted";
 import { useTheme } from "@/hooks/use-theme";
 import {
   analyzeComplaint,
@@ -53,6 +55,9 @@ import type { Analysis } from "@/lib/types";
 const MAX_PHOTOS = 4;
 
 type Photo = { uri: string; path: string | null };
+/** The unfinished complaint in the main box, while the app is open. */
+let keptDraft = "";
+
 type Step =
   | { kind: "write" }
   | { kind: "queued" }
@@ -130,10 +135,18 @@ export function Composer({ home }: { home?: boolean }) {
     subjectName?: string;
     draft?: string;
   }>();
-  const [text, setText] = useState("");
+  // What is typed in the main box survives leaving it (the menu button, a
+  // tab, coming back later): closing a screen should never cost someone
+  // their words. Kept for the session; cleared once it is posted.
+  const [text, setTextState] = useState(() => (home ? keptDraft : ""));
+  const setText = (next: string) => {
+    if (home) keptDraft = next;
+    setTextState(next);
+  };
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [focused, setFocused] = useState(false);
+  const keyboardBar = useKeyboardBar();
   const [step, setStep] = useState<Step>({ kind: "write" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -235,7 +248,7 @@ export function Composer({ home }: { home?: boolean }) {
     getDraft({ draftId: draftParam })
       .then(({ text: saved, ...analysis }) => {
         if (!live) return;
-        setText(saved);
+        setTextState(saved);
         review(analysis);
       })
       .catch((e) => setError(errorText(e)));
@@ -308,10 +321,8 @@ export function Composer({ home }: { home?: boolean }) {
         // Posted: the box is cleared and they land on their profile, with
         // the new complaint marked, so they know where it lives.
         reset();
-        router.navigate({
-          pathname: "/me",
-          params: { posted: res.submissionId },
-        });
+        setJustPosted(res.submissionId);
+        router.navigate("/me");
       }
     } catch (e) {
       setError(errorText(e));
@@ -533,8 +544,10 @@ export function Composer({ home }: { home?: boolean }) {
               placeholderTextColor={theme.textSecondary}
               maxLength={4000}
               accessibilityLabel="Your complaint"
+              inputAccessoryViewID={keyboardBar.id}
               style={[styles.input, { color: theme.text }]}
             />
+            {keyboardBar.element}
             {photos.length > 0 && (
               <Row style={{ flexWrap: "wrap", gap: 10 }}>
                 {photos.map((p, i) => (

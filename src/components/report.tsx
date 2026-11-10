@@ -69,7 +69,9 @@ export function ReportButton({
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={[styles.sheet, { backgroundColor: theme.background }]} onPress={() => {}}>
+          <Pressable
+          style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          onPress={() => {}}>
             <T variant="heading">What&apos;s wrong with it?</T>
             <T variant="small">
               Reports go to the people who run UCS, never to the organization. Disagreeing with a complaint isn&apos;t a
@@ -104,7 +106,8 @@ export function ReportButton({
 const styles = StyleSheet.create({
   trigger: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   compact: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
-  sheet: { borderRadius: 18, padding: 18, gap: 12, width: '100%', maxWidth: 480, alignSelf: 'center' },
+  // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 480, alignSelf: 'center' },
   reason: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 12, padding: 12 },
 });
