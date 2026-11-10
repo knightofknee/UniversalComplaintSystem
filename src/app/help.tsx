@@ -52,6 +52,13 @@ export default function HelpScreen() {
         the model&apos;s pick.
       </T>
 
+      <T variant="heading">Fixes</T>
+      <T>
+        Anyone can propose a fix on a point: the organization, or someone who found a way around the problem. The
+        people who have the problem are told, and each says whether it fixed it fully, partly, or not at all. A
+        point shows as Fixed only when the people who had it before the fix was proposed say it worked.
+      </T>
+
       <T variant="heading">Photos</T>
       <T>
         You can attach up to four photos. They are resized and their metadata, including location, is removed

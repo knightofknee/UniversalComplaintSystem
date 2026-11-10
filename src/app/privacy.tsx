@@ -5,7 +5,7 @@ export default function PrivacyScreen() {
   return (
     <LegalPage
       title="Privacy policy"
-      updated="November 9, 2026"
+      updated="November 10, 2026"
       sections={[
         {
           heading: 'Who we are',
@@ -18,10 +18,10 @@ export default function PrivacyScreen() {
           heading: 'What we collect',
           body: [
             'An account identifier. The first time you open UCS we create an anonymous account so you can complain without signing up. It is not linked to your name, phone number, or device identifier.',
-            'Your email address and a password hash, only if you add an email. We use the email to sign you in, to let organizations reply to private complaints you send them, and to verify you if you respond for an organization. We never show it publicly.',
-            'A display name we assign at random (for example "Steady Heron"). It is the only name shown next to anything you post.',
+            'Your email address, only if you sign in. You can sign in with an email and password (we keep a hash of the password) or with Google or Apple, which tell us your email address and nothing else; Apple lets you hide your real address. We use the email to sign you in, to let organizations reply to private complaints you send them, and to verify you if you respond for an organization. We never show it publicly.',
+            'A display name we assign at random (for example "Steady Heron"). It is the only name shown next to anything you post. You can swap it for another random one, never one you type.',
             'What you submit: the text of each complaint, any photos you attach, whether you sent it publicly or privately, how it was filed (the points, organizations and topics), and, for private complaints, the conversation that follows.',
-            'Your support, "Best rant" votes and fix confirmations. We store which points you supported and which complaints you voted for so we can notify you and so you can withdraw; only the totals are public.',
+            'Your support, "Best rant" votes, fix confirmations and how you rated a proposed fix. We store which points you supported, which complaints you voted for and what you said about each fix so we can notify you and so you can withdraw; only the totals are public. A fix you propose for a point is public, under your display name.',
             'Notifications we send you inside the app, and, if you turn on phone notifications, your phone\'s push token (an address Apple or Google uses to deliver them, through Expo\'s push service).',
             'When you agreed to the terms of use.',
             'Reports you send: what you reported and why. Authors you chose to hide (their complaints are folded shut for you); that list is yours alone.',
@@ -79,7 +79,7 @@ export default function PrivacyScreen() {
         {
           heading: 'Deleting your account',
           body: [
-            'Delete your account at any time from Me > Account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every support, "Best rant" vote and fix confirmation you gave is withdrawn and the counts drop; your organization access, requests, queued complaints, hidden-author list, notifications, phone tokens and sign-in are deleted; reports you sent stay without your account attached. An organization\'s private counts keep the anonymous number, which contains none of your words.',
+            'Delete your account at any time from Me > Delete account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every support, "Best rant" vote, fix confirmation and fix rating you gave is withdrawn and the counts drop; fixes you proposed are deleted; your organization access, requests, queued complaints, hidden-author list, notifications, phone tokens and sign-in are deleted; reports you sent stay without your account attached. An organization\'s private counts keep the anonymous number, which contains none of your words.',
           ],
         },
         {

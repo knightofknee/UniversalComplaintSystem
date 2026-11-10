@@ -75,11 +75,13 @@ export async function ensureUser(uid: string): Promise<UserInfo> {
     if (d.banned === true) {
       throw new HttpsError('permission-denied', 'This account was suspended for breaking the terms of use.');
     }
+    // The account's own public id, so the app can tell which complaints and fixes are its own.
+    if (!d.authorId) await ref.update({ authorId: authorIdOf(uid) });
     return { displayName: d.displayName, responderFor: d.responderFor ?? [], termsAcceptedAt: d.termsAcceptedAt ?? null };
   }
   const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
   const displayName = `${pick(NAME_ADJECTIVES)} ${pick(NAME_NOUNS)}`;
-  await ref.set({ displayName, responderFor: [], createdAt: FieldValue.serverTimestamp() });
+  await ref.set({ displayName, authorId: authorIdOf(uid), responderFor: [], createdAt: FieldValue.serverTimestamp() });
   return { displayName, responderFor: [], termsAcceptedAt: null };
 }
 
@@ -111,6 +113,8 @@ export const LIMITS = {
   message: { max: 100, windowMs: 24 * 3600_000 },
   report: { max: 30, windowMs: 24 * 3600_000 },
   settings: { max: 60, windowMs: 3600_000 },
+  solution: { max: 10, windowMs: 24 * 3600_000 },
+  rename: { max: 10, windowMs: 24 * 3600_000 },
 } as const;
 
 /**
@@ -128,6 +132,8 @@ const IP_LIMITS: Record<keyof typeof LIMITS, { max: number; windowMs: number }> 
   message: { max: 300, windowMs: 24 * 3600_000 },
   report: { max: 100, windowMs: 24 * 3600_000 },
   settings: { max: 200, windowMs: 3600_000 },
+  solution: { max: 40, windowMs: 24 * 3600_000 },
+  rename: { max: 40, windowMs: 24 * 3600_000 },
 };
 
 /** A one-way hash of the caller's address: we never store the address itself. */

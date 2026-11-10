@@ -90,7 +90,11 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="account"
-              options={{ title: "Account", presentation: "modal" }}
+              options={{ title: "Sign in", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="delete-account"
+              options={{ title: "Delete account" }}
             />
             <Stack.Screen
               name="notifications"
@@ -106,10 +110,6 @@ export default function RootLayout() {
             />
             <Stack.Screen name="about" options={{ title: "How UCS works" }} />
             <Stack.Screen name="removals" options={{ title: "Removal log" }} />
-            <Stack.Screen
-              name="threads"
-              options={{ title: "Private complaints" }}
-            />
             <Stack.Screen
               name="thread/[orgId]/[threadId]"
               options={{ title: "Private" }}

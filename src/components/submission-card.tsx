@@ -95,7 +95,7 @@ function confirmHide(name: string, onYes: () => void) {
 /** One person's complaint, in their own words (and in English if they wrote another language). */
 export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: boolean }) {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [original, setOriginal] = useState(false);
   const [opened, setOpened] = useState(false);
   const blocked = useBlockedAuthors();
@@ -103,6 +103,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
   const source = s.source;
   const hidden = !!s.authorId && blocked.ids.has(s.authorId);
   const loves = s.loves ?? 0;
+  const own = !!s.authorId && s.authorId === profile?.authorId;
 
   // An author you hid: folded shut, never gone. You can still see that
   // someone you hid weighed in, and open it if this is the one time you want
@@ -131,6 +132,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
           {s.authorName}
         </T>
         <T variant="small">{timeAgo(s.createdAt?.toMillis())}</T>
+        {own && <Chip label="Yours" color={theme.primary} bg={theme.primarySoft} />}
         {source && <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />}
         {s.tone === 'rant' && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
         {addedPoint && <Chip label="Model added this point from it" color={theme.new} bg={theme.newSoft} />}
@@ -168,7 +170,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
         <Row style={{ gap: 4 }}>
           <BestRantButton submissionId={s.id} count={loves} />
           <ReportButton target={{ kind: 'submission', id: s.id }} compact />
-          {user && s.authorId && (
+          {user && s.authorId && !own && (
             <Pressable
               onPress={() =>
                 hidden

@@ -9,6 +9,8 @@ export { analyzeComplaint, getDraft, processQueue, searchPoints, submitComplaint
 export { flushNotices, recountRising, supportPoint, voteFix } from './points';
 export { loveRant } from './rants';
 export { linkPreview } from './share';
+export { proposeFix, rateFix } from './solutions';
+export { nameOptions, setName } from './names';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';

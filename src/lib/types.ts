@@ -96,6 +96,20 @@ export type Submission = {
   createdAt: Timestamp | null;
 };
 
+/** A fix someone proposed for a point (points/{id}/solutions/{authorId}). */
+export type Solution = {
+  /** The proposer's opaque author id: one fix per person per point. */
+  id: string;
+  text: string;
+  authorName: string;
+  authorId: string;
+  /** How the people who have the problem rated it. */
+  full: number;
+  partial: number;
+  none: number;
+  createdAt: Timestamp | null;
+};
+
 /** Where an imported complaint came from. */
 export type Source = {
   name: string;

@@ -75,6 +75,15 @@ export async function photoIsSafe(base64: string): Promise<boolean> {
 const PROFANITY = /\b(fuck\w*|shit\w*|cunt\w*|bitch\w*|asshole\w*|dick(head)?s?|whores?|sluts?|bastards?|motherf\w*|wank\w*|twats?|pricks?|scum\w*|retard\w*)\b/i;
 const CONTACT = /(https?:\/\/|www\.|@\w|\b[\w.+-]+@[\w-]+\.\w|\+?\d[\d\s().-]{7,}\d)/i;
 
+/**
+ * Insults aimed at people, the one thing the spice meter sends back. The
+ * same list as the app's on-device check (src/lib/read.ts NAME_CALLING);
+ * used where no model reads the text (proposed fixes).
+ */
+const NAME_CALLING =
+  /\b(bitch(es|y)?|assholes?|idiots?|morons?|retard(s|ed)?|cunts?|whores?|sluts?|bastards?|dumbass(es)?|dipshits?|scumbags?|douche(bag)?s?|twats?|pricks?|jackass(es)?|dickheads?|motherfuckers?)\b/i;
+export const nameCalling = (text: string) => NAME_CALLING.test(text);
+
 /** Null when the name can be a subject; else why not. */
 export function badSubjectName(name: string): string | null {
   const n = name.trim();
@@ -87,7 +96,7 @@ export function badSubjectName(name: string): string | null {
 // ── Reports ─────────────────────────────────────────────────────────────
 
 export const REPORT_REASONS = ['abuse', 'private_person', 'personal_data', 'spam', 'illegal', 'other'] as const;
-const KINDS = ['point', 'submission', 'response', 'subject', 'message', 'thread'] as const;
+const KINDS = ['point', 'submission', 'response', 'solution', 'subject', 'message', 'thread'] as const;
 type Kind = (typeof KINDS)[number];
 
 const str = (v: unknown) => (typeof v === 'string' && /^[\w-]{1,128}$/.test(v) ? v : '');
@@ -105,6 +114,7 @@ async function reportTarget(req: CallableRequest, uid: string) {
   else if (kind === 'submission') path = `submissions/${id}`;
   else if (kind === 'subject') path = `subjects/${id}`;
   else if (kind === 'response') path = `points/${pointId}/responses/${id}`;
+  else if (kind === 'solution') path = `points/${pointId}/solutions/${id}`;
   else {
     // Private: only the two sides of the conversation can report in it.
     const thread = await db.doc(`subjects/${orgId}/inbox/${threadId}`).get();
@@ -124,6 +134,9 @@ async function reportTarget(req: CallableRequest, uid: string) {
 async function authorUidOf(kind: Kind, path: string, snap: FirebaseFirestore.DocumentSnapshot): Promise<string | null> {
   if (kind === 'submission') return ((await db.doc(`authors/${snap.id}`).get()).get('uid') as string) ?? null;
   if (kind === 'response') return ((await db.doc(`authors/r_${snap.id}`).get()).get('uid') as string) ?? null;
+  if (kind === 'solution') {
+    return ((await db.doc(`authors/s_${path.split('/')[1]}_${snap.id}`).get()).get('uid') as string) ?? null;
+  }
   if (kind === 'thread') return (snap.get('uid') as string) ?? null;
   if (kind === 'message') {
     if (snap.get('uid')) return snap.get('uid') as string;
@@ -180,16 +193,28 @@ export async function removeTarget(path: string, reason: string) {
     return;
   }
   let kind: string;
+  let subjectNames: string[] | undefined;
   if (path.includes('/responses/')) {
     kind = 'response';
     await ref.update({ text: null, removed: true });
+  } else if (path.includes('/solutions/')) {
+    kind = 'proposed fix';
+    await ref.update({ text: null, removed: true });
+    const pointId = path.split('/')[1];
+    subjectNames = (await db.doc(`points/${pointId}`).get()).get('subjectNames') as string[] | undefined;
+    // If this fix was what made the point Fixed, it no longer is.
+    const { settleFix } = await import('./solutions');
+    await settleFix(pointId, snap.id);
   } else {
     kind = top === 'points' ? 'point' : top === 'submissions' ? 'submission' : 'subject';
     await ref.update({ removed: true });
   }
   await db.collection('removals').add({
     kind,
-    subjectNames: (snap.get('subjectNames') as string[] | undefined) ?? [snap.get('subjectName') ?? snap.get('name')].filter(Boolean),
+    subjectNames:
+      subjectNames ??
+      (snap.get('subjectNames') as string[] | undefined) ??
+      [snap.get('subjectName') ?? snap.get('name')].filter(Boolean),
     reason,
     at: FieldValue.serverTimestamp(),
   });

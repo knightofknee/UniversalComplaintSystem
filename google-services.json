@@ -12,7 +12,12 @@
           "package_name": "com.waldgrave.ucs"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "331431699365-ncvmkp2tu0rughge3vsgq1q5vqnn00ks.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBHqTDpkG9CFjS9mlnHnLVk9Zp5kB0Wg6I"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331431699365-ncvmkp2tu0rughge3vsgq1q5vqnn00ks.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "331431699365-kpe37b62dlo7ij9bes558hogd85l5emo.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.waldgrave.ucs"
+              }
+            }
+          ]
         }
       }
     }

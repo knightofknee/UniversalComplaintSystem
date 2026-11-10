@@ -54,6 +54,13 @@ service cloud.firestore {
       match /fixVotes/{uid} {
         allow read: if isMe(uid);
       }
+      // Proposed fixes are public; who rated one, and how, is private.
+      match /solutions/{solutionId} {
+        allow read: if resource.data.removed == false;
+        match /ratings/{uid} {
+          allow read: if isMe(uid);
+        }
+      }
     }
 
     match /submissions/{submissionId} {

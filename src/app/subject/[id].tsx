@@ -99,11 +99,11 @@ function Header({ subject }: { subject: Subject }) {
 
 const SORTS: { key: Sort; label: string }[] = [
   { key: 'rising', label: '🔥 Hot' },
-  { key: 'top', label: '👥 Most shared' },
+  { key: 'top', label: '🏆 Top' },
   { key: 'new', label: '🆕 New' },
 ];
 
-/** Hot, most shared, new: the same sorts as the Complaints tab. */
+/** Hot, top, new: the same sorts as the Complaints tab. */
 function SubjectFeed({ subject }: { subject: Subject }) {
   const [sort, setSort] = useState<Sort>('top');
   const points = usePoints(subject.id, sort);
@@ -112,7 +112,7 @@ function SubjectFeed({ subject }: { subject: Subject }) {
     <>
       <Tabs options={SORTS} value={sort} onChange={setSort} />
       {shown.length === 0 ? (
-        <Empty loading={points.loading} text={sort === 'rising' ? 'Nothing heating up this week.' : 'Nothing here yet.'} />
+        <Empty loading={points.loading} text="Nothing here yet." />
       ) : (
         <PointList>
           {shown.map((p, i) => (

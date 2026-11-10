@@ -4,8 +4,8 @@
  *   (the organization's anonymous private counts stay: they hold no words);
  * - public complaints lose their text, photos and author name; the points
  *   they fed stay on the record (other people share them), unattributed;
- * - every support, "Best rant" vote and fix confirmation is withdrawn and the
- *   counts drop;
+ * - every support, "Best rant" vote, fix confirmation and fix rating is
+ *   withdrawn and the counts drop; fixes they proposed are deleted;
  * - organization access, requests, queued complaints, blocks, notifications,
  *   phone notification tokens, limits and the sign-in itself are removed;
  *   reports they sent stay (they're about others' posts) without their name.
@@ -14,8 +14,9 @@ import { getAuth } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { CALLABLE, bucket, db, FieldValue, Timestamp, uidOf } from './common';
+import { authorIdOf, CALLABLE, bucket, db, FieldValue, Timestamp, uidOf } from './common';
 import { rantRank } from './rants';
+import { settleFix } from './solutions';
 
 const DELETED = 'Deleted account';
 const WEEK_MS = 7 * 24 * 3600_000;
@@ -74,6 +75,29 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
         }),
       });
     });
+  }
+  // Fixes they proposed are deleted with their ratings; ratings they gave
+  // are withdrawn and the tallies drop. Either can change what is Fixed.
+  const fixes = await db.collectionGroup('solutions').where('authorId', '==', authorIdOf(uid)).get();
+  for (const f of fixes.docs) {
+    const pointId = f.ref.parent.parent!.id;
+    await db.recursiveDelete(f.ref);
+    await db.doc(`authors/s_${pointId}_${f.id}`).delete();
+    await db.doc(`points/${pointId}`).update({ solutionCount: FieldValue.increment(-1) }).catch(() => {});
+    await settleFix(pointId, f.id);
+  }
+  const ratings = await db.collectionGroup('ratings').where('uid', '==', uid).get();
+  for (const r of ratings.docs) {
+    const fixRef = r.ref.parent.parent!;
+    const rating = r.get('rating') as string;
+    await fixRef
+      .update({
+        [rating]: FieldValue.increment(-1),
+        ...(r.get('early') ? { [rating === 'full' ? 'earlyFull' : 'earlyOther']: FieldValue.increment(-1) } : {}),
+      })
+      .catch(() => {});
+    await r.ref.delete();
+    await settleFix(fixRef.parent.parent!.id, fixRef.id);
   }
   const votes = await db.collectionGroup('fixVotes').where('uid', '==', uid).get();
   for (const v of votes.docs) {

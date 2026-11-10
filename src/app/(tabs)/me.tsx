@@ -4,8 +4,9 @@ import { collection, documentId, getDocs, limit, orderBy, query, where } from 'f
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Switch } from 'react-native';
 
+import { NameChanger } from '@/components/name-changer';
 import { showAlert } from '@/components/point-card';
-import { Button, Card, Empty, Row, Screen, T, Tabs } from '@/components/ui';
+import { Button, Card, Chip, Empty, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText } from '@/lib/api';
@@ -15,7 +16,7 @@ import { timeAgo, useCollection } from '@/lib/hooks';
 import { isOperator } from '@/lib/operator';
 import { type AppearancePref, setAppearance, useAppearancePref } from '@/lib/appearance';
 import { pushSupported, turnOffPush, turnOnPush } from '@/lib/push';
-import type { Notification, Submission } from '@/lib/types';
+import type { MyThread, Notification, Submission } from '@/lib/types';
 
 function Link({
   icon,
@@ -93,6 +94,19 @@ function AppearancePicker() {
   );
 }
 
+/** One of my complaints, public or private: the same row either way. */
+type Mine = {
+  key: string;
+  isPrivate: boolean;
+  text: string;
+  /** Who or what it is about. */
+  about: string;
+  at: number;
+  href: Href;
+  unread?: boolean;
+  resolved?: boolean;
+};
+
 export default function MeScreen() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -105,6 +119,10 @@ export default function MeScreen() {
   const mine = useCollection<{ id: string }>(
     user ? query(collection(db, `users/${user.uid}/mine`), orderBy('at', 'desc'), limit(30)) : null,
     `mine:${user?.uid}`,
+  );
+  const threads = useCollection<MyThread>(
+    user ? query(collection(db, `users/${user.uid}/threads`), orderBy('lastMessageAt', 'desc'), limit(30)) : null,
+    `threads:${user?.uid}`,
   );
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const ids = mine.items.map((m) => m.id).join(',');
@@ -121,16 +139,37 @@ export default function MeScreen() {
       .catch(() => setSubmissions([]));
   }, [ids]);
 
-  const shown = ids ? submissions : [];
+  // Public and private complaints are one list, newest activity first:
+  // they are all "what I complained about", told apart by one small label.
+  const complaints: Mine[] = [
+    ...(ids ? submissions : []).map((s) => ({
+      key: `s:${s.id}`,
+      isPrivate: false,
+      text: s.text,
+      about: s.subjectNames.join(' · '),
+      at: s.createdAt?.toMillis() ?? 0,
+      href: `/submission/${s.id}` as Href,
+    })),
+    ...threads.items.map((t) => ({
+      key: `t:${t.id}`,
+      isPrivate: true,
+      text: t.preview,
+      about: t.orgName,
+      at: t.lastMessageAt?.toMillis() ?? 0,
+      href: `/thread/${t.orgId}/${t.id}` as Href,
+      unread: t.unread,
+      resolved: t.status === 'resolved',
+    })),
+  ].sort((a, b) => b.at - a.at);
   const responder = (profile?.responderFor ?? []).length > 0;
+  const anonymous = !!user?.isAnonymous;
   return (
     <Screen topInset>
-      <T variant="title">{profile?.displayName ?? 'You'}</T>
+      <NameChanger name={profile?.displayName ?? 'You'} />
       <T variant="small">
-        {user?.isAnonymous
-          ? 'No account: public complaints from this device are yours. Add an email to keep your history in one place and to send private complaints.'
-          : user?.email}
+        {anonymous ? 'Not signed in. Sign in to keep your history and to send private complaints.' : user?.email}
       </T>
+      {anonymous && <Link icon="person-circle-outline" label="Sign in" href="/account" />}
       <Link
         icon="notifications-outline"
         label="Notifications"
@@ -139,8 +178,7 @@ export default function MeScreen() {
       />
       <PushSwitch on={!!profile?.pushOn} />
       <AppearancePicker />
-      <Link icon="lock-closed-outline" label="Private complaints" href="/threads" />
-      <Link icon="person-circle-outline" label={user?.isAnonymous ? 'Add an email' : 'Account'} href="/account" />
+      {!anonymous && <Link icon="person-circle-outline" label="Account" href="/account" />}
       <Link
         icon="briefcase-outline"
         label={responder ? 'Respond for your organization' : 'Work somewhere? Respond for it'}
@@ -149,15 +187,21 @@ export default function MeScreen() {
       {isOperator(user) && <Link icon="shield-half-outline" label="Operator queue" href="/operator" />}
 
       <T variant="label">Your complaints</T>
-      {shown.length === 0 ? (
-        <Empty text="Nothing yet. Surely something's bugging you?" loading={mine.loading} />
+      {complaints.length === 0 ? (
+        <Empty text="Nothing yet." loading={mine.loading || threads.loading} />
       ) : (
-        shown.map((s) => (
-          <Card key={s.id} onPress={() => router.push(`/submission/${s.id}`)}>
-            <T numberOfLines={3}>{s.text}</T>
-            <T variant="small">
-              {s.subjectNames.join(' · ')} · {timeAgo(s.createdAt?.toMillis())}
-            </T>
+        complaints.map((c) => (
+          <Card key={c.key} onPress={() => router.push(c.href)}>
+            <Row style={{ flexWrap: 'wrap', gap: 6 }}>
+              <Ionicons name={c.isPrivate ? 'lock-closed' : 'earth'} size={14} color={theme.textSecondary} />
+              <T variant="small" style={{ flex: 1 }}>
+                {c.isPrivate ? 'Private' : 'Public'} · {timeAgo(c.at)}
+              </T>
+              {c.unread && <Chip label="New reply" color={theme.primary} bg={theme.primarySoft} />}
+              {c.resolved && <Chip label="Resolved" color={theme.good} bg={theme.goodSoft} />}
+            </Row>
+            <T numberOfLines={3}>{c.text}</T>
+            {c.about ? <T variant="small">{c.about}</T> : null}
           </Card>
         ))
       )}
@@ -182,6 +226,7 @@ export default function MeScreen() {
       <Link icon="trash-bin-outline" label="Removal log" href="/removals" />
       <Link icon="shield-checkmark-outline" label="Privacy policy" href="/privacy" />
       <Link icon="document-text-outline" label="Terms of use" href="/terms" />
+      <Link icon="close-circle-outline" label="Delete account" href="/delete-account" />
     </Screen>
   );
 }

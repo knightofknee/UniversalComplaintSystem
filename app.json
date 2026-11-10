@@ -22,7 +22,8 @@
       "buildNumber": "1",
       "associatedDomains": [
         "applinks:www.waldgrave.com"
-      ]
+      ],
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.waldgrave.ucs",
@@ -83,6 +84,13 @@
         {
           "photosPermission": "Lets you attach photos to a complaint.",
           "cameraPermission": "Lets you take a photo to attach to a complaint."
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.331431699365-kpe37b62dlo7ij9bes558hogd85l5emo"
         }
       ],
       "@react-native-firebase/app",

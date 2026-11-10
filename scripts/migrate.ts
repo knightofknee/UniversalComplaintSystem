@@ -70,8 +70,18 @@ async function ranks() {
     void writer.update(s.ref, { loves, rantRank: rank });
     n++;
   }
+  // 2026-11-10: accounts know their own public author id (to mark what is theirs).
+  const { authorIdOf } = await import('../functions/src/common');
+  const users = await db.collection('users').select('authorId').get();
+  let u = 0;
+  for (const d of users.docs) {
+    if (d.get('authorId')) continue;
+    void writer.update(d.ref, { authorId: authorIdOf(d.id) });
+    u++;
+  }
   await writer.close();
   console.log(`${n} of ${subs.size} complaints given their best-rant rank.`);
+  console.log(`${u} of ${users.size} accounts given their public author id.`);
 }
 
 async function main() {

@@ -17,9 +17,25 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   auth 9109, firestore 8180, functions 5011, storage 9209) so they never
   clash with ../direct-democracy's; keep firebase.json and firebase.ts in
   sync.
-- No account needed: the app signs in anonymously on first open. Adding an
-  email (Account screen) links email+password to that same account. A
-  VERIFIED email is what lets someone respond for an organization.
+- No account needed: the app signs in anonymously on first open. SIGNING IN
+  (2026-11-10; never "add an email") attaches Apple, Google or
+  email+password to that same account (src/lib/sso.ts, src/app/account.tsx:
+  "Continue with Apple / Google", then "Sign up" | "I have an account" for
+  email). If that identity already has an account it signs in to it
+  instead. Google and Apple are enabled in Firebase Auth; Google client ids
+  are in sso.ts and the config files; Apple works on iOS only (the web
+  needs an Apple Services ID and key, not set up). The native modules
+  (expo-apple-authentication, @react-native-google-signin) need a build
+  made after 2026-11-10. A VERIFIED email is what lets someone respond for
+  an organization. Me says "Not signed in." plainly. Deleting an account is
+  its own screen (Me > Delete account, /delete-account), never on the
+  sign-in page.
+- Names (functions/src/names.ts): random two-word names from the lists in
+  common.ts, never typed. Me shows the name with a shuffle button
+  (`NameChanger`): shuffle through `nameOptions`, nothing changes until
+  "Use this name" and its confirmation (`setName`, which renames past
+  complaints and fixes too). `users.authorId` lets the app mark what is
+  the account's own ("Yours").
 - Clients never write the public record. Everything goes through callables
   in `functions/src` (intake.ts, points.ts, company.ts); firestore.rules
   allow only reads (plus marking own notifications read).
@@ -104,9 +120,14 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `npm run migrate ranks`.
 - Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
   🔥 Hot (`weekPeople`, `imported`, `weekSupport`; recounted every 6h by
-  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 👥 Most
-  shared (`people`, `imported`, `supportCount`), ✅ Fixed, 🆕 New
-  (`imported`, `createdAt`). No category browsing and no
+  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 🏆 Top
+  (`people`, `imported`, `supportCount`; never "Most shared"), ✅ Fixed,
+  🆕 New (`imported`, `createdAt`). A sort is its name and nothing else: no
+  line of description under it. Empty lists say "Nothing here yet." with
+  no joke and no finger pointed at anyone (2026-11-10).
+- Me lists "Your complaints" as ONE list, public and private in the same
+  row form (a globe or lock label), newest activity first; there is no
+  separate private-complaints screen. No category browsing and no
   "biggest topics" grid: topics are tags on points, reachable from them.
   Topic and organization pages use the same sorts. Search opens on "Most
   complained about" (subjects by supporters) with a small Companies /
@@ -121,6 +142,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Fixed is never self-declared: a responder's "Fixed" sets `fix_claimed`;
   supporters confirm (`voteFix`, FIX_CONFIRMATIONS) before it shows Fixed and
   counts in the org's stats.
+- Proposed fixes (2026-11-10, functions/src/solutions.ts,
+  src/components/solutions.tsx): ANYONE can propose a fix on a point
+  (`proposeFix`; `points/{id}/solutions/{authorId}`, one per person per
+  point), not only an organization. Supporters are notified and each rates
+  it fully / partly / not at all (`rateFix`, private `ratings/{uid}`,
+  public tallies). The point shows Fixed (`fixedBy`) only when enough people
+  who supported it BEFORE the fix was proposed say "fully" and outnumber
+  the rest (`settleFix`); it never touches an org's stats. No model reads a
+  fix: `nameCalling` and `stripSensitive` filter it, it needs the terms,
+  and it can be reported and removed like anything else.
 - Org access: `requestAccess` approves at once if the email domain is
   already on the subject; otherwise `checkClaims` (daily) matches the domain
   to the org website, and anything unconfirmed is held for

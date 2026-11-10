@@ -6,6 +6,7 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { showAlert, StatusChip, STATUS_LABEL, SupportButton } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
+import { Solutions } from '@/components/solutions';
 import { SubmissionCard } from '@/components/submission-card';
 import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
@@ -68,6 +69,16 @@ export default function PointScreen() {
     () => (point ? point.subjectIds.filter((s) => profile?.responderFor.includes(s)) : []),
     [point, profile],
   );
+  // Whether the reader has this problem (supports the point): they are who says if a proposed fix worked.
+  const [supported, setSupported] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(
+      doc(db, `points/${id}/supports/${user.uid}`),
+      (s) => setSupported(s.exists()),
+      () => setSupported(false),
+    );
+  }, [id, user]);
   const seenSent = useRef(false);
   useEffect(() => {
     if (!point || myOrgs.length === 0 || seenSent.current) return;
@@ -193,6 +204,8 @@ export default function PointScreen() {
       {myOrgs.map((sid) => (
         <RespondBox key={sid} point={point} subjectId={sid} subjectName={nameOf(sid)} />
       ))}
+
+      <Solutions pointId={point.id} supported={supported} />
 
       <T variant="label">Complaints</T>
       {submissions.length === 0 ? (

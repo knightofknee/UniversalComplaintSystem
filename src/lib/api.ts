@@ -72,6 +72,19 @@ export const deleteAccount = call<{ confirm: true }, { deleted: boolean }>('dele
 export const supportPoint = call<{ pointId: string; support: boolean }, { supported: boolean }>(
   'supportPoint',
 );
+/** Propose a fix for a point; its supporters are told and say if it worked. */
+export const proposeFix = call<Terms & { pointId: string; text: string }, { id: string }>('proposeFix');
+export type FixRating = 'full' | 'partial' | 'none';
+/** `rating: null` takes yours back. */
+export const rateFix = call<
+  { pointId: string; fixId: string; rating: FixRating | null },
+  { rating: FixRating | null; status: PointStatus }
+>('rateFix');
+
+/** Random public names to shuffle through; only `setName` changes anything. */
+export const nameOptions = call<Record<string, never>, { names: string[] }>('nameOptions');
+export const setName = call<{ name: string }, { name: string }>('setName');
+
 /** A reader's "Best rant" vote for one complaint. */
 export const loveRant = call<{ submissionId: string; love: boolean }, { loved: boolean; loves: number }>('loveRant');
 export const voteFix = call<{ pointId: string; orgId: string; fixed: boolean }, { status: PointStatus }>('voteFix');
@@ -85,7 +98,7 @@ export const respondToPoint = call<
   { ok: boolean }
 >('respondToPoint');
 
-export type ReportKind = 'point' | 'submission' | 'response' | 'subject' | 'message' | 'thread';
+export type ReportKind = 'point' | 'submission' | 'response' | 'solution' | 'subject' | 'message' | 'thread';
 export type ReportReason = 'abuse' | 'private_person' | 'personal_data' | 'spam' | 'illegal' | 'other';
 export const report = call<
   { kind: ReportKind; id: string; pointId?: string; orgId?: string; threadId?: string; reason: ReportReason; note?: string },

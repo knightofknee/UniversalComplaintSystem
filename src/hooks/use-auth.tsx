@@ -6,6 +6,8 @@ import { auth, db } from '@/lib/firebase';
 
 export type Profile = {
   displayName: string;
+  /** This account's opaque public id: what `submissions.authorId` holds for its own complaints. */
+  authorId?: string;
   responderFor: string[];
   /** Set once the terms are agreed (with the first post). */
   termsAcceptedAt?: unknown;
@@ -31,8 +33,8 @@ const AuthContext = createContext<AuthState>({
 
 /**
  * Nobody needs an account to complain: the first open signs in
- * anonymously. Adding an email (Me > Account) upgrades that same account,
- * keeping everything it already did.
+ * anonymously. Signing in (Me > Sign in) attaches an email, Google or Apple
+ * to that same account, keeping everything it already did.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

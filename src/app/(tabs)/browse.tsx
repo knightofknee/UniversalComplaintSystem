@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { useCollection } from '@/lib/hooks';
 import type { Point, Submission } from '@/lib/types';
 
-type Feed = 'hot' | 'rants' | 'shared' | 'fixed' | 'new';
+type Feed = 'hot' | 'rants' | 'top' | 'fixed' | 'new';
 const LIST = 40;
 /**
  * Best rants is readers' votes. Until this many rants have a vote, the list
@@ -23,20 +23,22 @@ const LIST = 40;
 const ENOUGH_VOTED = 10;
 const MODEL_PICK = 7;
 
-const FEEDS: { key: Feed; label: string; blurb: string; empty: string }[] = [
-  { key: 'hot', label: '🔥 Hot', blurb: 'Picking up the most voices this week.', empty: 'Nothing heating up this week. Yet.' },
-  { key: 'rants', label: '🤬 Best rants', blurb: 'Voted best by readers. Open one and vote.', empty: 'No great rants yet. Vote for one, or write it.' },
-  { key: 'shared', label: '👥 Most shared', blurb: 'The problems the most people have.', empty: "Nothing's broken here yet. Suspicious." },
-  { key: 'fixed', label: '✅ Fixed', blurb: 'Fixes the complainers themselves confirmed.', empty: 'Nothing confirmed fixed yet. Organizations, your move.' },
-  { key: 'new', label: '🆕 New', blurb: 'Fresh off the record.', empty: 'Quiet. Too quiet.' },
+// A name and nothing else: no line under it explaining the name.
+const FEEDS: { key: Feed; label: string }[] = [
+  { key: 'hot', label: '🔥 Hot' },
+  { key: 'rants', label: '🤬 Best rants' },
+  { key: 'top', label: '🏆 Top' },
+  { key: 'fixed', label: '✅ Fixed' },
+  { key: 'new', label: '🆕 New' },
 ];
+/** Said plainly, with no joke and no finger pointed: an empty list is nobody's fault. */
+const EMPTY = 'Nothing here yet.';
 
 /** Complaints: everything people complained about, sorted in ways worth scrolling. */
 export default function RecordScreen() {
   const theme = useTheme();
   const router = useRouter();
   const [feed, setFeed] = useState<Feed>('hot');
-  const spec = FEEDS.find((f) => f.key === feed)!;
   const points = collection(db, 'points');
   const live = where('removed', '==', false);
 
@@ -52,7 +54,7 @@ export default function RecordScreen() {
           // public records only fill in below.
           ...(feed === 'hot'
             ? [orderBy('weekPeople', 'desc'), orderBy('imported', 'asc'), orderBy('weekSupport', 'desc')]
-            : feed === 'shared'
+            : feed === 'top'
               ? [orderBy('people', 'desc'), orderBy('imported', 'asc'), orderBy('supportCount', 'desc')]
               : feed === 'fixed'
                 ? [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]
@@ -114,16 +116,15 @@ export default function RecordScreen() {
         })}
         <View style={{ width: 8 }} />
       </ScrollView>
-      <T variant="small">{spec.blurb}</T>
 
       {feed === 'rants' ? (
         shownRants.length === 0 ? (
-          <Empty loading={rants.loading} text={spec.empty} />
+          <Empty loading={rants.loading} text={EMPTY} />
         ) : (
           shownRants.map((s, i) => <RantCard key={s.id} s={s} rank={i + 1} />)
         )
       ) : shownPoints.length === 0 ? (
-        <Empty loading={pointList.loading} text={spec.empty} />
+        <Empty loading={pointList.loading} text={EMPTY} />
       ) : (
         <PointList>
           {shownPoints.map((p, i) => (
