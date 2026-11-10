@@ -7,8 +7,9 @@ import {
   signOut,
 } from 'firebase/auth';
 import { Stack, useRouter } from 'expo-router';
-import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { Image } from 'expo-image';
+import { useState, type ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { Button, Card, Field, Notice, Screen, T, Tabs } from '@/components/ui';
@@ -28,6 +29,7 @@ import { appleAvailable, Cancelled, continueWithApple, continueWithGoogle, googl
 export default function AccountScreen() {
   const { user, refresh } = useAuth();
   const router = useRouter();
+  const theme = useTheme();
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,28 +77,32 @@ export default function AccountScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Sign in' }} />
-      {appleAvailable && (
-        <ProviderButton
-          icon="logo-apple"
-          label="Continue with Apple"
-          solid
-          busy={busy === 'apple'}
-          disabled={!!busy}
-          onPress={() => run('apple', async () => (await continueWithApple(), refresh()))}
-        />
-      )}
-      {googleAvailable && (
-        <ProviderButton
-          icon="logo-google"
-          label="Continue with Google"
-          busy={busy === 'google'}
-          disabled={!!busy}
-          onPress={() => run('google', async () => (await continueWithGoogle(), refresh()))}
-        />
-      )}
-      <T variant="small" style={{ textAlign: 'center' }}>
-        or with an email
-      </T>
+      <View style={styles.providers}>
+        {googleAvailable && (
+          <ProviderButton
+            name="Google"
+            logo={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} contentFit="contain" />}
+            busy={busy === 'google'}
+            disabled={!!busy}
+            onPress={() => run('google', async () => (await continueWithGoogle(), refresh()))}
+          />
+        )}
+        {appleAvailable && (
+          <ProviderButton
+            name="Apple"
+            solid
+            logo={(color) => <Ionicons name="logo-apple" size={22} color={color} />}
+            busy={busy === 'apple'}
+            disabled={!!busy}
+            onPress={() => run('apple', async () => (await continueWithApple(), refresh()))}
+          />
+        )}
+      </View>
+      <View style={styles.divider}>
+        <View style={[styles.line, { backgroundColor: theme.border }]} />
+        <T variant="small">or</T>
+        <View style={[styles.line, { backgroundColor: theme.border }]} />
+      </View>
       <Tabs
         options={[
           { key: 'signup', label: 'Sign up' },
@@ -147,17 +153,21 @@ export default function AccountScreen() {
   );
 }
 
-/** Apple's and Google's buttons: their mark, "Continue with", full width. Apple's is solid, as its guidelines ask. */
+/**
+ * Apple's and Google's buttons, side by side: the mark and one word. Nobody
+ * needs "Continue with" spelled out on a button with the logo on it. Google's
+ * mark keeps its own four colors; Apple's button is solid, as its guidelines ask.
+ */
 function ProviderButton({
-  icon,
-  label,
+  name,
+  logo,
   solid,
   busy,
   disabled,
   onPress,
 }: {
-  icon: ComponentProps<typeof Ionicons>['name'];
-  label: string;
+  name: string;
+  logo: ReactNode | ((color: string) => ReactNode);
   solid?: boolean;
   busy?: boolean;
   disabled?: boolean;
@@ -170,30 +180,42 @@ function ProviderButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={`Sign in with ${name}`}
+      accessibilityState={{ disabled, busy }}
       style={({ pressed }) => [
         styles.provider,
         {
           backgroundColor: solid ? theme.text : theme.background,
           borderColor: solid ? theme.text : theme.border,
-          opacity: pressed || (disabled && !busy) ? 0.6 : 1,
+          opacity: pressed ? 0.85 : disabled && !busy ? 0.7 : 1,
         },
       ]}>
-      {busy ? <ActivityIndicator color={fg} /> : <Ionicons name={icon} size={20} color={fg} />}
-      <Text style={[styles.providerText, { color: fg }]}>{label}</Text>
+      {busy ? (
+        <ActivityIndicator color={fg} />
+      ) : (
+        <>
+          {typeof logo === 'function' ? logo(fg) : logo}
+          <Text style={[styles.providerText, { color: fg }]}>{name}</Text>
+        </>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  providers: { flexDirection: 'row', gap: 10 },
   provider: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  providerText: { fontFamily: Fonts.bold, fontSize: 17 },
+  providerText: { fontFamily: Fonts.bold, fontSize: 16 },
+  logo: { width: 22, height: 22 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  line: { flex: 1, height: StyleSheet.hairlineWidth },
 });

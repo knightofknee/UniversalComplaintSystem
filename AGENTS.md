@@ -20,8 +20,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - No account needed: the app signs in anonymously on first open. SIGNING IN
   (2026-11-10; never "add an email") attaches Apple, Google or
   email+password to that same account (src/lib/sso.ts, src/app/account.tsx:
-  "Continue with Apple / Google", then "Sign up" | "I have an account" for
-  email). If that identity already has an account it signs in to it
+  a row of two compact buttons, the logo and one word, "Google" | "Apple",
+  the same style as the user's other apps and never "Continue with ...";
+  then "Sign up" | "I have an account" for email). If that identity already has an account it signs in to it
   instead. Google and Apple are enabled in Firebase Auth; Google client ids
   are in sso.ts and the config files; Apple works on iOS only (the web
   needs an Apple Services ID and key, not set up). The native modules
