@@ -1,5 +1,5 @@
 /**
- * Proposed fixes, names and added details, tested against the LOCAL EMULATORS only (never
+ * Proposed fixes, names, added details and account merging, tested against the LOCAL EMULATORS only (never
  * the live record): who may rate a fix, how the tallies move, and when a
  * point becomes Fixed or stops being so.
  *
@@ -13,7 +13,7 @@ process.env.GCLOUD_PROJECT = 'universal-complaint-system';
 async function main() {
   const { db, Timestamp } = await import('../functions/src/common');
   const { initializeApp } = await import('firebase/app');
-  const { getAuth, connectAuthEmulator, signInAnonymously } = await import('firebase/auth');
+  const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signInAnonymously } = await import('firebase/auth');
   const { getFunctions, connectFunctionsEmulator, httpsCallable } = await import('firebase/functions');
 
   let failed = 0;
@@ -21,21 +21,23 @@ async function main() {
     if (!ok) failed++;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}${ok ? '' : ` (got ${JSON.stringify(got)})`}`);
   };
-  const person = async (name: string) => {
+  const person = async (name: string, withEmail = false) => {
     const app = initializeApp({ apiKey: 'x', projectId: 'universal-complaint-system' }, name);
     const auth = getAuth(app);
     connectAuthEmulator(auth, 'http://localhost:9109', { disableWarnings: true });
     const fns = getFunctions(app, 'us-central1');
     connectFunctionsEmulator(fns, 'localhost', 5011);
-    const { user } = await signInAnonymously(auth);
+    const { user } = withEmail
+      ? await createUserWithEmailAndPassword(auth, `${name}-${Date.now()}@example.com`, 'a-test-password')
+      : await signInAnonymously(auth);
     const call = (fn: string, data: object) => httpsCallable(fns, fn)(data).then((r) => r.data);
-    return { uid: user.uid as string, call };
+    return { uid: user.uid as string, call, token: () => user.getIdToken() };
   };
   const fails = async (p: Promise<unknown>) => p.then(() => null, (e: { message: string }) => e.message);
 
   const point = db.collection('points').doc();
   await point.set({ text: 'The elevator is always broken.', subjectIds: [], subjectNames: [], removed: false, status: 'open', supportCount: 3, weekSupport: 0 });
-  const [a, b, c, late, proposer] = await Promise.all(['a', 'b', 'c', 'late', 'proposer'].map(person));
+  const [a, b, c, late, proposer] = await Promise.all(['a', 'b', 'c', 'late', 'proposer'].map((name) => person(name)));
   const hourAgo = Timestamp.fromMillis(Date.now() - 3600_000);
   for (const p of [a, b, c]) await point.collection('supports').doc(p.uid).set({ uid: p.uid, at: hourAgo, via: 'direct' });
 
@@ -103,6 +105,42 @@ async function main() {
   await a.call('addDetail', { submissionId: sub.id, item: 'when it happened' });
   check('a suggestion can be dismissed without adding anything', (await mineRef.get()).get('missing').length === 0 && (await sub.get()).get('details').length === 1);
   check('and stays dismissed', JSON.stringify((await mineRef.get()).get('dismissed')) === '["when it happened"]', (await mineRef.get()).get('dismissed'));
+
+  // Signing in to an existing account brings the device's signed-out activity with it (merge.ts).
+  const { authorIdOf } = await import('../functions/src/common');
+  const guest = await person('guest');
+  const member = await person('member', true);
+  const [mine1, both] = [db.collection('points').doc(), db.collection('points').doc()];
+  const post = db.collection('submissions').doc();
+  const other = db.collection('submissions').doc();
+  const base = { subjectIds: [], subjectNames: [], removed: false, status: 'open', weekSupport: 0, weekPeople: 0 };
+  await mine1.set({ ...base, text: 'Guest point.', supportCount: 1, people: 1, canonical: { submissionId: post.id, authorName: 'Guest', actionability: 50 } });
+  await both.set({ ...base, text: 'A point both support.', supportCount: 2, people: 2 });
+  await mine1.collection('supports').doc(guest.uid).set({ uid: guest.uid, at: hourAgo, via: 'submission' });
+  await both.collection('supports').doc(guest.uid).set({ uid: guest.uid, at: hourAgo, via: 'direct' });
+  await both.collection('supports').doc(member.uid).set({ uid: member.uid, at: hourAgo, via: 'direct' });
+  await post.set({ text: 'Guest complaint.', authorName: 'Guest', authorId: authorIdOf(guest.uid), removed: false, addedPointIds: [mine1.id], matchedPointIds: [] });
+  await db.doc(`authors/${post.id}`).set({ uid: guest.uid });
+  await db.doc(`users/${guest.uid}/mine/${post.id}`).set({ at: hourAgo, missing: ['which store'] });
+  await other.set({ text: 'Someone else.', authorName: 'x', removed: false, loves: 2, rantScore: 0, rantRank: 2100 });
+  await other.collection('loves').doc(guest.uid).set({ uid: guest.uid });
+  await other.collection('loves').doc(member.uid).set({ uid: member.uid });
+  await guest.call('proposeFix', { pointId: both.id, text: 'Restart it twice, that clears it.', acceptTerms: true });
+
+  check('a signed-out account cannot be merged into', !!(await fails(guest.call('mergeAccount', { fromToken: await guest.token() }))));
+  check('a real account cannot be merged away', /Nothing to bring over/.test((await fails(member.call('mergeAccount', { fromToken: await member.token() }))) ?? ''));
+  await member.call('mergeAccount', { fromToken: await guest.token() });
+  const memberName = (await db.doc(`users/${member.uid}`).get()).get('displayName');
+  const moved = (await post.get()).data()!;
+  check('the complaint is the signed-in account\'s now', moved.authorId === authorIdOf(member.uid) && moved.authorName === memberName, moved);
+  check('it is in their list, with its suggestions', JSON.stringify((await db.doc(`users/${member.uid}/mine/${post.id}`).get()).get('missing')) === '["which store"]');
+  check('the headline credit follows', (await mine1.get()).get('canonical.authorName') === memberName);
+  check('support moves over', (await mine1.collection('supports').doc(member.uid).get()).exists && (await mine1.get()).get('supportCount') === 1);
+  check('support both gave counts once', (await both.get()).get('supportCount') === 1 && (await both.get()).get('people') === 1, (await both.get()).data());
+  check('a vote both gave counts once', (await other.get()).get('loves') === 1 && (await other.get()).get('rantRank') === 1100, (await other.get()).data());
+  const fixNow = await both.collection('solutions').doc(authorIdOf(member.uid)).get();
+  check('the proposed fix moves over', fixNow.exists && fixNow.get('authorName') === memberName && !(await both.collection('solutions').doc(authorIdOf(guest.uid)).get()).exists);
+  check('the signed-out account is gone', !(await db.doc(`users/${guest.uid}`).get()).exists && !(await mine1.collection('supports').doc(guest.uid).get()).exists);
 
   console.log(failed ? `\n${failed} FAILED` : '\nAll checks pass');
     process.exit(failed ? 1 : 0);

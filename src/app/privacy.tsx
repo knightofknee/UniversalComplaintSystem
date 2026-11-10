@@ -17,7 +17,7 @@ export default function PrivacyScreen() {
         {
           heading: 'What we collect',
           body: [
-            'An account identifier. The first time you open UCS we create an anonymous account so you can complain without signing up. It is not linked to your name, phone number, or device identifier.',
+            'An account identifier. The first time you open UCS we create an anonymous account so you can complain without signing up. It is not linked to your name, phone number, or device identifier. If you later sign in to an account you already have, what you did while signed out (complaints, support, votes) moves into that account and the anonymous one is deleted.',
             'Your email address, only if you sign in. You can sign in with an email and password (we keep a hash of the password) or with Google or Apple, which tell us your email address and nothing else; Apple lets you hide your real address. We use the email to sign you in, to let organizations reply to private complaints you send them, and to verify you if you respond for an organization. We never show it publicly.',
             'A display name we assign at random (for example "Steady Heron"). It is the only name shown next to anything you post. You can swap it for another random one, never one you type.',
             'What you submit: the text of each complaint, any details you add to it later, any photos you attach, whether you sent it publicly or privately, how it was filed (the points, organizations and topics), and, for private complaints, the conversation that follows.',

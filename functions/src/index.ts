@@ -17,6 +17,7 @@ export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';
 export { setPush } from './push';
 export { deleteAccount } from './account';
+export { mergeAccount } from './merge';
 
 /** Drafts nobody submitted expire (a day, or a week for a queued complaint); they were never public. */
 export const clearDrafts = onSchedule('every day 03:00', async () => {

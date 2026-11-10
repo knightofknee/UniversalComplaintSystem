@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { Platform } from 'react-native';
 
+import { mergeAccount } from '@/lib/api';
 import { auth } from '@/lib/firebase';
 
 /**
@@ -17,7 +18,8 @@ import { auth } from '@/lib/firebase';
  * Everyone starts with an anonymous account, so signing in is first an
  * attempt to attach the Google/Apple identity to that same account (nothing
  * this device did is lost). If that identity already has a UCS account, it
- * signs in to it instead; what this device did without one stays behind.
+ * signs in to it instead, and what this device did while signed out is
+ * moved into that account (`switchAccount`).
  *
  * Client ids are identifiers, not secrets (they are in the app's config
  * files too). The web client id is the one Firebase verifies tokens against.
@@ -36,6 +38,19 @@ const TAKEN = ['auth/credential-already-in-use', 'auth/email-already-in-use'];
 const CLOSED = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
 const codeOf = (e: unknown) => (e as { code?: string })?.code ?? '';
 
+/**
+ * Switch from the device's signed-out account to an existing one, bringing
+ * over what the signed-out one did (the complaint just posted, say). The
+ * server needs proof of the account being left, so its token is taken before
+ * the switch. A failed move never undoes the sign-in.
+ */
+export async function switchAccount(signIn: () => Promise<unknown>) {
+  const leaving = auth.currentUser;
+  const fromToken = leaving?.isAnonymous ? await leaving.getIdToken().catch(() => null) : null;
+  await signIn();
+  if (fromToken) await mergeAccount({ fromToken }).catch((e) => console.warn('Could not bring this device\'s activity over', e));
+}
+
 async function applyCredential(credential: AuthCredential, fromError: (e: never) => AuthCredential | null) {
   const user = auth.currentUser;
   if (user?.isAnonymous) {
@@ -45,7 +60,7 @@ async function applyCredential(credential: AuthCredential, fromError: (e: never)
     } catch (e) {
       if (!TAKEN.includes(codeOf(e))) throw e;
       // An Apple token can be used once; the error carries one that still works.
-      await signInWithCredential(auth, fromError(e as never) ?? credential);
+      await switchAccount(() => signInWithCredential(auth, fromError(e as never) ?? credential));
       return;
     }
   }
@@ -63,7 +78,7 @@ async function popup(provider: AuthProvider, fromError: (e: never) => AuthCreden
         if (!TAKEN.includes(codeOf(e))) throw e;
         const existing = fromError(e as never);
         if (!existing) throw e;
-        await signInWithCredential(auth, existing);
+        await switchAccount(() => signInWithCredential(auth, existing));
         return;
       }
     }

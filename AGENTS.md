@@ -23,7 +23,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   a row of two compact buttons, the logo and one word, "Google" | "Apple",
   the same style as the user's other apps and never "Continue with ...";
   then "Sign up" | "I have an account" for email). If that identity already has an account it signs in to it
-  instead. Google and Apple are enabled in Firebase Auth; Google client ids
+  instead AND THE DEVICE'S SIGNED-OUT ACTIVITY MOVES INTO IT (`switchAccount`
+  in sso.ts, `mergeAccount` in functions/src/merge.ts: complaints, support,
+  votes, fixes, ratings; duplicates count once; the anonymous account is
+  deleted). Every path that signs in to an existing account must go through
+  `switchAccount`, or a just-posted complaint is stranded. Google and Apple are enabled in Firebase Auth; Google client ids
   are in sso.ts and the config files; Apple works on iOS only (the web
   needs an Apple Services ID and key, not set up). The native modules
   (expo-apple-authentication, @react-native-google-signin) need a build
@@ -160,8 +164,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   separate private-complaints screen. No category browsing and no
   "biggest topics" grid: topics are tags on points, reachable from them.
   Topic and organization pages use the same sorts. Search opens on "Most
-  complained about" (subjects by supporters) with a small Companies /
-  Topics / Both pick that also filters search results.
+  complained about" (subjects by supporters). The small Companies / Topics
+  / Both pick sits under the search box and is ALWAYS visible, with or
+  without results; it filters the list and the pages in search results.
 - Type: Bricolage Grotesque (`Fonts` in src/constants/theme.ts) for titles,
   the complaint box and counts; the system face for reading.
 - Intake is two calls: `analyzeComplaint` writes a private draft and shows

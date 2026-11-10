@@ -21,11 +21,15 @@ const KINDS: { key: Kind; label: string }[] = [
   { key: 'both', label: 'Both' },
 ];
 
-/** A small choice of what kind of pages to show. Stays out of the way. */
+/**
+ * A small choice of what kind of pages to show. It sits under the search
+ * box and is ALWAYS there, whatever the results: a filter that disappears
+ * when it filters everything out can't be switched back.
+ */
 function KindPick({ value, onChange }: { value: Kind; onChange: (k: Kind) => void }) {
   const theme = useTheme();
   return (
-    <Row style={{ gap: 16, marginTop: -6 }}>
+    <Row style={{ gap: 16 }}>
       {KINDS.map((k) => {
         const on = k.key === value;
         return (
@@ -106,14 +110,10 @@ export default function SearchScreen() {
         returnKeyType="search"
         accessibilityLabel="Search"
       />
+      <KindPick value={kind} onChange={setKind} />
       <InlineError text={error} />
-      {!active && <Starters kind={kind} onKind={setKind} />}
-      {shownSubjects.length > 0 && (
-        <Row style={{ justifyContent: 'space-between' }}>
-          <T variant="label">Pages</T>
-          <KindPick value={kind} onChange={setKind} />
-        </Row>
-      )}
+      {!active && <Starters kind={kind} />}
+      {shownSubjects.length > 0 && <T variant="label">Pages</T>}
       <View>
         {shownSubjects.map((s) => (
           <SubjectRow
@@ -160,7 +160,7 @@ function SubjectRow({ name, detail, rank, onPress }: { name: string; detail: str
 }
 
 /** Before typing: the most complained-about companies, topics, or both. */
-function Starters({ kind, onKind }: { kind: Kind; onKind: (k: Kind) => void }) {
+function Starters({ kind }: { kind: Kind }) {
   const router = useRouter();
   const kinds = kind === 'both' ? ['organization', 'topic'] : [kind];
   const orgs = useCollection<Subject>(
@@ -180,7 +180,6 @@ function Starters({ kind, onKind }: { kind: Kind; onKind: (k: Kind) => void }) {
   return (
     <>
       <T variant="heading">Most complained about</T>
-      <KindPick value={kind} onChange={onKind} />
       <View>
         {orgs.items.map((s, i) => (
           <SubjectRow

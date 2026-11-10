@@ -18,7 +18,14 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText } from '@/lib/api';
 import { auth } from '@/lib/firebase';
-import { appleAvailable, Cancelled, continueWithApple, continueWithGoogle, googleAvailable } from '@/lib/sso';
+import {
+  appleAvailable,
+  Cancelled,
+  continueWithApple,
+  continueWithGoogle,
+  googleAvailable,
+  switchAccount,
+} from '@/lib/sso';
 
 /**
  * Sign in. Everyone already has an anonymous account, so signing in with
@@ -138,7 +145,7 @@ export default function AccountScreen() {
               const linked = await linkWithCredential(auth.currentUser!, cred);
               await sendEmailVerification(linked.user);
             } else {
-              await signInWithEmailAndPassword(auth, email.trim(), password);
+              await switchAccount(() => signInWithEmailAndPassword(auth, email.trim(), password));
             }
             await refresh();
           })
@@ -147,7 +154,7 @@ export default function AccountScreen() {
       <T variant="small">
         {signup
           ? 'Passwords need at least 8 characters. Your email is never shown.'
-          : 'What this device did without an account stays on this device.'}
+          : 'What you did here before signing in, like a complaint you just posted, moves into your account.'}
       </T>
     </Screen>
   );

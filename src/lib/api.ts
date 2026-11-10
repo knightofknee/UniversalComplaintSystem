@@ -67,6 +67,12 @@ export const blockThread = call<ThreadRef & { blocked: boolean }, { blockedBy: '
 export const setOrgSettings = call<{ subjectId: string; publishPrivate: boolean }, { publishPrivate: boolean }>(
   'setOrgSettings',
 );
+/**
+ * After signing in to an account that already existed: bring over what the
+ * device's signed-out account did. `fromToken` is that account's ID token,
+ * taken just before switching.
+ */
+export const mergeAccount = call<{ fromToken: string }, { moved: number }>('mergeAccount');
 export const deleteAccount = call<{ confirm: true }, { deleted: boolean }>('deleteAccount');
 
 export const supportPoint = call<{ pointId: string; support: boolean }, { supported: boolean }>(
