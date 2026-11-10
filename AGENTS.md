@@ -167,8 +167,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   meter (the advice there is his), and after ~20s at three peppers or more
   he says one of `RUDY_LINES` (src/lib/rudy.ts) in a speech bubble, then
   again every ~2 minutes with a random offset, and goes quiet when it
-  cools. His lines are on the writer's side: heat is welcome, rudeness
-  just gets a complaint skipped.
+  cools. He is a SCHOLAR OF KINDNESS: his lines are things he has
+  worked out ("Be hard on the problem and soft on the person."), plainly
+  nice, or cute. Never snark and never a jab at anyone (no "PR team"
+  jokes).
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
