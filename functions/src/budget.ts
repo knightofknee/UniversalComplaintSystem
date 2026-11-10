@@ -42,7 +42,7 @@ export async function dailyBudget(): Promise<number> {
 /** The error a paused intake throws; `analyzeComplaint` turns it into a queued complaint. */
 export class BudgetPaused extends HttpsError {
   constructor() {
-    super('resource-exhausted', 'Checking complaints is paused for today. Search and "Same here" still work.');
+    super('resource-exhausted', 'Checking complaints is paused for today. Search and supporting still work.');
   }
 }
 

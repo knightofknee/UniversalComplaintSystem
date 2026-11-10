@@ -8,6 +8,7 @@ import { PointCard, PointList } from '@/components/point-card';
 import { Empty, Row, Screen, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { useCollection } from '@/lib/hooks';
 import type { Point, Submission } from '@/lib/types';
@@ -17,7 +18,7 @@ const LIST = 40;
 
 const FEEDS: { key: Feed; label: string; blurb: string; empty: string }[] = [
   { key: 'hot', label: '🔥 Hot', blurb: 'Picking up the most voices this week.', empty: 'Nothing heating up this week. Yet.' },
-  { key: 'rants', label: '🤬 Best rants', blurb: 'The ones worth reading out loud.', empty: 'No great rants yet. The box is right there.' },
+  { key: 'rants', label: '🤬 Best rants', blurb: 'Voted best by readers. Open one and vote.', empty: 'No great rants yet. The box is right there.' },
   { key: 'shared', label: '👥 Most shared', blurb: 'The problems the most people have.', empty: "Nothing's broken here yet. Suspicious." },
   { key: 'fixed', label: '✅ Fixed', blurb: 'Fixes the complainers themselves confirmed.', empty: 'Nothing confirmed fixed yet. Organizations, your move.' },
   { key: 'new', label: '🆕 New', blurb: 'Fresh off the record.', empty: 'Quiet. Too quiet.' },
@@ -38,13 +39,17 @@ export default function RecordScreen() {
       : query(
           points,
           live,
+          // People first: support from real accounts outranks any amount
+          // from the imported public records, and at equal real support
+          // what a person raised comes before what was imported. The
+          // public records only fill in below.
           ...(feed === 'hot'
-            ? [orderBy('weekSupport', 'desc')]
+            ? [orderBy('weekPeople', 'desc'), orderBy('imported', 'asc'), orderBy('weekSupport', 'desc')]
             : feed === 'shared'
-              ? [orderBy('supportCount', 'desc')]
+              ? [orderBy('people', 'desc'), orderBy('imported', 'asc'), orderBy('supportCount', 'desc')]
               : feed === 'fixed'
                 ? [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]
-                : [orderBy('createdAt', 'desc')]),
+                : [orderBy('imported', 'asc'), orderBy('createdAt', 'desc')]),
           limit(LIST),
         ),
     `record:${feed}`,
@@ -54,8 +59,9 @@ export default function RecordScreen() {
       ? query(
           collection(db, 'submissions'),
           where('removed', '==', false),
-          where('tone', '==', 'rant'),
-          orderBy('rantScore', 'desc'),
+          // Readers' votes first, then rants people wrote, then imported ones (rantRank).
+          where('rantRank', '>', 0),
+          orderBy('rantRank', 'desc'),
           limit(LIST),
         )
       : null,
@@ -119,6 +125,9 @@ function RantCard({ s, rank }: { s: Submission; rank: number }) {
   const theme = useTheme();
   const router = useRouter();
   const score = s.rantScore ?? 0;
+  const loves = s.loves ?? 0;
+  const blocked = useBlockedAuthors();
+  const hidden = !!s.authorId && blocked.ids.has(s.authorId);
   return (
     <Pressable
       onPress={() => router.push(`/submission/${s.id}`)}
@@ -126,14 +135,23 @@ function RantCard({ s, rank }: { s: Submission; rank: number }) {
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={[styles.rantRank, { color: theme.rant }]}>#{rank}</Text>
         <Text style={{ color: theme.rant, fontFamily: Fonts.bold, fontSize: 14 }}>
-          {'🔥'.repeat(Math.max(1, Math.round(score / 3.4)))} {score}/10
+          {loves > 0
+            ? `🤬 ${loves.toLocaleString()}`
+            : score > 0
+              ? `${'🔥'.repeat(Math.max(1, Math.round(score / 3.4)))} ${score}/10`
+              : ''}
         </Text>
       </Row>
-      <Text style={[styles.rantText, { color: theme.text }]} numberOfLines={8}>
-        {s.text}
-      </Text>
+      {hidden ? (
+        <T variant="small">Hidden by you. Tap to open it anyway.</T>
+      ) : (
+        <Text style={[styles.rantText, { color: theme.text }]} numberOfLines={8}>
+          {s.text}
+        </Text>
+      )}
       <T variant="small" numberOfLines={1}>
-        {s.authorName} · {s.subjectNames.slice(0, 3).join(' · ')}
+        {hidden ? '' : `${s.authorName} · `}
+        {s.subjectNames.slice(0, 3).join(' · ')}
       </T>
     </Pressable>
   );

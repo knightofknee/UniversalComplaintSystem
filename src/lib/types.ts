@@ -19,6 +19,11 @@ export type Point = {
   supportCount: number;
   /** Support gained in the last 7 days ("Rising this week"). */
   weekSupport?: number;
+  /** Supporters with real accounts (no imported records), all time and this week. Lists rank by these first. */
+  people?: number;
+  weekPeople?: number;
+  /** Seeded from a public record rather than raised by a person here. */
+  imported?: boolean;
   submissionCount: number;
   rantCount: number;
   hot: boolean;
@@ -78,8 +83,12 @@ export type Submission = {
   matchedPointIds: string[];
   addedPointIds: string[];
   tone: 'constructive' | 'neutral' | 'rant';
-  /** 1-10 for rants (how good a read it is), 0 otherwise; "Best rants" sorts by it. */
+  /** The model's 1-10 for rants (how good a read it is), 0 otherwise. */
   rantScore?: number;
+  /** Readers' "Best rant" votes. */
+  loves?: number;
+  /** Sort key of "Best rants": votes, then written by a person, then the model's score. 0 = not listed. */
+  rantRank?: number;
   /** 1-5 peppers (the language, not the problem). */
   spice?: number;
   actionability: number;

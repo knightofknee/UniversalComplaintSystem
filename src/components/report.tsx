@@ -23,7 +23,16 @@ export type ReportTarget = { kind: ReportKind; id: string; pointId?: string; org
  * organization, and nothing is hidden automatically: we review every
  * report within a day.
  */
-export function ReportButton({ target, label = 'Report' }: { target: ReportTarget; label?: string }) {
+export function ReportButton({
+  target,
+  label = 'Report',
+  compact,
+}: {
+  target: ReportTarget;
+  label?: string;
+  /** Just the flag, for a row where something else is the main action. */
+  compact?: boolean;
+}) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason | null>(null);
@@ -49,9 +58,14 @@ export function ReportButton({ target, label = 'Report' }: { target: ReportTarge
   };
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={label} hitSlop={10} style={styles.trigger}>
-        <Ionicons name="flag-outline" size={14} color={theme.textSecondary} />
-        <T variant="small">{label}</T>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={compact ? 6 : 10}
+        style={compact ? styles.compact : styles.trigger}>
+        <Ionicons name="flag-outline" size={compact ? 19 : 14} color={theme.textSecondary} />
+        {!compact && <T variant="small">{label}</T>}
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
         <Pressable style={styles.backdrop} onPress={close}>
@@ -89,6 +103,7 @@ export function ReportButton({ target, label = 'Report' }: { target: ReportTarge
 
 const styles = StyleSheet.create({
   trigger: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  compact: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
   sheet: { borderRadius: 18, padding: 18, gap: 12, width: '100%', maxWidth: 480, alignSelf: 'center' },
   reason: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 12, padding: 12 },

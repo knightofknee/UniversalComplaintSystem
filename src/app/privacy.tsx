@@ -5,7 +5,7 @@ export default function PrivacyScreen() {
   return (
     <LegalPage
       title="Privacy policy"
-      updated="November 7, 2026"
+      updated="November 9, 2026"
       sections={[
         {
           heading: 'Who we are',
@@ -21,10 +21,10 @@ export default function PrivacyScreen() {
             'Your email address and a password hash, only if you add an email. We use the email to sign you in, to let organizations reply to private complaints you send them, and to verify you if you respond for an organization. We never show it publicly.',
             'A display name we assign at random (for example "Steady Heron"). It is the only name shown next to anything you post.',
             'What you submit: the text of each complaint, any photos you attach, whether you sent it publicly or privately, how it was filed (the points, organizations and topics), and, for private complaints, the conversation that follows.',
-            'Your "Same here"s and fix confirmations. We store which points you supported so we can notify you and so you can withdraw; only the totals are public.',
+            'Your support, "Best rant" votes and fix confirmations. We store which points you supported and which complaints you voted for so we can notify you and so you can withdraw; only the totals are public.',
             'Notifications we send you inside the app, and, if you turn on phone notifications, your phone\'s push token (an address Apple or Google uses to deliver them, through Expo\'s push service).',
             'When you agreed to the terms of use.',
-            'Reports you send: what you reported and why. Authors you chose to hide (Block); that list is yours alone.',
+            'Reports you send: what you reported and why. Authors you chose to hide (their complaints are folded shut for you); that list is yours alone.',
             'Complaints you write while complaint checking is paused for the day are saved until they can be checked, then deleted after a week if you don\'t post them.',
             'To stop abuse, a one-way hash of your network address with the times of your recent actions. We never store the address itself, and only recent times are kept.',
             'If you respond for an organization: your work email, the organization, and the result of checking your email domain against the organization\'s website.',
@@ -79,7 +79,7 @@ export default function PrivacyScreen() {
         {
           heading: 'Deleting your account',
           body: [
-            'Delete your account at any time from Me > Account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every "Same here" and fix confirmation you gave is withdrawn and the counts drop; your organization access, requests, queued complaints, hidden-author list, notifications, phone tokens and sign-in are deleted; reports you sent stay without your account attached. An organization\'s private counts keep the anonymous number, which contains none of your words.',
+            'Delete your account at any time from Me > Account. When you do: your private complaints, their conversations and photos are deleted; your public complaints lose their text, photos and display name, while the points they fed stay on the record without your name because other people share them; every support, "Best rant" vote and fix confirmation you gave is withdrawn and the counts drop; your organization access, requests, queued complaints, hidden-author list, notifications, phone tokens and sign-in are deleted; reports you sent stay without your account attached. An organization\'s private counts keep the anonymous number, which contains none of your words.',
           ],
         },
         {
@@ -91,7 +91,7 @@ export default function PrivacyScreen() {
         {
           heading: 'Your choices and rights',
           body: [
-            'You can choose public or private for every complaint, remove personal details before posting, withdraw any "Same here", and delete your account. To ask for a copy of your data or a correction, contact us.',
+            'You can choose public or private for every complaint, remove personal details before posting, withdraw any support or vote, and delete your account. To ask for a copy of your data or a correction, contact us.',
           ],
         },
         {

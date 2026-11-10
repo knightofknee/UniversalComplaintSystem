@@ -493,6 +493,156 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "rantRank",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weekPeople",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weekSupport",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "people",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "weekPeople",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weekSupport",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "people",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supportCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "points",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "removed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subjectIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "imported",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -600,6 +750,24 @@
       "collectionGroup": "privatePoints",
       "fieldPath": "embedding",
       "indexes": []
+    },
+    {
+      "collectionGroup": "loves",
+      "fieldPath": "uid",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
     }
   ]
 }

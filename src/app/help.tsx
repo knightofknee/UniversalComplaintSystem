@@ -44,6 +44,13 @@ export default function HelpScreen() {
         people who raised it confirm before it counts.
       </T>
 
+      <T variant="heading">Two ways to back a complaint</T>
+      <T>
+        The up arrow on a point means you have that problem too. Best rant, on a complaint, means you loved reading
+        it. They are counted separately: one says how many people share a problem, the other picks the rants worth
+        reading.
+      </T>
+
       <T variant="heading">Photos</T>
       <T>
         You can attach up to four photos. They are resized and their metadata, including location, is removed

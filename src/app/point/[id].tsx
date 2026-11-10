@@ -12,11 +12,10 @@ import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/compon
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, markSeen, respondToPoint, voteFix } from '@/lib/api';
-import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { successHaptic } from '@/lib/haptics';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
-import { shareLink } from '@/lib/share';
+import { pointShareText, shareLink } from '@/lib/share';
 import type { OrgStatus, Point, PointStatus, Response, Submission } from '@/lib/types';
 
 const FIX_STATES: PointStatus[] = ['fix_claimed', 'fixed', 'not_fixed'];
@@ -26,7 +25,6 @@ export default function PointScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { user, profile } = useAuth();
-  const blocked = useBlockedAuthors();
   const { data: point, loading } = useDoc<Point>(`points/${id}`);
   const responses = useCollection<Response>(
     query(collection(db, `points/${id}/responses`), orderBy('createdAt', 'asc')),
@@ -50,14 +48,14 @@ export default function PointScreen() {
     ),
     `added:${id}`,
   );
+  // Authors the reader hid stay in the list, folded shut (SubmissionCard).
   const submissions = useMemo(
     () =>
-      [...added.items, ...matched.items]
-        .filter((s) => !s.authorId || !blocked.ids.has(s.authorId))
-        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)),
-    [added.items, matched.items, blocked.ids],
+      [...added.items, ...matched.items].sort(
+        (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
+      ),
+    [added.items, matched.items],
   );
-  const hiddenCount = added.items.length + matched.items.length - submissions.length;
 
   // Organizations this person responds for that this point is about.
   const myOrgs = useMemo(
@@ -88,7 +86,7 @@ export default function PointScreen() {
         options={{
           headerRight: () => (
             <Pressable
-              onPress={() => shareLink(`"${point.text}" · ${point.supportCount} people said "Same here"`, `/point/${point.id}`)}
+              onPress={() => shareLink(pointShareText(point), `/point/${point.id}`)}
               accessibilityLabel="Share this point"
               hitSlop={10}>
               <Ionicons name="share-outline" size={22} color={theme.primary} />
@@ -190,14 +188,9 @@ export default function PointScreen() {
 
       <T variant="label">Complaints</T>
       {submissions.length === 0 ? (
-        <Empty text={hiddenCount ? 'Only complaints from authors you hid.' : ''} loading={matched.loading || added.loading} />
+        <Empty text="" loading={matched.loading || added.loading} />
       ) : (
         submissions.map((s) => <SubmissionCard key={s.id} s={s} addedPoint={s.addedPointIds.includes(point.id)} />)
-      )}
-      {hiddenCount > 0 && submissions.length > 0 && (
-        <T variant="small">
-          {hiddenCount} complaint{hiddenCount === 1 ? '' : 's'} from authors you hid.
-        </T>
       )}
       <Button
         kind="secondary"
@@ -299,8 +292,8 @@ function FixCheck({
       ) : (
         <T variant="small">
           {supportedAt
-            ? 'You said "Same here" after the fix was claimed, so the call is up to people who had the problem before.'
-            : 'People who said "Same here" before the fix was claimed decide.'}
+            ? 'You supported this after the fix was claimed, so the call is up to people who had the problem before.'
+            : 'People who supported this before the fix was claimed decide.'}
         </T>
       )}
     </Card>

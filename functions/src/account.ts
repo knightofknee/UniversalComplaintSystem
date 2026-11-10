@@ -4,7 +4,8 @@
  *   (the organization's anonymous private counts stay: they hold no words);
  * - public complaints lose their text, photos and author name; the points
  *   they fed stay on the record (other people share them), unattributed;
- * - every "Same here" and fix confirmation is withdrawn and the counts drop;
+ * - every support, "Best rant" vote and fix confirmation is withdrawn and the
+ *   counts drop;
  * - organization access, requests, queued complaints, blocks, notifications,
  *   phone notification tokens, limits and the sign-in itself are removed;
  *   reports they sent stay (they're about others' posts) without their name.
@@ -14,6 +15,7 @@ import type { DocumentReference } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { CALLABLE, bucket, db, FieldValue, Timestamp, uidOf } from './common';
+import { rantRank } from './rants';
 
 const DELETED = 'Deleted account';
 const WEEK_MS = 7 * 24 * 3600_000;
@@ -36,7 +38,7 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   const follows = await db.collectionGroup('followers').where('uid', '==', uid).get();
   await Promise.all(follows.docs.map((d) => d.ref.delete()));
 
-  // "Same here": withdraw, and take it out of every count it was in.
+  // Support: withdraw, and take it out of every count it was in.
   const supports = await db.collectionGroup('supports').where('uid', '==', uid).get();
   for (const s of supports.docs) {
     const pointRef = s.ref.parent.parent!;
@@ -45,13 +47,33 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
     if (point.exists) {
       await pointRef.update({
         supportCount: FieldValue.increment(-1),
-        ...(recent ? { weekSupport: FieldValue.increment(-1) } : {}),
+        people: FieldValue.increment(-1),
+        ...(recent ? { weekSupport: FieldValue.increment(-1), weekPeople: FieldValue.increment(-1) } : {}),
       });
       for (const sid of point.get('subjectIds') as string[]) {
         await db.doc(`subjects/${sid}`).update({ 'stats.supporters': FieldValue.increment(-1) });
       }
     }
     await s.ref.delete();
+  }
+  // "Best rant" votes: withdraw, and the complaint's count and rank drop.
+  const loves = await db.collectionGroup('loves').where('uid', '==', uid).get();
+  for (const l of loves.docs) {
+    const subRef = l.ref.parent.parent!;
+    await db.runTransaction(async (tx) => {
+      const sub = await tx.get(subRef);
+      tx.delete(l.ref);
+      if (!sub.exists) return;
+      const left = Math.max(0, ((sub.get('loves') as number | undefined) ?? 0) - 1);
+      tx.update(subRef, {
+        loves: left,
+        rantRank: rantRank({
+          loves: left,
+          rantScore: (sub.get('rantScore') as number | undefined) ?? 0,
+          imported: !!sub.get('source'),
+        }),
+      });
+    });
   }
   const votes = await db.collectionGroup('fixVotes').where('uid', '==', uid).get();
   for (const v of votes.docs) {
@@ -70,7 +92,8 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
     const sub = db.doc(`submissions/${m.id}`);
     const snap = await sub.get();
     if (!snap.exists) continue;
-    await sub.update({ text: '[deleted]', englishText: null, photos: [], authorName: DELETED });
+    // The words are gone, so it leaves "Best rants" too.
+    await sub.update({ text: '[deleted]', englishText: null, photos: [], authorName: DELETED, rantScore: 0, rantRank: 0 });
     await bucket().deleteFiles({ prefix: `public/${m.id}/` });
     for (const pid of [...(snap.get('addedPointIds') as string[]), ...(snap.get('matchedPointIds') as string[])]) {
       const point = await db.doc(`points/${pid}`).get();

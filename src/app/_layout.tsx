@@ -82,7 +82,7 @@ export default function RootLayout() {
               name="help"
               options={{ title: "Help", presentation: "modal" }}
             />
-            <Stack.Screen name="point/[id]" options={{ title: "Point" }} />
+            <Stack.Screen name="point/[id]" options={{ title: "" }} />
             <Stack.Screen name="subject/[id]" options={{ title: "" }} />
             <Stack.Screen
               name="submission/[id]"

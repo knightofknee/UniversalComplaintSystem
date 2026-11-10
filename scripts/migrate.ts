@@ -16,7 +16,67 @@ import { readableCompany } from './cfpb-names';
 
 process.env.GCLOUD_PROJECT ??= 'universal-complaint-system';
 
+/**
+ * 2026-11-09: what lists rank by. `npm run migrate ranks` runs only this.
+ * - points get `people` / `weekPeople`: support from real accounts only
+ *   (imported supporters have ids like "import:cfpb:123"), and `imported`
+ *   (seeded from a public record), so a complaint a person made sorts above
+ *   the public-record seed;
+ * - submissions get `loves` (readers' "Best rant" votes) and `rantRank`.
+ */
+async function ranks() {
+  const { db } = await import('../functions/src/common');
+  const { rantRank } = await import('../functions/src/rants');
+  const weekAgo = Date.now() - 7 * 24 * 3600_000;
+  const people = new Map<string, { all: number; week: number }>();
+  const supports = await db.collectionGroup('supports').select('at').get();
+  for (const d of supports.docs) {
+    if (d.id.includes(':')) continue;
+    const pointId = d.ref.parent.parent!.id;
+    const c = people.get(pointId) ?? { all: 0, week: 0 };
+    c.all++;
+    if ((d.get('at')?.toMillis?.() ?? 0) >= weekAgo) c.week++;
+    people.set(pointId, c);
+  }
+  const subs = await db
+    .collection('submissions')
+    .select('loves', 'rantScore', 'rantRank', 'source', 'text', 'addedPointIds')
+    .get();
+  // A point is imported when the complaint that created it came from a public record.
+  const seeded = new Set<string>();
+  for (const s of subs.docs) {
+    if (s.get('source')) for (const id of (s.get('addedPointIds') as string[] | undefined) ?? []) seeded.add(id);
+  }
+  const writer = db.bulkWriter();
+  const points = await db.collection('points').select('people', 'weekPeople', 'imported').get();
+  let n = 0;
+  for (const p of points.docs) {
+    const c = people.get(p.id) ?? { all: 0, week: 0 };
+    const imported = seeded.has(p.id);
+    if (p.get('people') === c.all && p.get('weekPeople') === c.week && p.get('imported') === imported) continue;
+    void writer.update(p.ref, { people: c.all, weekPeople: c.week, imported });
+    n++;
+  }
+  console.log(
+    `${n} of ${points.size} points given their real-people counts (${people.size} have any; ${seeded.size} are imported).`,
+  );
+
+  n = 0;
+  for (const s of subs.docs) {
+    const loves = (s.get('loves') as number | undefined) ?? 0;
+    const gone = s.get('text') === '[deleted]';
+    const rank = gone ? 0 : rantRank({ loves, rantScore: (s.get('rantScore') as number | undefined) ?? 0, imported: !!s.get('source') });
+    if (s.get('loves') === loves && s.get('rantRank') === rank) continue;
+    void writer.update(s.ref, { loves, rantRank: rank });
+    n++;
+  }
+  await writer.close();
+  console.log(`${n} of ${subs.size} complaints given their best-rant rank.`);
+}
+
 async function main() {
+  if (process.argv[2] === 'ranks') return ranks();
+  await ranks();
   const { authorIdOf, db, FieldValue } = await import('../functions/src/common');
 
   const mine = await db.collectionGroup('mine').get();

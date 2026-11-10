@@ -7,6 +7,8 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 20 });
 
 export { analyzeComplaint, getDraft, processQueue, searchPoints, submitComplaint } from './intake';
 export { flushNotices, recountRising, supportPoint, voteFix } from './points';
+export { loveRant } from './rants';
+export { linkPreview } from './share';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';

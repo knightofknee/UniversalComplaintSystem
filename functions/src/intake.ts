@@ -38,6 +38,7 @@ import {
 } from './common';
 import { badSubjectName, photoIsSafe } from './moderation';
 import { promotePrivatePoint, submitPrivate } from './private';
+import { rantRank } from './rants';
 
 const MAX_TEXT = 4000;
 const MAX_PHOTOS = 4;
@@ -592,6 +593,8 @@ export async function recordPublic(args: {
         ...(newSupporter
           ? { supportCount: FieldValue.increment(1), ...(countsThisWeek ? { weekSupport: FieldValue.increment(1) } : {}) }
           : {}),
+        // Real accounts only; lists rank by these first (see supportPoint).
+        ...(newSupporter && !imported ? { people: FieldValue.increment(1), weekPeople: FieldValue.increment(1) } : {}),
       };
       // A clearer wording can lead the point, credited as "summarized from"
       // its author's complaint, but only when it says the same thing: one
@@ -634,6 +637,11 @@ export async function recordPublic(args: {
         ...filing(pointSubjects),
         supportCount: 1,
         weekSupport: countsThisWeek ? 1 : 0,
+        people: imported ? 0 : 1,
+        weekPeople: imported ? 0 : 1,
+        // Raised by a person, or seeded from a public record: at equal real
+        // support, what a person raised comes first in every list.
+        imported,
         submissionCount: 1,
         rantCount: isRant ? 1 : 0,
         hot: isRant,
@@ -666,6 +674,8 @@ export async function recordPublic(args: {
     }
   }
 
+  const rantScore =
+    result.tone === 'rant' && !useRewrite ? Math.max(1, Math.min(10, Math.round(result.rantScore ?? 1))) : 0;
   await submission.set({
     authorName: displayName,
     authorId: authorIdOf(uid),
@@ -678,8 +688,11 @@ export async function recordPublic(args: {
     matchedPointIds,
     addedPointIds,
     tone: result.tone,
-    // "Best rants" ranks by this; only rants have one.
-    rantScore: result.tone === 'rant' && !useRewrite ? Math.max(1, Math.min(10, Math.round(result.rantScore ?? 1))) : 0,
+    // The model's read of a rant, 1-10; only rants have one.
+    rantScore,
+    // Readers' "Best rant" votes, and the list's sort key (rants.ts).
+    loves: 0,
+    rantRank: rantRank({ loves: 0, rantScore, imported }),
     // Peppers. The rewrite is the calm version.
     spice: useRewrite ? 1 : Math.max(1, Math.min(5, Math.round(result.spice ?? 1))),
     actionability: result.actionability,

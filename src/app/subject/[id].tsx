@@ -17,7 +17,12 @@ import { shareLink } from '@/lib/share';
 import type { Point, Subject } from '@/lib/types';
 
 type Sort = 'top' | 'rising' | 'new';
-const SORT_FIELD: Record<Sort, string> = { top: 'supportCount', rising: 'weekSupport', new: 'createdAt' };
+/** People first: support from real accounts outranks imported public records (see the Complaints tab). */
+const SORT_FIELDS: Record<Sort, string[]> = {
+  top: ['people', 'imported', 'supportCount'],
+  rising: ['weekPeople', 'imported', 'weekSupport'],
+  new: ['imported', 'createdAt'],
+};
 
 function usePoints(subjectId: string, sort: Sort) {
   return useCollection<Point>(
@@ -25,7 +30,7 @@ function usePoints(subjectId: string, sort: Sort) {
       collection(db, 'points'),
       where('removed', '==', false),
       where('subjectIds', 'array-contains', subjectId),
-      orderBy(SORT_FIELD[sort], 'desc'),
+      ...SORT_FIELDS[sort].map((f) => orderBy(f, f === 'imported' ? 'asc' : 'desc')),
       limit(100),
     ),
     `subject:${subjectId}:${sort}`,

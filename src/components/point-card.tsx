@@ -82,8 +82,8 @@ function useSupport(pointId: string, count: number) {
 }
 
 /**
- * The upvote: a small box beside the row, arrow over count. Same meaning as
- * "Same here" (you have this problem too); support is private, the count public.
+ * The upvote: a small box beside the row, arrow over count. It means "I have
+ * this problem too"; who supports what is private, the count public.
  */
 export function Vote({ pointId, count }: { pointId: string; count: number }) {
   const theme = useTheme();
@@ -94,7 +94,7 @@ export function Vote({ pointId, count }: { pointId: string; count: number }) {
         onPress={toggle}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={on ? `You said same here. ${shown} people have this problem. Tap to take it back.` : `Same here. ${shown} people have this problem.`}
+        accessibilityLabel={on ? `You support this. ${shown} people have this problem. Tap to take it back.` : `Support this: you have this problem too. ${shown} people do.`}
         accessibilityState={{ selected: on }}
         style={({ pressed }) => [
           styles.vote,
@@ -111,7 +111,10 @@ export function Vote({ pointId, count }: { pointId: string; count: number }) {
   );
 }
 
-/** The one big "Same here" on a point's own page. */
+/**
+ * The one big support button on a point's own page: the same up arrow and
+ * count as the rows, larger, and no words. Filled once it's yours.
+ */
 export function SupportButton({ pointId, count }: { pointId: string; count: number }) {
   const theme = useTheme();
   const { on, shown, toggle, scale } = useSupport(pointId, count);
@@ -120,7 +123,11 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
-        accessibilityLabel={on ? 'Take back your "Same here"' : 'Same here: you have this problem too'}
+        accessibilityLabel={
+          on
+            ? `You support this: you have this problem too. ${shown} people do. Tap to take it back.`
+            : `Support this: you have this problem too. ${shown} people do.`
+        }
         accessibilityState={{ selected: on }}
         style={({ pressed }) => [
           styles.hero,
@@ -130,13 +137,8 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
             opacity: pressed ? 0.85 : 1,
           },
         ]}>
-        <Ionicons name={on ? 'checkmark' : 'arrow-up'} size={20} color={on ? theme.onPrimary : theme.primary} />
-        <Text style={[styles.heroLabel, { color: on ? theme.onPrimary : theme.text }]}>
-          {on ? 'You too' : 'Same here'}
-        </Text>
-        <Text style={[styles.heroCount, { color: on ? theme.onPrimary : theme.textSecondary }]}>
-          {shown.toLocaleString()}
-        </Text>
+        <Ionicons name="arrow-up" size={24} color={on ? theme.onPrimary : theme.primary} />
+        <Text style={[styles.heroCount, { color: on ? theme.onPrimary : theme.text }]}>{shown.toLocaleString()}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -214,11 +216,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    minWidth: 96,
+    justifyContent: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  heroLabel: { fontFamily: Fonts.bold, fontSize: 18 },
-  heroCount: { fontFamily: Fonts.medium, fontSize: 18 },
+  heroCount: { fontFamily: Fonts.bold, fontSize: 22 },
 });

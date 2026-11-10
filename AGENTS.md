@@ -78,12 +78,32 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   inline lines or toasts (`showToast`, src/components/toast.tsx), never
   pop-up alerts, never codes (`errorText` in src/lib/api.ts).
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
-  vote box on the right (`Vote`: arrow over count). The big "Same here"
-  (`SupportButton`) is only on a point's own page.
+  vote box on the right (`Vote`: arrow over count). The big one
+  (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
+  (2026-11-09): the up arrow and a count, nothing else. "Same here" is
+  retired, like "Me too" before it; in prose say "support". A point's page
+  has no header title (blank beats "Point").
+- TWO SEPARATE VOTES (2026-11-09). The arrow on a POINT means "I have this
+  problem too" (`supportPoint`). "🤬 Best rant" on a COMPLAINT means "I
+  loved reading this" (`loveRant`, functions/src/rants.ts;
+  `submissions/{id}/loves/{uid}` private, `submissions.loves` public).
+  `BestRantButton` is the wide, enticing button on every complaint card
+  (`SubmissionCard`), with report and hide as bare icons pushed right.
+  Never on an imported record; authors may vote for their own.
+- PEOPLE OVER IMPORTS (2026-11-09, the user's direction): the imported
+  public records are seed data that will eventually stop being shown, so a
+  complaint a person made always outranks them. Points carry `people` /
+  `weekPeople` (support from real accounts only; imported supporter ids
+  contain ":") and `imported` (seeded from a public record). Every list
+  sorts by real people first, then person-raised before imported, then the
+  old count. `rantRank` on submissions does the same for Best rants
+  (votes x1000, +100 if a person wrote it, + the model's `rantScore`; 0 =
+  not listed). New fields on old data: `npm run migrate ranks`.
 - Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
-  🔥 Hot (`weekSupport`, recounted every 6h by `recountRising`), 🤬 Best
-  rants (rant submissions by `rantScore`, 1-10 from the model), 👥 Most
-  shared (`supportCount`), ✅ Fixed, 🆕 New. No category browsing and no
+  🔥 Hot (`weekPeople`, `imported`, `weekSupport`; recounted every 6h by
+  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 👥 Most
+  shared (`people`, `imported`, `supportCount`), ✅ Fixed, 🆕 New
+  (`imported`, `createdAt`). No category browsing and no
   "biggest topics" grid: topics are tags on points, reachable from them.
   Topic and organization pages use the same sorts. Search opens on "Most
   complained about" (subjects by supporters) with a small Companies /
@@ -164,7 +184,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   - **Terms**: first post/message/response/claim needs `acceptTerms`
     (`requireTerms`; `users.termsAcceptedAt`), shown by `TermsCheck`.
   - **Block**: readers hide authors (`users/{uid}/blocks`, opaque
-    `submissions.authorId`); either side blocks a private thread
+    `submissions.authorId`). Hidden means FOLDED SHUT, never gone
+    (2026-11-09): a one-line row reading "Hidden by you" and "Show", with
+    NO author name until it is opened, so you can see someone you hid
+    weighed in and open it if you want. Either side blocks a private thread
     (`blockedBy`). Who wrote what is server-only in `authors/{id}`.
   - **Fixes are per organization** (`points.orgStatus.{orgId}`); only
     supporters from before `fixClaimedAt` confirm; `fixVotes/{orgId}_{uid}`.
@@ -192,7 +215,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   - Shared links are `https://www.waldgrave.com/ucs/app/...` (src/lib/share.ts);
     `+native-intent.ts` strips the prefix; `npm run publish-web` copies the
     web export into ../../Documents/GitHub/the-waldgrave/public/ucs/app.
-  - "Same here" (never "Me too") is the support button.
+  - Sharing (`shareLink`) sends ONE piece of text with the link on its own
+    last line, so Copy then paste carries the words and the link together
+    (`pointShareText`). Link previews: the site sends /ucs/app/point|subject|
+    submission/<id> through the-waldgrave/pages/api/ucs/share.js, which asks
+    the public `linkPreview` function (functions/src/share.ts, no App Check)
+    for a title and description and writes them into the page for preview
+    fetchers only; people get the plain page with no wait. iOS universal
+    links are live (AASA on the site + `associatedDomains`); Android needs
+    UCS added to the site's assetlinks.json once the release SHA-256 exists.
+  - The suggested rewrite is posted as written, so it can never contain a
+    blank to fill in: the prompt forbids it and `hasPlaceholder`
+    (functions/src/ai.ts) drops any that slips through. Never call it
+    "sharper"; the option reads "Post this wording instead" / "Edit it first".
 - Appearance (2026-11-06): DARK is the default, chosen by the app, not the
   phone (src/lib/appearance.ts; Me > Appearance: Dark / Light / Match phone,
   saved per device). Native: `Appearance.setColorScheme`, so the tab bar,

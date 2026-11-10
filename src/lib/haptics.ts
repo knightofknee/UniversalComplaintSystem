@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
 /**
- * Haptic accents on the moments that matter (a "Same here", posting, a
+ * Haptic accents on the moments that matter (supporting a point, posting, a
  * confirmed fix), never on plain navigation. No-ops on the web.
  */
 export function tapHaptic(): void {

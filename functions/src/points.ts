@@ -1,5 +1,5 @@
 /**
- * Supporting a point ("Same here"), and supporters confirming whether a fix
+ * Supporting a point (the up arrow: "I have this problem too"), and supporters confirming whether a fix
  * is real.
  *
  * Status is per organization (`orgStatus.{orgId}`): on a point filed under
@@ -54,16 +54,22 @@ export const supportPoint = onCall(CALLABLE, async (req) => {
     const recent = !support && Date.now() - (mine.get('at') as Timestamp).toMillis() < RISING_WINDOW_MS;
     if (support) {
       tx.set(mine.ref, { uid, at: FieldValue.serverTimestamp(), via: 'direct' });
+      // `people` / `weekPeople` count real accounts only (never imported
+      // records): lists rank by them first, so a complaint a person made
+      // always sits above the public-record seed.
       tx.update(ref, {
         supportCount: FieldValue.increment(1),
         weekSupport: FieldValue.increment(1),
+        people: FieldValue.increment(1),
+        weekPeople: FieldValue.increment(1),
         lastActivityAt: FieldValue.serverTimestamp(),
       });
     } else {
       tx.delete(mine.ref);
       tx.update(ref, {
         supportCount: FieldValue.increment(-1),
-        ...(recent ? { weekSupport: FieldValue.increment(-1) } : {}),
+        people: FieldValue.increment(-1),
+        ...(recent ? { weekSupport: FieldValue.increment(-1), weekPeople: FieldValue.increment(-1) } : {}),
       });
     }
     for (const sid of point.get('subjectIds') as string[]) {
@@ -209,28 +215,34 @@ export const flushNotices = onSchedule('every 60 minutes', async () => {
 /**
  * Support is counted into weekSupport the moment it is given; this ages it
  * out. Every 6 hours each point's weekSupport is recounted from the support
- * timestamps of the last 7 days.
+ * timestamps of the last 7 days, and weekPeople with it (the same count
+ * without imported records, whose supporter ids look like "import:cfpb:1").
  */
 export const recountRising = onSchedule('every 6 hours', async () => {
   const cutoff = Timestamp.fromMillis(Date.now() - RISING_WINDOW_MS);
   const recent = await db.collectionGroup('supports').where('at', '>=', cutoff).select().get();
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { all: number; people: number }>();
   for (const d of recent.docs) {
     const pointId = d.ref.parent.parent!.id;
-    counts.set(pointId, (counts.get(pointId) ?? 0) + 1);
+    const c = counts.get(pointId) ?? { all: 0, people: 0 };
+    c.all++;
+    if (!d.id.includes(':')) c.people++;
+    counts.set(pointId, c);
   }
-  const current = await db.collection('points').where('weekSupport', '>', 0).select('weekSupport').get();
-  const writes = new Map<string, number>();
+  const current = await db.collection('points').where('weekSupport', '>', 0).select('weekSupport', 'weekPeople').get();
+  const writes = new Map<string, { all: number; people: number }>();
   for (const d of current.docs) {
-    const n = counts.get(d.id) ?? 0;
-    if (n !== d.get('weekSupport')) writes.set(d.id, n);
+    const c = counts.get(d.id) ?? { all: 0, people: 0 };
+    if (c.all !== d.get('weekSupport') || c.people !== (d.get('weekPeople') ?? 0)) writes.set(d.id, c);
     counts.delete(d.id);
   }
-  for (const [id, n] of counts) writes.set(id, n);
+  for (const [id, c] of counts) writes.set(id, c);
   const entries = [...writes];
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db.batch();
-    for (const [id, n] of entries.slice(i, i + 400)) batch.update(db.doc(`points/${id}`), { weekSupport: n });
+    for (const [id, c] of entries.slice(i, i + 400)) {
+      batch.update(db.doc(`points/${id}`), { weekSupport: c.all, weekPeople: c.people });
+    }
     await batch.commit();
   }
 });

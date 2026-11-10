@@ -933,7 +933,7 @@ function ReviewSection(props: {
           >
             <Row style={{ justifyContent: "space-between" }}>
               <T style={{ fontWeight: "700", flex: 1 }}>
-                Post the sharper version instead
+                Post this wording instead
               </T>
               <Switch
                 value={props.useRewrite}
@@ -943,6 +943,19 @@ function ReviewSection(props: {
             <T variant="small" color={theme.text}>
               “{result.suggestedRewrite}”
             </T>
+            <Pressable
+              onPress={() => props.onUseAlternative(result.suggestedRewrite!)}
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <T
+                variant="small"
+                color={theme.primary}
+                style={{ fontWeight: "700" }}
+              >
+                Edit it first
+              </T>
+            </Pressable>
           </Pressable>
         )}
       </Section>
@@ -1141,12 +1154,18 @@ function Done({
   return (
     <>
       <Stamp />
-      <T variant="title">It&apos;s on the record.</T>
+      <T variant="title">Posted.</T>
       <T>
-        You&apos;re now behind {total} point{total === 1 ? "" : "s"}
-        {step.matched.length > 0 &&
-          `, ${step.matched.length} alongside people who said it first`}
-        . We&apos;ll tell you when anything moves.
+        {step.matched.length === 0
+          ? total === 1
+            ? "Nobody had raised this yet. You're the first."
+            : "Nobody had raised these yet. You're the first."
+          : step.added.length === 0
+            ? total === 1
+              ? "Other people already raised this. Yours now counts with theirs."
+              : "Other people already raised these. Yours now counts with theirs."
+            : "Some of this was already here, so yours counts with theirs. The rest is new."}{" "}
+        We&apos;ll tell you when someone joins in or an organization answers.
       </T>
       <View>
         {step.matched.map((id) => (
