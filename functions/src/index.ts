@@ -16,7 +16,7 @@ export { checkClaims, markSeen, requestAccess, respondToPoint } from './company'
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';
 export { setPush } from './push';
-export { deleteAccount } from './account';
+export { deleteAccount, deleteComplaint } from './account';
 export { mergeAccount } from './merge';
 
 /** Drafts nobody submitted expire (a day, or a week for a queued complaint); they were never public. */

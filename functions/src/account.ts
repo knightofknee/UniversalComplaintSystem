@@ -161,3 +161,77 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   await getAuth().deleteUser(uid);
   return { deleted: true };
 });
+
+/**
+ * Deleting one of your own public complaints. The words, photos and added
+ * details go and it leaves every list. What it did to the record is undone:
+ * the support it gave each point is withdrawn, and a point that existed only
+ * because of this complaint goes with it. A point other people share stays,
+ * without this author's name on its headline.
+ */
+export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, async (req) => {
+  const uid = uidOf(req);
+  const id = typeof req.data?.submissionId === 'string' && /^[\w-]{1,128}$/.test(req.data.submissionId) ? req.data.submissionId : '';
+  const author = await db.doc(`authors/${id}`).get();
+  if (!id || author.get('uid') !== uid) throw new HttpsError('permission-denied', 'Only the author can delete a complaint.');
+  const ref = db.doc(`submissions/${id}`);
+  const sub = await ref.get();
+  if (!sub.exists) throw new HttpsError('not-found', 'That complaint is gone.');
+  const isRant = sub.get('tone') === 'rant';
+  const pointIds = [
+    ...new Set([
+      ...((sub.get('addedPointIds') as string[] | undefined) ?? []),
+      ...((sub.get('matchedPointIds') as string[] | undefined) ?? []),
+    ]),
+  ];
+  for (const pid of pointIds) {
+    const pointRef = db.doc(`points/${pid}`);
+    const point = await pointRef.get();
+    if (!point.exists) continue;
+    const subjectIds = (point.get('subjectIds') as string[] | undefined) ?? [];
+    const update: Record<string, unknown> = {
+      submissionCount: FieldValue.increment(-1),
+      ...(isRant ? { rantCount: FieldValue.increment(-1) } : {}),
+    };
+    // The support this complaint gave (not support given separately with the arrow).
+    const support = await pointRef.collection('supports').doc(uid).get();
+    if (support.exists && support.get('submissionId') === id) {
+      const recent = Date.now() - ((support.get('at') as Timestamp | undefined)?.toMillis() ?? 0) < WEEK_MS;
+      update.supportCount = FieldValue.increment(-1);
+      update.people = FieldValue.increment(-1);
+      if (recent) {
+        update.weekSupport = FieldValue.increment(-1);
+        update.weekPeople = FieldValue.increment(-1);
+      }
+      await support.ref.delete();
+      for (const sid of subjectIds) {
+        await db.doc(`subjects/${sid}`).update({ 'stats.supporters': FieldValue.increment(-1) }).catch(() => {});
+      }
+    }
+    const alone = ((point.get('submissionCount') as number | undefined) ?? 1) <= 1;
+    if (alone) {
+      update.removed = true;
+      for (const sid of subjectIds) {
+        await db.doc(`subjects/${sid}`).update({ 'stats.points': FieldValue.increment(-1) }).catch(() => {});
+      }
+    } else if (point.get('canonical.submissionId') === id) {
+      update['canonical.authorName'] = DELETED;
+    }
+    await pointRef.update(update);
+  }
+  await ref.update({
+    text: '[deleted]',
+    englishText: null,
+    photos: [],
+    details: [],
+    authorName: DELETED,
+    rantScore: 0,
+    rantRank: 0,
+    removed: true,
+  });
+  await bucket().deleteFiles({ prefix: `public/${id}/` });
+  await db.recursiveDelete(ref.collection('loves'));
+  await db.doc(`users/${uid}/mine/${id}`).delete();
+  await author.ref.delete();
+  return { deleted: true };
+});

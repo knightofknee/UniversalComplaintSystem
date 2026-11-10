@@ -73,6 +73,8 @@ export const setOrgSettings = call<{ subjectId: string; publishPrivate: boolean 
  * taken just before switching.
  */
 export const mergeAccount = call<{ fromToken: string }, { moved: number }>('mergeAccount');
+/** Delete one of your own public complaints; what it added to the record is undone. */
+export const deleteComplaint = call<{ submissionId: string }, { deleted: boolean }>('deleteComplaint');
 export const deleteAccount = call<{ confirm: true }, { deleted: boolean }>('deleteAccount');
 
 export const supportPoint = call<{ pointId: string; support: boolean }, { supported: boolean }>(

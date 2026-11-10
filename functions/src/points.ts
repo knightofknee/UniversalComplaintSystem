@@ -31,6 +31,23 @@ export type OrgStatus = {
   no: number;
 };
 
+/** A point's followers hear that others have joined when it reaches one of these. */
+const JOIN_MILESTONES = [2, 3, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+
+/**
+ * Called after a real person's support is added. `people` is the count
+ * before it. Tells everyone already on the point that they are not alone,
+ * only at milestones (and never more than every 6 hours per point).
+ */
+export async function announceJoin(pointId: string, peopleBefore: number, text: string) {
+  const now = peopleBefore + 1;
+  if (!JOIN_MILESTONES.includes(now)) return;
+  await notifyPointFollowers(pointId, {
+    type: 'joined',
+    text: `${now} people now have this problem: "${text}"`,
+  });
+}
+
 export const supportPoint = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   const pointId = typeof req.data?.pointId === 'string' ? req.data.pointId : '';
@@ -38,7 +55,9 @@ export const supportPoint = onCall(CALLABLE, async (req) => {
   await rateLimit(req, 'support');
   const { responderFor } = await ensureUser(uid);
   const ref = db.doc(`points/${pointId}`);
+  let joined = null as { before: number; text: string } | null;
   await db.runTransaction(async (tx) => {
+    joined = null;
     const point = await tx.get(ref);
     if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That point is gone.');
     if ((point.get('subjectIds') as string[]).some((s) => responderFor.includes(s))) {
@@ -75,7 +94,9 @@ export const supportPoint = onCall(CALLABLE, async (req) => {
     for (const sid of point.get('subjectIds') as string[]) {
       tx.update(db.doc(`subjects/${sid}`), { 'stats.supporters': FieldValue.increment(delta) });
     }
+    if (support) joined = { before: (point.get('people') as number | undefined) ?? 0, text: point.get('text') as string };
   });
+  if (joined) await announceJoin(pointId, joined.before, joined.text).catch(() => {});
   return { supported: support };
 });
 

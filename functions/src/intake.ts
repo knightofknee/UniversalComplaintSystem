@@ -38,6 +38,7 @@ import {
 } from './common';
 import { badSubjectName, photoIsSafe } from './moderation';
 import { promotePrivatePoint, submitPrivate } from './private';
+import { announceJoin } from './points';
 import { rantRank } from './rants';
 
 const MAX_TEXT = 4000;
@@ -801,6 +802,10 @@ export async function recordPublic(args: {
       }
       if (newSupporter) await addSupporters(current, 1);
       await ref.update(update);
+      // The people already on this point hear that someone joined them.
+      if (newSupporter && !imported) {
+        await announceJoin(ref.id, (pointSnap.get('people') as number | undefined) ?? 0, pointSnap.get('text') as string).catch(() => {});
+      }
     } else {
       const ref = db.collection('points').doc();
       addedPointIds.push(ref.id);
