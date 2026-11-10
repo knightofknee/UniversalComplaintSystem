@@ -157,7 +157,7 @@ function DuplicateCard({ d }: { d: Duplicate }) {
       ))}
       <T variant="small">
         Closeness {d.distance} (under 0.12 is usually the same complaint). Merging keeps the one with more people and
-        moves the other's supporters, complaints, responses and fixes into it.
+        moves the other one&apos;s supporters, complaints, responses and fixes into it.
       </T>
       <Row>
         <Button label="Not the same" kind="secondary" onPress={() => act('dismiss')} busy={busy === 'dismiss'} style={{ flex: 1 }} />
