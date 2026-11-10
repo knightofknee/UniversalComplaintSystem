@@ -570,7 +570,7 @@ export function Composer({ home }: { home?: boolean }) {
                 ))}
               </Row>
             )}
-            {read.words > 0 && (
+            {read.words > 0 && !read.quiet && (
               <View
                 style={styles.live}
                 accessibilityLiveRegion="polite"

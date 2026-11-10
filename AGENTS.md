@@ -51,7 +51,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   bottom of the screen when it is down; capped at 460pt only in windows
   700pt+ wide). Everything else is INSIDE the box: placeholder "What could
   be better?", photo thumbnails, one live line (peppers + the single nudge
-  from src/lib/read.ts), a "+" for photos (iOS action sheet: camera or
+  from src/lib/read.ts; a nudge fires only on a pattern that clearly shows
+  something is missing, never on a guess, and says nothing for non-English
+  text; `npm run read-audit` types sample complaints word by word and runs
+  the regression checks, run it after any change there), a "+" for photos (iOS action sheet: camera or
   library) and the "Next" pill. No bottom bar, no logo, no blurb, no lists
   on this screen: similar complaints show after Next, as the matches in the
   review. The keyboard overlap is measured (`useKeyboard`), not

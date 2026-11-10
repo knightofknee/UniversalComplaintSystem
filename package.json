@@ -15,6 +15,7 @@
     "remove": "tsx scripts/remove.ts",
     "export-web": "WEB_EXPORT=1 expo export --platform web --output-dir dist-web",
     "usage": "tsx scripts/usage.ts",
+    "read-audit": "tsx scripts/read-audit.ts",
     "migrate": "tsx scripts/migrate.ts",
     "import": "tsx scripts/import.ts",
     "publish-web": "npm run export-web && rm -rf ../../Documents/GitHub/the-waldgrave/public/ucs/app && cp -R dist-web ../../Documents/GitHub/the-waldgrave/public/ucs/app",
