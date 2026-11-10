@@ -27,6 +27,10 @@ export default function HelpScreen() {
         aimed at people, including the people who work there. A five is sent back with a few rewrites that keep
         the heat and the facts but aim them at the problem. At least one of them tries to be funny.
       </T>
+      <T>
+        The pepper beside the meter is Rudy. The advice there is his, and if you stay hot for a while he will say
+        so. He is on your side: heat is welcome, rudeness just gets a complaint skipped.
+      </T>
 
       <T variant="heading">The next step</T>
       <T>

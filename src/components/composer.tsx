@@ -39,6 +39,7 @@ import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { setJustPosted } from "@/lib/just-posted";
+import { useRudy } from "@/lib/rudy";
 import { useTheme } from "@/hooks/use-theme";
 import {
   analyzeComplaint,
@@ -213,6 +214,8 @@ export function Composer({ home }: { home?: boolean }) {
   });
   const navigation = useNavigation();
   const read = readComplaint(text);
+  // Three peppers or more for a while: Rudy has something to say about it.
+  const rudy = useRudy(read.words > 0 && read.spice >= 3);
 
   /** Resize, strip metadata (location included), upload. */
   const ingest = async (uri: string) => {
@@ -652,11 +655,33 @@ export function Composer({ home }: { home?: boolean }) {
                 ))}
               </Row>
             )}
+            {rudy.line && read.words > 0 && !read.quiet && (
+              <Pressable
+                onPress={rudy.dismiss}
+                accessibilityRole="button"
+                accessibilityLabel={`Rudy says: ${rudy.line} Tap to dismiss.`}
+                accessibilityLiveRegion="polite"
+                style={[styles.bubble, { backgroundColor: theme.rantSoft }]}
+              >
+                <Text style={[styles.bubbleText, { color: theme.text }]}>
+                  {rudy.line}
+                </Text>
+                <View
+                  style={[styles.bubbleTail, { backgroundColor: theme.rantSoft }]}
+                />
+              </Pressable>
+            )}
             {read.words > 0 && !read.quiet && (
               <View
                 style={styles.live}
                 accessibilityLiveRegion="polite"
               >
+                {/* Rudy: the advice here is his. */}
+                <Image
+                  source={require("@/assets/images/rudy.png")}
+                  style={styles.rudy}
+                  accessibilityLabel="Rudy the red pepper"
+                />
                 <Peppers n={read.spice} size={13} />
                 <Text
                   numberOfLines={2}
@@ -1287,6 +1312,26 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
   },
   live: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rudy: { width: 30, height: 30, marginLeft: -4, marginRight: -2 },
+  bubble: {
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 2,
+  },
+  bubbleText: { fontFamily: Fonts.medium, fontSize: 14, lineHeight: 19 },
+  // The little point of the bubble, aimed down at Rudy.
+  bubbleTail: {
+    position: "absolute",
+    left: 8,
+    bottom: -4,
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    transform: [{ rotate: "45deg" }],
+  },
   next: {
     height: 40,
     minWidth: 88,

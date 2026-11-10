@@ -153,12 +153,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   the organization's points, what is waiting on it (each number opens that
   list), response rate and time (`firstRespondedBy`), what the complaints
   are about (topics), and exports the table. NOT YET TESTED BY THE USER.
-- ICON (2026-11-10, the user's direction): a red chili pepper with a curled
-  tip on the dark background, for the spice meter and "constructive heat".
-  Drawn in code: `python3 scripts/icon-gen.py` writes the SVGs,
+- RUDY THE RED PEPPER (2026-11-10, the user's direction): the icon is a
+  character, not an object: a grinning red chili with eyes, in the spirit
+  of VeggieTales. Never a chat bubble, never a plain pepper. Drawn in code:
+  `python3 scripts/icon-gen.py <dir>` writes the SVGs,
   scripts/icon-render.swift turns them into the PNGs in assets/images
-  (icon has no alpha channel, as the App Store requires). The website's copy
-  is the-waldgrave/public/ucs/icon.png. Never a chat bubble.
+  (icon.png has no alpha channel, as the App Store requires; rudy.png is
+  him alone for use in the app). The website's copy is
+  the-waldgrave/public/ucs/icon.png. In the box he sits beside the spice
+  meter (the advice there is his), and after ~20s at three peppers or more
+  he says one of `RUDY_LINES` (src/lib/rudy.ts) in a speech bubble, then
+  again every ~2 minutes with a random offset, and goes quiet when it
+  cools. His lines are on the writer's side: heat is welcome, rudeness
+  just gets a complaint skipped.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
