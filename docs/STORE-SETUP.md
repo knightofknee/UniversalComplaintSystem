@@ -68,7 +68,7 @@ then run `eas init` again.
 
 ### 0b2. Make yourself the operator (once)
 
-In the UCS app: Me > Add an email > **bricarlis@gmail.com**, and verify it.
+In the UCS app: Me > Sign in > Sign up with **bricarlis@gmail.com**, then click the link in the email (the app notices by itself).
 That account then sees **Operator queue** in Me (organization requests to
 check, reports, AI spend) and gets the daily "Needs you" notification at
 6:00 Chicago time whenever something waits. Apple expects reports to be
@@ -181,16 +181,19 @@ location, purchases, or advertising data.
   responds for the "Universal Complaint System" organization page, so the
   reviewer can respond, set statuses and see the private inbox.
   `npm run reviewer` prints the same file again.
-- Notes (paste): "No account is needed to read, complain, or say 'Same
-  here'. Sign in with the demo account (Me > Add an email > sign in) to see
-  the organization side: Me > Respond for your organization. User-generated
-  content safeguards (guideline 1.2): the terms agreement is shown before a
-  first post; every complaint, point, response, page and private message has
-  Report; any author can be hidden (Hide this author), and either side of a
-  private conversation can block the other; threats, hate, sexual content
-  and posts about private people are refused before posting; photos are
-  screened; reports reach us immediately and are reviewed within 24 hours,
-  and abusive accounts are suspended."
+- Notes (paste): "No account is needed to read, complain, or support a
+  complaint. Sign in with the demo account (Me > Sign in > I have an
+  account) to see the organization side: Me > Respond for your
+  organization. Sign in with Apple and Google are optional; Delete account
+  is at Me > About > Delete account, and deleting revokes the Apple sign-in.
+  User-generated content safeguards (guideline 1.2): the terms agreement is
+  shown before a first post; every complaint, point, response, page and
+  private message has Report; any author can be hidden (the eye icon on a
+  complaint), and either side of a private conversation can block the
+  other; threats, hate, sexual content, name-calling and posts about private
+  people are refused before posting; photos are screened; reports reach us
+  immediately and are reviewed within 24 hours, and abusive accounts are
+  suspended."
 
 ### 1g. TestFlight first
 
@@ -286,7 +289,7 @@ before production access. Start that early.
    **Add fingerprint** → paste each SHA-256 → Save.
 
 Until both are done, Android store builds can't attest, and every
-complaint, search and "Same here" on Android is refused.
+complaint, search and support on Android is refused.
 
 4. Android app links (shared links opening the app): send me the SHA-256 and
    I'll add the `com.waldgrave.ucs` entry to the Waldgrave
@@ -359,7 +362,7 @@ nobody owns. No organization controls it. They can respond, but they can
 never delete or edit what you wrote.
 
 • Complain in seconds, in any language, no account needed.
-• See if others already said it, and add your "Same here".
+• See if others already said it, and add your support with one tap.
 • Starts full: complaints from public government records (CFPB, NHTSA) are
   already on it, labelled by source.
 • Your complaint is split into specific points and merged with everyone who
