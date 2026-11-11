@@ -158,7 +158,8 @@ async function main() {
     const draftRef = db.doc(`drafts/${analysis.draftId}`);
     const draft = (await draftRef.get()).data() as Parameters<typeof intake.recordPublic>[0]['draft'];
     await draftRef.delete();
-    if (!analysis.result.isComplaint || analysis.result.safety?.unsafe) return 'skipped';
+    // Nothing wrong in it, unsafe, or no issue the model could name: not for the record.
+    if (!analysis.result.isComplaint || analysis.result.safety?.unsafe || analysis.result.points.length === 0) return 'skipped';
     const res = await intake.recordPublic({
       uid,
       displayName: authorName,
