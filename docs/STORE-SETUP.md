@@ -187,7 +187,7 @@ location, purchases, or advertising data.
   organization. Sign in with Apple and Google are optional; Delete account
   is at Me > About > Delete account, and deleting revokes the Apple sign-in.
   User-generated content safeguards (guideline 1.2): the terms agreement is
-  shown before a first post; every complaint, point, response, page and
+  shown before a first post; every complaint, issue, response, page and
   private message has Report; any author can be hidden (the eye icon on a
   complaint), and either side of a private conversation can block the
   other; threats, hate, sexual content, name-calling and posts about private
@@ -318,7 +318,7 @@ complaint, search and support on Android is refused.
   - Shared with third parties: **No** (Anthropic and Google process data on
     our behalf as service providers, which Play doesn't count as sharing).
   - Encrypted in transit: **Yes**.
-  - Users can request deletion: **Yes**, in the app (Me → Account → Delete
+  - Users can request deletion: **Yes**, in the app (Me → About → Delete
     account) and at the deletion URL.
 - Account deletion URL: from the table.
 - News, government, financial, health declarations: **No** to each.
