@@ -57,6 +57,22 @@
         "CLAUDE_PREVIEW": "1"
       },
       "port": 3078
+    },
+    {
+      "name": "metro-sim",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--dev-client",
+        "--port",
+        "8095"
+      ],
+      "env": {
+        "BROWSER": "none",
+        "CI": "1"
+      },
+      "port": 8095
     }
   ]
 }
