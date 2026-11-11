@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
+import { signOut } from 'firebase/auth';
 import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
@@ -11,7 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText } from '@/lib/api';
 import { unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { timeAgo, useCollection } from '@/lib/hooks';
 import { useJustPosted } from '@/lib/just-posted';
 import { isOperator } from '@/lib/operator';
@@ -271,12 +272,15 @@ export default function MeScreen() {
         </>
       )}
 
-      <T variant="label">About</T>
-      <Link icon="information-circle-outline" label="How UCS works" href="/about" />
-      <Link icon="trash-bin-outline" label="Removal log" href="/removals" />
-      <Link icon="shield-checkmark-outline" label="Privacy policy" href="/privacy" />
-      <Link icon="document-text-outline" label="Terms of use" href="/terms" />
-      <Link icon="close-circle-outline" label="Delete account" href="/delete-account" />
+      {!anonymous && (
+        <Button
+          label="Sign out"
+          kind="secondary"
+          onPress={() => signOut(auth).catch((e) => showAlert("Couldn't sign out", errorText(e)))}
+        />
+      )}
+      {/* Everything about the app, and deleting an account, is one tap further in. */}
+      <Link icon="information-circle-outline" label="About" href="/more" />
     </Screen>
   );
 }

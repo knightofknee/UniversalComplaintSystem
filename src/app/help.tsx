@@ -28,8 +28,8 @@ export default function HelpScreen() {
         the heat and the facts but aim them at the problem. At least one of them tries to be funny.
       </T>
       <T>
-        The pepper beside the meter is Rudy. The advice there is his, and if you stay hot for a while he will say
-        so. He is on your side: heat is welcome, rudeness just gets a complaint skipped.
+        The pepper beside the meter is Rudy. His face follows the peppers: he beams when it is mild and cries when
+        it turns to name-calling.
       </T>
 
       <T variant="heading">The next step</T>

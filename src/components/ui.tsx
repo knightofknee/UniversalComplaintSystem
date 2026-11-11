@@ -162,23 +162,40 @@ export function Chip({ label, color, bg }: { label: string; color: string; bg: s
 
 export function Field(props: TextInputProps & { label?: string }) {
   const theme = useTheme();
-  const { label, style, ...rest } = props;
+  const { label, style, placeholder, ...rest } = props;
   const bar = useKeyboardBar();
+  // On iOS a one-line field draws its own placeholder a few points lower
+  // than typed text whenever it isn't focused, so the words jump when
+  // someone starts typing. We draw the placeholder ourselves, centered the
+  // same way the typed text is. (Needs a controlled field, to know it is empty.)
+  const own = Platform.OS === 'ios' && !rest.multiline && typeof rest.value === 'string';
   return (
     <View style={{ gap: 6 }}>
       {label && <T variant="label">{label}</T>}
-      <TextInput
-        placeholderTextColor={theme.textSecondary}
-        // Every field gets the bar with the hide-keyboard button.
-        inputAccessoryViewID={bar.id}
-        {...rest}
-        style={[
-          styles.field,
-          { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
-          rest.multiline && { minHeight: 120, textAlignVertical: 'top' },
-          style,
-        ]}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={theme.textSecondary}
+          placeholder={own ? undefined : placeholder}
+          accessibilityLabel={rest.accessibilityLabel ?? label ?? placeholder}
+          // Every field gets the bar with the hide-keyboard button.
+          inputAccessoryViewID={bar.id}
+          {...rest}
+          style={[
+            styles.field,
+            { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
+            // One line: a fixed height and no vertical padding, so the text sits centered.
+            rest.multiline ? { minHeight: 120, textAlignVertical: 'top' } : styles.oneLine,
+            style,
+          ]}
+        />
+        {own && !rest.value && !!placeholder && (
+          <View pointerEvents="none" style={styles.placeholder} accessible={false} importantForAccessibility="no">
+            <Text numberOfLines={1} style={{ fontSize: 16, color: theme.textSecondary }}>
+              {placeholder}
+            </Text>
+          </View>
+        )}
+      </View>
       {bar.element}
     </View>
   );
@@ -287,6 +304,9 @@ const styles = StyleSheet.create({
   chip: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, alignSelf: 'flex-start' },
   chipText: { fontSize: 12, fontWeight: '700' },
   field: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
+  oneLine: { height: 44, paddingVertical: 0 },
+  // Over the field's text area: same inset as `field` (padding 12 + border 1), centered like the text.
+  placeholder: { position: 'absolute', left: 13, right: 13, top: 0, bottom: 0, justifyContent: 'center' },
   tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   notice: { borderRadius: 14, padding: 12, gap: 6 },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },

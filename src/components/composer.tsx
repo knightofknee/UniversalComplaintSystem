@@ -39,7 +39,7 @@ import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { setJustPosted } from "@/lib/just-posted";
-import { useRudy } from "@/lib/rudy";
+import { rudyFace, useRudy } from "@/lib/rudy";
 import { useTheme } from "@/hooks/use-theme";
 import {
   analyzeComplaint,
@@ -214,7 +214,7 @@ export function Composer({ home }: { home?: boolean }) {
   });
   const navigation = useNavigation();
   const read = readComplaint(text);
-  // Three peppers or more for a while: Rudy has something to say about it.
+  // Hot the whole time for minutes: Rudy says one kind thing (a hidden extra).
   const rudy = useRudy(read.words > 0 && read.spice >= 3);
 
   /** Resize, strip metadata (location included), upload. */
@@ -666,6 +666,7 @@ export function Composer({ home }: { home?: boolean }) {
                 <Text style={[styles.bubbleText, { color: theme.text }]}>
                   {rudy.line}
                 </Text>
+                <Ionicons name="close" size={15} color={theme.textSecondary} />
                 <View
                   style={[styles.bubbleTail, { backgroundColor: theme.rantSoft }]}
                 />
@@ -676,9 +677,9 @@ export function Composer({ home }: { home?: boolean }) {
                 style={styles.live}
                 accessibilityLiveRegion="polite"
               >
-                {/* Rudy: the advice here is his. */}
+                {/* Rudy: his face follows the peppers, beaming at one, crying at five. */}
                 <Image
-                  source={require("@/assets/images/rudy.png")}
+                  source={rudyFace(read.spice)}
                   style={styles.rudy}
                   accessibilityLabel="Rudy the red pepper"
                 />
@@ -1312,8 +1313,11 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
   },
   live: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rudy: { width: 30, height: 30, marginLeft: -4, marginRight: -2 },
+  rudy: { width: 40, height: 40, marginLeft: -6, marginRight: -4 },
   bubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     alignSelf: "flex-start",
     maxWidth: "92%",
     borderRadius: 14,
@@ -1321,11 +1325,16 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     marginBottom: 2,
   },
-  bubbleText: { fontFamily: Fonts.medium, fontSize: 14, lineHeight: 19 },
+  bubbleText: {
+    flexShrink: 1,
+    fontFamily: Fonts.medium,
+    fontSize: 14,
+    lineHeight: 19,
+  },
   // The little point of the bubble, aimed down at Rudy.
   bubbleTail: {
     position: "absolute",
-    left: 8,
+    left: 10,
     bottom: -4,
     width: 10,
     height: 10,

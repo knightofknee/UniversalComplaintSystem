@@ -255,8 +255,8 @@ Two things to state there:
   for App Functionality only. Apple and Google sign-in give the app the
   email and nothing else.
 - **App Review notes** (1f): "Sign in with Apple and Google are optional;
-  the app works without an account. Delete account is at Me > Delete
-  account, and deleting revokes the Apple sign-in."
+  the app works without an account. Delete account is at Me > About >
+  Delete account, and deleting revokes the Apple sign-in."
 
 ## 2. Google Play
 

@@ -36,8 +36,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   (expo-apple-authentication, @react-native-google-signin) need a build
   made after 2026-11-10. A VERIFIED email is what lets someone respond for
   an organization. Me says "Not signed in." plainly. Deleting an account is
-  its own screen (Me > Delete account, /delete-account), never on the
-  sign-in page.
+  its own screen (/delete-account), reached only through Me > About, never
+  on the Me tab or the sign-in page. Me has a "Sign out" button (signed in
+  only) above the single "About" row (src/app/more.tsx: how it works,
+  help, removal log, privacy, terms, delete account).
 - Names (functions/src/names.ts): random two-word names from the lists in
   common.ts, never typed. Me shows the name with a shuffle button
   (`NameChanger`): shuffle through `nameOptions`, nothing changes until
@@ -124,6 +126,12 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   the complaint's own points (REREAD_SAME_POINT). If the model can't run,
   the detail is still added after plain filters. `npm run fix-test` covers
   the callable; one line, 5 details at most.
+- One-line `Field`s draw their OWN placeholder on iOS (a centered Text over
+  the field): the system's sits about 4pt lower than typed text whenever
+  the field isn't focused, so the words jumped on the first keystroke.
+- Test company: `npm run tester -- someone@tester.com [--wait]` makes
+  "Tester Company" and lets that account respond for it with its email
+  marked verified. The account is made in the app, never by the script.
 - KEYBOARDS (2026-11-10): every text field has an obvious way to put the
   keyboard away: a bar on top of it with a hide button
   (`useKeyboardBar`, src/components/keyboard-bar.tsx; `Field` has it built
@@ -172,13 +180,14 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   (icon.png has no alpha channel, as the App Store requires; rudy.png is
   him alone for use in the app). The website's copy is
   the-waldgrave/public/ucs/icon.png. In the box he sits beside the spice
-  meter (the advice there is his), and after ~20s at three peppers or more
-  he says one of `RUDY_LINES` (src/lib/rudy.ts) in a speech bubble, then
-  again every ~2 minutes with a random offset, and goes quiet when it
-  cools. He is a SCHOLAR OF KINDNESS: his lines are things he has
-  worked out ("Be hard on the problem and soft on the person."), plainly
-  nice, or cute. Never snark and never a jab at anyone (no "PR team"
-  jokes).
+  meter and HIS FACE IS THE FEEDBACK (2026-11-10, the user's direction):
+  `rudy-1..5.png`, beaming at one pepper, happy, neutral, worried, and
+  crying at five. Text that tells a writer to calm down antagonizes or
+  misses; a sad pepper says it without accusing anyone. His sayings
+  (`RUDY_LINES`, src/lib/rudy.ts) are a hidden extra: one line only after
+  three straight minutes at three peppers or more, in a bubble with an x
+  that a tap dismisses and that blocks nothing. Every line says kindness is
+  good or is simply kind; NONE implies the writer is doing something wrong.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
   (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS

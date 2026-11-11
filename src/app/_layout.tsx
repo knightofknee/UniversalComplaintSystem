@@ -139,6 +139,7 @@ export default function RootLayout() {
                 ...SHEET,
               }}
             />
+            <Stack.Screen name="more" options={{ title: "About" }} />
             <Stack.Screen name="about" options={{ title: "How UCS works" }} />
             <Stack.Screen name="removals" options={{ title: "Removal log" }} />
             <Stack.Screen

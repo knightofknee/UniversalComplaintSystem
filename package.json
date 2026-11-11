@@ -20,7 +20,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "import": "tsx scripts/import.ts",
     "publish-web": "npm run export-web && rm -rf ../../Documents/GitHub/the-waldgrave/public/ucs/app && cp -R dist-web ../../Documents/GitHub/the-waldgrave/public/ucs/app",
-    "reviewer": "tsx scripts/reviewer.ts"
+    "reviewer": "tsx scripts/reviewer.ts",
+    "tester": "tsx scripts/tester.ts"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "^0.4.1",
