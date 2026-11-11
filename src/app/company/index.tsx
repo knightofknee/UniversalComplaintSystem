@@ -68,11 +68,11 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
       {subject && <Stats subject={subject} />}
       <T variant="small">
         Public numbers above. Private: {count(privateTotal, 'complaint')} across{' '}
-        {count(privatePoints.items.length, 'point')}, visible only to your team.
+        {count(privatePoints.items.length, 'problem')}, visible only to your team.
       </T>
       <Tabs
         options={[
-          { key: 'points', label: 'Points' },
+          { key: 'points', label: 'Problems' },
           { key: 'inbox', label: unread ? `Private inbox · ${unread}` : 'Private inbox' },
           { key: 'settings', label: 'Settings' },
         ]}
@@ -234,7 +234,7 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
 
   const exportCsv = async () => {
     const rows = [
-      ['Point', 'People', 'New this week', 'Complaints', 'Status', 'Seen', 'Responded', 'Proposed fixes', 'First raised', 'Filed under'],
+      ['Problem', 'People', 'New this week', 'Complaints', 'Status', 'Seen', 'Responded', 'Proposed fixes', 'First raised', 'Filed under'],
       ...points.map((p) => [
         p.text,
         p.supportCount,
@@ -286,7 +286,7 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
       </Box>
       <T variant="small">
         You have responded to {s.rate}% of these points
-        {s.median ? `, typically ${s.median} after a point is first raised` : ''}. {s.total.toLocaleString()} people in
+        {s.median ? `, typically ${s.median} after a problem is first raised` : ''}. {s.total.toLocaleString()} people in
         all; {s.here.toLocaleString()} of them complained or added their support here, the rest come from public
         records.
       </T>
@@ -299,13 +299,13 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
                 {name}
               </T>
               <T variant="small">
-                {t.people.toLocaleString()} people · {count(t.points, 'point')}
+                {t.people.toLocaleString()} people · {count(t.points, 'problem')}
               </T>
             </Row>
           ))}
         </>
       )}
-      <Button kind="quiet" icon="download-outline" label="Export these points as a table" onPress={exportCsv} />
+      <Button kind="quiet" icon="download-outline" label="Export these problems as a table" onPress={exportCsv} />
     </Card>
   );
 }

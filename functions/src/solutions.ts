@@ -36,7 +36,7 @@ export const proposeFix = onCall(CALLABLE, async (req) => {
   await rateLimit(req, 'solution');
   const pointRef = db.doc(`points/${pointId}`);
   const point = await pointRef.get();
-  if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That point is gone.');
+  if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That problem is gone.');
   const authorId = authorIdOf(uid);
   const ref = pointRef.collection('solutions').doc(authorId);
   const existing = await ref.get();
@@ -87,7 +87,7 @@ export const rateFix = onCall(CALLABLE, async (req) => {
     ]);
     if (!fix.exists || fix.get('removed')) throw new HttpsError('not-found', 'That fix is gone.');
     if (!support.exists) {
-      throw new HttpsError('permission-denied', 'Support the point first: the people who have the problem say if a fix worked.');
+      throw new HttpsError('permission-denied', 'Tap the arrow on the problem first: the people who have it say if a fix worked.');
     }
     const before = mine.exists ? (mine.get('rating') as Rating) : null;
     if (before === rating) return;

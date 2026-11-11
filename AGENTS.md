@@ -58,6 +58,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Clients never write the public record. Everything goes through callables
   in `functions/src` (intake.ts, points.ts, company.ts); firestore.rules
   allow only reads (plus marking own notifications read).
+- ON SCREEN A POINT IS A "PROBLEM" (2026-11-11, the user's choice): one
+  specific thing that is wrong, which many complaints can share ("8
+  problems", "Report this problem", "New problem · worded by the model").
+  Never "point" in anything a person reads (app, help, privacy, terms,
+  store copy, website). Code, data and the model's prompt keep `points`.
 - Data model: `subjects` (organization | topic), `points` (atomic things
   wrong; the unit of support, status, response), `submissions` (a person's
   words, kept as written; `matchedPointIds` / `addedPointIds` record what

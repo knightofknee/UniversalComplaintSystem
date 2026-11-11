@@ -261,7 +261,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
         {own && <Chip label="Yours" color={theme.primary} bg={theme.primarySoft} />}
         {source && <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />}
         {s.tone === 'rant' && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
-        {addedPoint && <Chip label="Model added this point from it" color={theme.new} bg={theme.newSoft} />}
+        {addedPoint && <Chip label="Model added this problem from it" color={theme.new} bg={theme.newSoft} />}
         {s.rewritten && <Chip label="Clearer version" color={theme.textSecondary} bg={theme.background} />}
       </Row>
       <T>{translated && !original ? s.englishText : s.text}</T>

@@ -4,8 +4,8 @@ const RULES = [
   'Organizations can respond. They can never remove, hide, reorder, or edit what people wrote.',
   'Nothing is sold that changes what is seen or how it ranks.',
   'Only illegal content, personal data, and complaints about private individuals are removed, and every removal is listed in the public removal log.',
-  'People who respond for an organization can’t support points about it.',
-  'A fix counts only when the people who raised the point confirm it.',
+  'People who respond for an organization can’t support problems about it.',
+  'A fix counts only when the people who raised the problem confirm it.',
 ];
 
 export default function AboutScreen() {
@@ -21,17 +21,17 @@ export default function AboutScreen() {
         Your complaint is counted, merged with everyone who shares it, and visible to the people who can fix it. We
         can&apos;t promise they&apos;ll answer. Everyone can see whether they did.
       </T>
-      <T variant="heading">Points, not posts</T>
+      <T variant="heading">Problems, not posts</T>
       <T>
-        A model splits each complaint into points, the specific things that are wrong, and matches them to points
-        already on the record, so a hundred people saying the same thing become one point with a hundred
-        supporters. Wherever the model added a new point, it is marked. Every complaint stays visible in its
+        A model splits each complaint into problems, the specific things that are wrong, and matches them to problems
+        already on the record, so a hundred people saying the same thing become one problem with a hundred
+        supporters. Wherever the model added a new problem, it is marked. Every complaint stays visible in its
         author&apos;s own words.
       </T>
       <T variant="heading">Organizations</T>
       <T>
         Anyone with a verified email at an organization&apos;s domain can respond for it. Each organization&apos;s page
-        shows how many points it has, and what share it has seen, answered, and fixed.
+        shows how many problems it has, and what share it has seen, answered, and fixed.
       </T>
       <T variant="heading">The rules</T>
       {RULES.map((r) => (

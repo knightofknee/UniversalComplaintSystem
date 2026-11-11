@@ -26,7 +26,7 @@ export default function NotificationsScreen() {
   return (
     <Screen>
       {items.length === 0 ? (
-        <Empty loading={loading} text="When something moves on a point you support, it shows up here." />
+        <Empty loading={loading} text="When something moves on a problem you support, it shows up here." />
       ) : (
         items.map((n) => (
           <Card key={n.id} onPress={() => open(n)}>

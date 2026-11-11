@@ -229,9 +229,9 @@ async function responderFor(uid: string, pointId: string, subjectId: string) {
     db.doc(`points/${pointId}`).get(),
     db.doc(`subjects/${subjectId}/responders/${uid}`).get(),
   ]);
-  if (!point.exists) throw new HttpsError('not-found', 'That point is gone.');
+  if (!point.exists) throw new HttpsError('not-found', 'That problem is gone.');
   if (!responder.exists || !(point.get('subjectIds') as string[]).includes(subjectId)) {
-    throw new HttpsError('permission-denied', 'You don\'t respond for an organization on this point.');
+    throw new HttpsError('permission-denied', 'You don\'t respond for an organization on this problem.');
   }
   return { point, responder };
 }

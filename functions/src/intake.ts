@@ -709,7 +709,7 @@ export async function recordPublic(args: {
       ? result.pii.redactedText!
       : (result.pii.sensitiveRemovedText ?? text);
   const keptIdx = result.points.map((_, i) => i).filter((i) => options.keep.includes(i));
-  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one point.');
+  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one problem.');
 
   const resolved = await Promise.all(
     result.subjects.map((s, i) => (options.removeSubjects.has(i) ? null : resolveSubject(s))),

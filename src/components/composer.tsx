@@ -1145,7 +1145,7 @@ function ReviewSection(props: {
                 <T variant="small" color={hit ? theme.primary : theme.new}>
                   {hit
                     ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} who said it`
-                    : "New point · worded by the model"}
+                    : "New problem · worded by the model"}
                   {analysis.alsoPrivate?.[i] && !isPrivate
                     ? " · raised privately too"
                     : ""}

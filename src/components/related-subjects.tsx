@@ -59,7 +59,7 @@ export function RelatedSubjects({
                 {s.name}
               </T>
               <T variant="small">
-                {here} point{here === 1 ? '' : 's'} here
+                {here} problem{here === 1 ? '' : 's'} here
                 {kind === 'organization' ? (s.claimed ? ` · responds to ${rate}%` : ' · not on UCS yet') : ''}
               </T>
             </Card>

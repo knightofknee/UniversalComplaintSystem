@@ -88,7 +88,7 @@ export default function PointScreen() {
     }
   }, [point, myOrgs]);
 
-  if (!point) return <Screen><Empty loading={loading} text="This point isn't on the record (or it was removed)." /></Screen>;
+  if (!point) return <Screen><Empty loading={loading} text="This problem isn't on the record (or it was removed)." /></Screen>;
 
   const seenCount = Object.keys(point.seenBy ?? {}).length;
   // Only present for organizations that chose to publish their private counts.
@@ -104,7 +104,7 @@ export default function PointScreen() {
           headerRight: () => (
             <Pressable
               onPress={() => shareLink(`/point/${point.id}`)}
-              accessibilityLabel="Share this point"
+              accessibilityLabel="Share this problem"
               hitSlop={10}>
               <Ionicons name="share-outline" size={22} color={theme.primary} />
             </Pressable>
@@ -224,7 +224,7 @@ export default function PointScreen() {
           })
         }
       />
-      <ReportButton target={{ kind: 'point', id: point.id }} label="Report this point" />
+      <ReportButton target={{ kind: 'point', id: point.id }} label="Report this problem" />
     </Screen>
   );
 }
