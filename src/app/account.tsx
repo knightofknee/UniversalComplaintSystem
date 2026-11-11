@@ -4,15 +4,15 @@ import {
   linkWithCredential,
   sendEmailVerification,
   signInWithEmailAndPassword,
-  signOut,
 } from 'firebase/auth';
 import { Stack, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
-import { Button, Card, Field, Notice, Screen, T, Tabs } from '@/components/ui';
+import { showToast } from '@/components/toast';
+import { Button, Field, Screen, T, Tabs } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
@@ -35,7 +35,6 @@ import {
  */
 export default function AccountScreen() {
   const { user, refresh } = useAuth();
-  const router = useRouter();
   const theme = useTheme();
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [email, setEmail] = useState('');
@@ -54,31 +53,9 @@ export default function AccountScreen() {
     }
   };
 
-  if (user && !user.isAnonymous) {
-    return (
-      <Screen>
-        <Stack.Screen options={{ title: 'Account' }} />
-        <T variant="heading">{user.email ?? 'Signed in'}</T>
-        {user.emailVerified ? (
-          <Notice>
-            <T>Email verified.</T>
-          </Notice>
-        ) : (
-          <Card>
-            <T>Check your inbox for a verification link, then come back.</T>
-            <Button label="I've verified it" onPress={() => run('verify', refresh)} busy={busy === 'verify'} />
-            <Button
-              label="Send the link again"
-              kind="quiet"
-              onPress={() => run('resend', async () => user && sendEmailVerification(user))}
-            />
-          </Card>
-        )}
-        <Button label="Sign out" kind="secondary" onPress={() => run('out', () => signOut(auth))} />
-        <Button label="Delete account" kind="quiet" onPress={() => router.push('/delete-account')} />
-      </Screen>
-    );
-  }
+  // Signed in already: this sheet has nothing to say. (Me shows the email,
+  // a line to confirm it if needed, and Sign out; deleting is under About.)
+  if (user && !user.isAnonymous) return <Close />;
 
   const signup = mode === 'signup';
   return (
@@ -145,6 +122,7 @@ export default function AccountScreen() {
               const cred = EmailAuthProvider.credential(email.trim(), password);
               const linked = await linkWithCredential(auth.currentUser!, cred);
               await sendEmailVerification(linked.user);
+              showToast('You are signed up', `We sent a link to ${email.trim()} to confirm it.`, 'info');
             } else {
               await switchAccount(() => signInWithEmailAndPassword(auth, email.trim(), password));
             }
@@ -208,6 +186,16 @@ function ProviderButton({
       )}
     </Pressable>
   );
+}
+
+/** Closes the sheet as soon as it is shown. */
+function Close() {
+  const router = useRouter();
+  useEffect(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/me');
+  }, [router]);
+  return null;
 }
 
 const styles = StyleSheet.create({

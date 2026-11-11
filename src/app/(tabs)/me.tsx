@@ -5,6 +5,7 @@ import { collection, documentId, getDocs, limit, orderBy, query, where } from 'f
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
+import { ConfirmEmail } from '@/components/email-status';
 import { NameChanger } from '@/components/name-changer';
 import { showAlert } from '@/components/point-card';
 import { Button, Card, Chip, Empty, Row, Screen, T, Tabs } from '@/components/ui';
@@ -210,6 +211,7 @@ export default function MeScreen() {
         {anonymous ? 'Not signed in. Sign in to keep your history and to send private complaints.' : user?.email}
       </T>
       {anonymous && <Link icon="person-circle-outline" label="Sign in" href="/account" />}
+      <ConfirmEmail />
       <Link
         icon="notifications-outline"
         label="Notifications"
@@ -218,7 +220,6 @@ export default function MeScreen() {
       />
       <PushSwitch on={!!profile?.pushOn} />
       <AppearancePicker />
-      {!anonymous && <Link icon="person-circle-outline" label="Account" href="/account" />}
       <Link
         icon="briefcase-outline"
         label={responder ? 'Respond for your organization' : 'Work somewhere? Respond for it'}

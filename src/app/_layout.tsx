@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { Platform, Pressable } from "react-native";
 
 import { Colors, Fonts } from "@/constants/theme";
+import { VerifiedNotice } from "@/components/email-status";
 import { Toaster } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -157,6 +158,7 @@ export default function RootLayout() {
             />
           </Stack>
         )}
+        <VerifiedNotice />
         <Toaster />
       </AuthProvider>
     </ThemeProvider>

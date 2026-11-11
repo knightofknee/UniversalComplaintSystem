@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { showAlert } from '@/components/point-card';
 import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Field, Notice, Screen, T } from '@/components/ui';
+import { ConfirmEmail } from '@/components/email-status';
 import { useAuth } from '@/hooks/use-auth';
 import { errorText, requestAccess } from '@/lib/api';
 import { db } from '@/lib/firebase';
@@ -94,12 +95,13 @@ export default function ClaimScreen() {
         Respond publicly for your organization: acknowledge points, say what&apos;s planned, mark fixes. You can&apos;t
         remove or edit anything people wrote.
       </T>
-      {!verified && (
+      {!verified && (!user || user.isAnonymous) && (
         <Notice tone="warn">
-          <T>First, add and verify your work email.</T>
-          <Button label="Add work email" kind="secondary" onPress={() => router.push('/account')} />
+          <T>First, sign up with your work email.</T>
+          <Button label="Sign up" kind="secondary" onPress={() => router.push('/account')} />
         </Notice>
       )}
+      <ConfirmEmail reason="so we know it is your work address" />
       {verified && <T variant="small">Applying as {user!.email}</T>}
 
       {subject ? (

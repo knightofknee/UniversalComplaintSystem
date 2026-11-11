@@ -35,7 +35,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   (`revokeAppleBeforeDelete`), as App Review 5.1.1(v) requires. The native modules
   (expo-apple-authentication, @react-native-google-signin) need a build
   made after 2026-11-10. A VERIFIED email is what lets someone respond for
-  an organization. Me says "Not signed in." plainly. Deleting an account is
+  an organization. Me says "Not signed in." plainly. EMAIL CONFIRMATION IS NOTICED, NEVER
+  REPORTED (2026-11-10): while an email is unconfirmed, use-auth.tsx
+  reloads the user every 4s while the app is in front (30s after 15
+  minutes, and at once on returning to the app); when it flips it refreshes
+  the token and `VerifiedNotice` (src/components/email-status.tsx) shows
+  "Email verified" with OK, closing itself after 4s. No "I've verified it"
+  button anywhere. Until then `ConfirmEmail` is one quiet line (Me, the
+  claim page, private sending) with "Send the link again". The sign-in
+  sheet closes once someone is signed in; there is no signed-in Account
+  page. Deleting an account is
   its own screen (/delete-account), reached only through Me > About, never
   on the Me tab or the sign-in page. Me has a "Sign out" button (signed in
   only) above the single "About" row (src/app/more.tsx: how it works,

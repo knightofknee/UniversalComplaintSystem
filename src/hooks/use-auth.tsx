@@ -1,6 +1,7 @@
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { auth, db } from '@/lib/firebase';
 
@@ -22,6 +23,9 @@ type AuthState = {
   loading: boolean;
   /** Re-read the token (after verifying an email, say). */
   refresh: () => Promise<void>;
+  /** The email was just confirmed (noticed on its own); shown once, then cleared. */
+  justVerified: boolean;
+  clearJustVerified: () => void;
 };
 
 const AuthContext = createContext<AuthState>({
@@ -29,6 +33,8 @@ const AuthContext = createContext<AuthState>({
   profile: null,
   loading: true,
   refresh: async () => {},
+  justVerified: false,
+  clearJustVerified: () => {},
 });
 
 /**
@@ -41,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
+  const [justVerified, setJustVerified] = useState(false);
+  const checking = useRef(false);
 
   useEffect(
     () =>
@@ -67,6 +75,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [user, version]);
 
+  // Signed in with an email that isn't confirmed yet: look again every few
+  // seconds while the app is open (and the moment it comes back to the
+  // front), so clicking the link, in any browser on any device, is noticed
+  // without anyone having to say so. Stops once it is confirmed.
+  const unconfirmed = !!user && !user.isAnonymous && !!user.email && !user.emailVerified;
+  useEffect(() => {
+    if (!unconfirmed) return;
+    const started = Date.now();
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = async () => {
+      if (stopped || checking.current) return;
+      checking.current = true;
+      try {
+        if (AppState.currentState === 'active') {
+          await auth.currentUser?.reload();
+          if (auth.currentUser?.emailVerified) {
+            // A fresh token carries the confirmed email to the server.
+            await auth.currentUser.getIdToken(true);
+            if (!stopped) {
+              setUser(auth.currentUser);
+              setVersion((v) => v + 1);
+              setJustVerified(true);
+            }
+            return;
+          }
+        }
+      } catch {
+        // Offline for a moment: the next look will do.
+      } finally {
+        checking.current = false;
+      }
+      if (!stopped) timer = setTimeout(check, Date.now() - started < 15 * 60_000 ? 4000 : 30_000);
+    };
+    timer = setTimeout(check, 4000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      clearTimeout(timer);
+      void check();
+    });
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      sub.remove();
+    };
+  }, [unconfirmed, version]);
+
   const refresh = async () => {
     await auth.currentUser?.reload();
     await auth.currentUser?.getIdToken(true);
@@ -76,7 +131,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setVersion((v) => v + 1);
   };
 
-  return <AuthContext.Provider value={{ user, profile, loading, refresh }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ user, profile, loading, refresh, justVerified, clearJustVerified: () => setJustVerified(false) }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);

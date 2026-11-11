@@ -38,6 +38,7 @@ import { TermsCheck, useTermsAccepted } from "@/components/terms-check";
 import { Button, Chip, InlineError, Row, T, Tabs } from "@/components/ui";
 import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
+import { ConfirmEmail } from "@/components/email-status";
 import { setJustPosted } from "@/lib/just-posted";
 import { rudyFace, useRudy } from "@/lib/rudy";
 import { useTheme } from "@/hooks/use-theme";
@@ -828,6 +829,7 @@ export function Composer({ home }: { home?: boolean }) {
           privateTo={privateTo}
           setPrivateTo={setPrivateTo}
           canSendPrivately={canSendPrivately}
+          signedOut={!user || user.isAnonymous}
           removePII={removePII}
           setRemovePII={setRemovePII}
           useRewrite={useRewrite}
@@ -927,6 +929,8 @@ function ReviewSection(props: {
   privateTo: number | null;
   setPrivateTo: (i: number) => void;
   canSendPrivately: boolean;
+  /** No email on the account yet (vs. one that isn't confirmed). */
+  signedOut: boolean;
   removePII: boolean;
   setRemovePII: (v: boolean) => void;
   useRewrite: boolean;
@@ -1215,12 +1219,15 @@ function ReviewSection(props: {
               ? `Only ${props.privateName} reads it, and they can reply to you. Nothing of it is public.`
               : "Anyone can read it and add their voice. More voices, more pressure."}
           </T>
-          {isPrivate && !props.canSendPrivately && (
+          {isPrivate && !props.canSendPrivately && props.signedOut && (
             <Button
               kind="secondary"
-              label="Add your email to send privately"
+              label="Sign in to send privately"
               onPress={() => router.push("/account")}
             />
+          )}
+          {isPrivate && !props.canSendPrivately && !props.signedOut && (
+            <ConfirmEmail reason="to send privately" />
           )}
         </Section>
       )}
