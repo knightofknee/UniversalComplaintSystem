@@ -58,11 +58,22 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Clients never write the public record. Everything goes through callables
   in `functions/src` (intake.ts, points.ts, company.ts); firestore.rules
   allow only reads (plus marking own notifications read).
-- ON SCREEN A POINT IS A "PROBLEM" (2026-11-11, the user's choice): one
-  specific thing that is wrong, which many complaints can share ("8
-  problems", "Report this problem", "New problem · worded by the model").
-  Never "point" in anything a person reads (app, help, privacy, terms,
-  store copy, website). Code, data and the model's prompt keep `points`.
+- ISSUES AND STATEMENTS (2026-11-11, the user's direction; replaced
+  "problem", which replaced "point"). On screen a point is an ISSUE: one
+  distinct thing wrong, which many complaints share ("8 issues", "Report
+  this issue", "New issue · worded by the model"). Under every issue are its
+  STATEMENTS: what each complaint said about it, pulled out by the model at
+  intake (`said`, in the author's own voice, specifics kept), stored at
+  `points/{id}/statements/{submissionId}` (functions/src/statements.ts) and
+  listed on the issue's page, each opening its complaint. A cause, place,
+  consequence or detail is never an issue of its own: it goes in the
+  statement. The words must say what the thing is (the user: "we should use
+  accurate language"): describe what a list shows rather than label it.
+  Never "point" or "problem" for this in anything a person reads; code,
+  data and the model's prompt keep `points`. A statement follows its
+  complaint (`syncStatements`: renamed, merged, removed, deleted); merging
+  issues moves them (`moveStatements`); a re-read with an added detail
+  rewrites them.
 - Data model: `subjects` (organization | topic), `points` (atomic things
   wrong; the unit of support, status, response), `submissions` (a person's
   words, kept as written; `matchedPointIds` / `addedPointIds` record what
@@ -72,7 +83,7 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   vector search; Claude (`CLAUDE_MODEL` in functions/src/ai.ts) does intake
   with structured output. The model may only reference candidates it was
   shown (enforced after the call). Every model-made change is labeled in the
-  UI ("New point · added by the model").
+  UI ("New issue · worded by the model").
 - Tags (2026-11-02): every point is filed under its organizations AND at
   least one topic (a kind of problem, never containing an org name, e.g.
   "Checked bag fees"); every subject has one of the fixed `CATEGORIES`
@@ -114,7 +125,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   3-4 and fine. `submissions.spice` is stored. The intake output schema
   (functions/src/ai.ts) is near Anthropic's grammar size limit: keep
   `.describe()` strings terse and put guidance in INTAKE_SYSTEM "Fields";
-  check with a 2-token parse call before deploying a schema change.
+  check with a 2-token parse call before deploying a schema change. The
+  model fills a compact `ModelOutput` (one nullable string instead of a flag
+  plus reason; category a plain string) and `expand` turns it into the
+  `IntakeResult` everything else reads (2026-11-11, to make room for
+  `said`).
   Copy is fun and pushes toward improvement, not criticism. Errors are
   inline lines or toasts (`showToast`, src/components/toast.tsx), never
   pop-up alerts, never codes (`errorText` in src/lib/api.ts).
@@ -215,6 +230,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `BestRantButton` is the wide, enticing button on every complaint card
   (`SubmissionCard`), with report and hide as bare icons pushed right.
   Never on an imported record; authors may vote for their own.
+  "🍋 Easy peasy" (2026-11-11, functions/src/easy.ts) sits beside it: from
+  what the author says or suggests, this looks easy to fix (`easyFix`;
+  `submissions/{id}/easy/{uid}` private, `submissions.easy` public). An
+  author can't vote on their own; never on imported records. It feeds the
+  🍋 Easiest sort.
 - PEOPLE OVER IMPORTS (2026-11-09, the user's direction): the imported
   public records are seed data that will eventually stop being shown, so a
   complaint a person made always outranks them. Points carry `people` /
@@ -229,7 +249,8 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `npm run migrate ranks`.
 - Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
   🔥 Hot (`weekPeople`, `imported`, `weekSupport`; recounted every 6h by
-  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 🏆 Top
+  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 🍋 Easiest
+  (submissions by `easy`), 🏆 Top
   (`people`, `imported`, `supportCount`; never "Most shared"), ✅ Fixed,
   🆕 New (`imported`, `createdAt`). A sort is its name and nothing else: no
   line of description under it. Empty lists say "Nothing here yet." with
@@ -303,7 +324,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   `max_tokens` 6000 and junk text rejected before the model. Past the
   ceiling only complaint checking pauses.
 - App Check (2026-11-05) is ENFORCED on every callable (`CALLABLE` in
-  functions/src/common.ts; skipped in the emulators). Web: reCAPTCHA
+  functions/src/common.ts; skipped in the emulators), on Firestore and
+  Storage, and on Firebase Auth (2026-11-11: tested first; the JS SDK sends
+  the token on every Auth call, native builds included, and the hosted
+  email-confirmation link still works). Web: reCAPTCHA
   Enterprise (site key in src/lib/firebase.ts). iOS: App Attest (team
   R3H7M2M4F5, entitlement in app.json). Android: Play Integrity, which still
   needs the release SHA-256 on the Firebase Android app and the Play Console

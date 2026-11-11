@@ -17,6 +17,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { authorIdOf, CALLABLE, bucket, db, FieldValue, Timestamp, uidOf } from './common';
 import { rantRank } from './rants';
 import { settleFix } from './solutions';
+import { withdrawEasy } from './easy';
 
 const DELETED = 'Deleted account';
 const WEEK_MS = 7 * 24 * 3600_000;
@@ -76,6 +77,8 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
       });
     });
   }
+  // "Easy peasy" votes: withdrawn the same way.
+  await withdrawEasy(uid);
   // Fixes they proposed are deleted with their ratings; ratings they gave
   // are withdrawn and the tallies drop. Either can change what is Fixed.
   const fixes = await db.collectionGroup('solutions').where('authorId', '==', authorIdOf(uid)).get();
@@ -231,6 +234,7 @@ export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
   });
   await bucket().deleteFiles({ prefix: `public/${id}/` });
   await db.recursiveDelete(ref.collection('loves'));
+  await db.recursiveDelete(ref.collection('easy'));
   await db.doc(`users/${uid}/mine/${id}`).delete();
   await author.ref.delete();
   return { deleted: true };

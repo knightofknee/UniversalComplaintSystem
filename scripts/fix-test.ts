@@ -34,6 +34,11 @@ async function main() {
     return { uid: user.uid as string, call, token: () => user.getIdToken() };
   };
   const fails = async (p: Promise<unknown>) => p.then(() => null, (e: { message: string }) => e.message);
+  // Triggers (statements.ts) run a moment after the write that fires them.
+  const eventually = async (ok: () => Promise<boolean>, ms = 15000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 300))) if (await ok()) return true;
+    return ok();
+  };
 
   const point = db.collection('points').doc();
   await point.set({ text: 'The elevator is always broken.', subjectIds: [], subjectNames: [], removed: false, status: 'open', supportCount: 3, weekSupport: 0 });
@@ -48,7 +53,7 @@ async function main() {
   check('one fix per person per point', /already/i.test((await fails(proposer.call('proposeFix', { pointId: point.id, text: 'Another way around it entirely.' }))) ?? ''));
   const fix = point.collection('solutions').doc(made.id);
   check('the proposer cannot rate their own', !!(await fails(proposer.call('rateFix', { pointId: point.id, fixId: made.id, rating: 'full' }))));
-  check('someone without the problem cannot rate', /Support the point/i.test((await fails(late.call('rateFix', { pointId: point.id, fixId: made.id, rating: 'full' }))) ?? ''));
+  check('someone without the problem cannot rate', /arrow on the issue/i.test((await fails(late.call('rateFix', { pointId: point.id, fixId: made.id, rating: 'full' }))) ?? ''));
 
   // A later supporter's rating shows in the tally but decides nothing.
   await point.collection('supports').doc(late.uid).set({ uid: late.uid, at: Timestamp.now(), via: 'direct' });
@@ -125,6 +130,10 @@ async function main() {
   await other.set({ text: 'Someone else.', authorName: 'x', removed: false, loves: 2, rantScore: 0, rantRank: 2100 });
   await other.collection('loves').doc(guest.uid).set({ uid: guest.uid });
   await other.collection('loves').doc(member.uid).set({ uid: member.uid });
+  await other.set({ easy: 2 }, { merge: true });
+  await other.collection('easy').doc(guest.uid).set({ uid: guest.uid });
+  await other.collection('easy').doc(member.uid).set({ uid: member.uid });
+  await mine1.collection('statements').doc(post.id).set({ text: 'I said this as a guest.', submissionId: post.id, authorId: authorIdOf(guest.uid), authorName: 'Guest', imported: false, removed: false, createdAt: hourAgo });
   await guest.call('proposeFix', { pointId: both.id, text: 'Restart it twice, that clears it.', acceptTerms: true });
 
   check('a signed-out account cannot be merged into', !!(await fails(guest.call('mergeAccount', { fromToken: await guest.token() }))));
@@ -133,6 +142,9 @@ async function main() {
   const memberName = (await db.doc(`users/${member.uid}`).get()).get('displayName');
   const moved = (await post.get()).data()!;
   check('the complaint is the signed-in account\'s now', moved.authorId === authorIdOf(member.uid) && moved.authorName === memberName, moved);
+  const said = mine1.collection('statements').doc(post.id);
+  check('what it said follows it to the account', await eventually(async () => (await said.get()).get('authorName') === memberName && (await said.get()).get('authorId') === authorIdOf(member.uid)), (await said.get()).data());
+  check('an Easy peasy vote both gave counts once', (await other.get()).get('easy') === 1 && !(await other.collection('easy').doc(guest.uid).get()).exists, (await other.get()).get('easy'));
   check('it is in their list, with its suggestions', JSON.stringify((await db.doc(`users/${member.uid}/mine/${post.id}`).get()).get('missing')) === '["which store"]');
   check('the headline credit follows', (await mine1.get()).get('canonical.authorName') === memberName);
   check('support moves over', (await mine1.collection('supports').doc(member.uid).get()).exists && (await mine1.get()).get('supportCount') === 1);
@@ -162,6 +174,7 @@ async function main() {
   const smallSub = db.collection('submissions').doc();
   await smallSub.set({ text: 'They lost my bag.', removed: false, tone: 'rant', matchedPointIds: [], addedPointIds: [small.id] });
   await small.collection('responses').doc('r1').set({ text: 'We are looking into it.', removed: false });
+  await small.collection('statements').doc(smallSub.id).set({ text: 'They lost my bag at JFK.', submissionId: smallSub.id, authorId: 'x', authorName: 'x', imported: false, removed: false, createdAt: hourAgo });
 
   await flagDuplicates(db, [small.id, unrelated.id]);
   const [pa, pb] = [big.id, small.id].sort();
@@ -175,10 +188,35 @@ async function main() {
   check('complaints and the rant count come along', kept.submissionCount === 2 && kept.rantCount === 1 && (await smallSub.get()).get('matchedPointIds').includes(big.id), kept);
   check('it gains the other point\'s topic', kept.subjectIds.includes(topicB.id) && kept.subjectNames.includes('Baggage claims'), kept.subjectNames);
   check('responses move over', (await big.collection('responses').doc('r1').get()).exists);
+  check('what each complaint said moves over', (await big.collection('statements').doc(smallSub.id).get()).get('text') === 'They lost my bag at JFK.' && !(await small.collection('statements').doc(smallSub.id).get()).exists);
   check('the merged point leaves the record', (await small.get()).get('removed') === true && (await small.get()).get('mergedInto') === big.id);
   const ta = (await topicA.get()).get('stats');
   const tb = (await topicB.get()).get('stats');
   check('page totals follow', ta.points === 1 && ta.supporters === 4 && tb.points === 1 && tb.supporters === 4, { ta, tb });
+
+  // "Easy peasy" (easy.ts) and what happens to a complaint's statements when it is deleted (statements.ts).
+  const [writer, reader] = await Promise.all([person('writer'), person('reader')]);
+  const issue = db.collection('points').doc();
+  const theirs = db.collection('submissions').doc();
+  const record = db.collection('submissions').doc();
+  await issue.set({ ...base, text: 'Checkout lines are too long.', supportCount: 1, people: 1, submissionCount: 1, rantCount: 0, canonical: { submissionId: theirs.id, authorName: 'W', actionability: 50 } });
+  await issue.collection('supports').doc(writer.uid).set({ uid: writer.uid, at: hourAgo, via: 'submission', submissionId: theirs.id });
+  await theirs.set({ text: 'Open more registers at 5pm.', authorName: 'W', authorId: authorIdOf(writer.uid), removed: false, tone: 'constructive', addedPointIds: [issue.id], matchedPointIds: [], easy: 0 });
+  await db.doc(`authors/${theirs.id}`).set({ uid: writer.uid });
+  await record.set({ text: 'From a public record.', removed: false, source: { shortName: 'CFPB' }, easy: 0 });
+  await issue.collection('statements').doc(theirs.id).set({ text: 'Open more registers at 5pm.', submissionId: theirs.id, authorId: authorIdOf(writer.uid), authorName: 'W', imported: false, removed: false, createdAt: hourAgo });
+  check('an author cannot call their own easy', /yours/i.test((await fails(writer.call('easyFix', { submissionId: theirs.id, easy: true }))) ?? ''));
+  check('nobody votes on a public record', /Public records/.test((await fails(reader.call('easyFix', { submissionId: record.id, easy: true }))) ?? ''));
+  await reader.call('easyFix', { submissionId: theirs.id, easy: true });
+  await reader.call('easyFix', { submissionId: theirs.id, easy: true });
+  check('one Easy peasy per person', (await theirs.get()).get('easy') === 1 && (await theirs.collection('easy').doc(reader.uid).get()).exists);
+  await reader.call('easyFix', { submissionId: theirs.id, easy: false });
+  check('and it can be taken back', (await theirs.get()).get('easy') === 0 && !(await theirs.collection('easy').doc(reader.uid).get()).exists);
+  await reader.call('easyFix', { submissionId: theirs.id, easy: true });
+  await writer.call('deleteComplaint', { submissionId: theirs.id });
+  const st = issue.collection('statements').doc(theirs.id);
+  check('a deleted complaint takes what it said with it', await eventually(async () => (await st.get()).get('removed') === true && (await st.get()).get('text') === undefined), (await st.get()).data());
+  check('and its Easy peasy votes', !(await theirs.collection('easy').doc(reader.uid).get()).exists);
 
   console.log(failed ? `\n${failed} FAILED` : '\nAll checks pass');
     process.exit(failed ? 1 : 0);

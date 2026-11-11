@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { useCollection } from '@/lib/hooks';
 import type { Point, Submission } from '@/lib/types';
 
-type Feed = 'hot' | 'rants' | 'top' | 'fixed' | 'new';
+type Feed = 'hot' | 'rants' | 'easy' | 'top' | 'fixed' | 'new';
 /** A page of the list; "Show more" adds another. */
 const LIST = 40;
 /**
@@ -28,6 +28,7 @@ const MODEL_PICK = 7;
 const FEEDS: { key: Feed; label: string }[] = [
   { key: 'hot', label: '🔥 Hot' },
   { key: 'rants', label: '🤬 Best rants' },
+  { key: 'easy', label: '🍋 Easiest' },
   { key: 'top', label: '🏆 Top' },
   { key: 'fixed', label: '✅ Fixed' },
   { key: 'new', label: '🆕 New' },
@@ -49,7 +50,7 @@ export default function RecordScreen() {
   const live = where('removed', '==', false);
 
   const pointList = useCollection<Point>(
-    feed === 'rants'
+    feed === 'rants' || feed === 'easy'
       ? null
       : query(
           points,
@@ -81,6 +82,20 @@ export default function RecordScreen() {
         )
       : null,
     'record:rants',
+  );
+  // Complaints readers voted "Easy peasy": looks easy to fix from what the author says (easy.ts).
+  const easy = useCollection<Submission>(
+    feed === 'easy'
+      ? query(
+          collection(db, 'submissions'),
+          where('removed', '==', false),
+          where('easy', '>', 0),
+          orderBy('easy', 'desc'),
+          orderBy('createdAt', 'desc'),
+          limit(count),
+        )
+      : null,
+    `record:easy:${count}`,
   );
   const voted = rants.items.filter((s) => (s.loves ?? 0) > 0);
   const shownRants =
@@ -129,6 +144,19 @@ export default function RecordScreen() {
         ) : (
           shownRants.map((s, i) => <RantCard key={s.id} s={s} rank={i + 1} />)
         )
+      ) : feed === 'easy' ? (
+        easy.items.length === 0 ? (
+          <Empty loading={easy.loading} text={EMPTY} />
+        ) : (
+          <>
+            {easy.items.map((s, i) => (
+              <RantCard key={s.id} s={s} rank={i + 1} easy />
+            ))}
+            {easy.items.length >= count && (
+              <Button kind="secondary" label="Show more" onPress={() => setCount(count + LIST)} />
+            )}
+          </>
+        )
       ) : shownPoints.length === 0 ? (
         <Empty loading={pointList.loading} text={EMPTY} />
       ) : (
@@ -147,8 +175,8 @@ export default function RecordScreen() {
   );
 }
 
-/** A rant, in its author's words, with its heat. */
-function RantCard({ s, rank }: { s: Submission; rank: number }) {
+/** A complaint in its author's words, with its votes: a rant's heat, or how easy it looks to fix. */
+function RantCard({ s, rank, easy }: { s: Submission; rank: number; easy?: boolean }) {
   const theme = useTheme();
   const router = useRouter();
   const score = s.rantScore ?? 0;
@@ -160,8 +188,10 @@ function RantCard({ s, rank }: { s: Submission; rank: number }) {
       onPress={() => router.push(`/submission/${s.id}`)}
       style={({ pressed }) => [styles.rant, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.85 : 1 }]}>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text style={[styles.rantRank, { color: theme.rant }]}>#{rank}</Text>
-        {loves > 0 ? (
+        <Text style={[styles.rantRank, { color: easy ? theme.good : theme.rant }]}>#{rank}</Text>
+        {easy ? (
+          <Text style={{ color: theme.good, fontFamily: Fonts.bold, fontSize: 14 }}>🍋 {(s.easy ?? 0).toLocaleString()}</Text>
+        ) : loves > 0 ? (
           <Text style={{ color: theme.rant, fontFamily: Fonts.bold, fontSize: 14 }}>🤬 {loves.toLocaleString()}</Text>
         ) : (
           <Text style={{ color: theme.new, fontFamily: Fonts.bold, fontSize: 14 }}>✨ Model&apos;s pick · {score}/10</Text>

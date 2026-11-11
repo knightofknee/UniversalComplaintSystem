@@ -1113,7 +1113,7 @@ function ReviewSection(props: {
         </View>
       )}
 
-      <Section title="It becomes" hint="Tap one to leave it out.">
+      <Section title="The issues it raises" hint="Each one collects everyone who has it. Tap one to leave it out.">
         {result.points.map((p, i) => {
           const hit = p.matchedPointId ? matched[p.matchedPointId] : null;
           const kept = !dropped.has(i);
@@ -1141,11 +1141,16 @@ function ReviewSection(props: {
                 color={kept ? theme.good : theme.textSecondary}
               />
               <View style={{ flex: 1, gap: 3 }}>
-                <T>{hit ? hit.text : p.statement}</T>
+                <T style={{ fontWeight: "600" }}>{hit ? hit.text : p.statement}</T>
+                {!!p.said && (
+                  <T variant="small" color={theme.text}>
+                    You said: {p.said}
+                  </T>
+                )}
                 <T variant="small" color={hit ? theme.primary : theme.new}>
                   {hit
-                    ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} who said it`
-                    : "New problem · worded by the model"}
+                    ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} with this issue`
+                    : "New issue · worded by the model"}
                   {analysis.alsoPrivate?.[i] && !isPrivate
                     ? " · raised privately too"
                     : ""}

@@ -41,6 +41,7 @@ import { promotePrivatePoint, submitPrivate } from './private';
 import { flagDuplicates } from './duplicates';
 import { announceJoin } from './points';
 import { rantRank } from './rants';
+import { joinSaid, writeStatements } from './statements';
 
 const MAX_TEXT = 4000;
 const MAX_PHOTOS = 4;
@@ -638,6 +639,29 @@ export async function rereadWithDetail(args: { displayName: string; submissionId
     if (Object.keys(update).length) await point.ref.update({ ...update, lastActivityAt: FieldValue.serverTimestamp() });
   }
 
+  // This complaint's own account of each of its issues, now with the detail.
+  // Unlike the headline it is only ever this author's words, so it is
+  // rewritten whether or not others share the issue.
+  for (const point of points) {
+    const parts = result.points.filter((_, i) => belongsTo[i] === point.id).map((p) => p.said || p.statement);
+    const text = joinSaid(parts);
+    if (!text) continue;
+    const ref = point.ref.collection('statements').doc(submissionId);
+    const existing = await ref.get();
+    if (existing.exists) await ref.update({ text });
+    else {
+      await ref.set({
+        text,
+        submissionId,
+        authorId: sub.get('authorId') as string,
+        authorName: sub.get('authorName') as string,
+        imported: !!sub.get('source'),
+        removed: false,
+        createdAt: sub.get('createdAt') ?? FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   const unique = gained.filter((x, i) => gained.findIndex((y) => y.id === x.id) === i);
   await subRef.update({
     details: FieldValue.arrayUnion(detail),
@@ -709,7 +733,7 @@ export async function recordPublic(args: {
       ? result.pii.redactedText!
       : (result.pii.sensitiveRemovedText ?? text);
   const keptIdx = result.points.map((_, i) => i).filter((i) => options.keep.includes(i));
-  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one problem.');
+  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one issue.');
 
   const resolved = await Promise.all(
     result.subjects.map((s, i) => (options.removeSubjects.has(i) ? null : resolveSubject(s))),
@@ -739,6 +763,10 @@ export async function recordPublic(args: {
 
   const matchedPointIds: string[] = [];
   const addedPointIds: string[] = [];
+  // What this complaint says about each issue, kept under the issue (statements.ts).
+  const said = new Map<string, string[]>();
+  const say = (pointId: string, p: IntakeResult['points'][number]) =>
+    said.set(pointId, [...(said.get(pointId) ?? []), p.said || p.statement]);
 
   for (const i of keptIdx) {
     const p = result.points[i];
@@ -750,6 +778,8 @@ export async function recordPublic(args: {
       if (!pointSnap.exists || pointSnap.get('removed')) continue;
       const current = pointSnap.get('subjectIds') as string[];
       if (current.some((s) => responderFor.includes(s))) continue;
+      say(ref.id, p);
+      if (matchedPointIds.includes(ref.id)) continue;
       matchedPointIds.push(ref.id);
       const newSupporter = await db
         .doc(`points/${ref.id}/supports/${uid}`)
@@ -810,6 +840,7 @@ export async function recordPublic(args: {
     } else {
       const ref = db.collection('points').doc();
       addedPointIds.push(ref.id);
+      say(ref.id, p);
       await ref.set({
         text: p.statement,
         ...filing(pointSubjects),
@@ -884,6 +915,14 @@ export async function recordPublic(args: {
   // Who wrote it stays server-side: for deleting an account and for
   // suspending an abusive one, never shown.
   await db.doc(`authors/${submission.id}`).set({ uid });
+  await writeStatements({
+    submissionId: submission.id,
+    authorId: authorIdOf(uid),
+    authorName: displayName,
+    imported,
+    createdAt: source ? source.date : FieldValue.serverTimestamp(),
+    said,
+  });
   // The author's own index of what they posted, with what the model thought
   // was missing: shown only to them, as suggestions (details.ts).
   // Two points saying the same thing: nominated for the operator to merge (duplicates.ts).

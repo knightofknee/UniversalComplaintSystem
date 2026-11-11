@@ -18,7 +18,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
 import { assertBudget, countCall, recordClaudeUsage } from './budget';
-import { CATEGORIES } from './categories';
+import { CATEGORIES, type Category } from './categories';
 
 export const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 
@@ -55,6 +55,63 @@ export async function embed(texts: string[], kind: 'search' | 'intake' = 'intake
 
 // Descriptions stay terse: the output grammar has a size limit and every
 // character here counts. The guidance lives in INTAKE_SYSTEM ("Fields").
+const ModelOutput = z.object({
+  language: z.string().describe('BCP-47, e.g. "en", "pt-BR".'),
+  englishText: z.string().nullable().describe('English translation, or null if already English.'),
+  unsafe: z.string().nullable().describe('Only if unsafe: what has to change. Else null.'),
+  notComplaint: z.string().nullable().describe('Spam, gibberish, a test, nothing wrong: why. Else null.'),
+  ticketAdvice: z.string().nullable().describe('Only if a support ticket: the advice. Else null.'),
+  pii: z.object({
+    found: z.array(z.string()).describe('Labels of personal data present.'),
+    redactedText: z.string().nullable().describe('Text with only that data as [removed]; null if none.'),
+    sensitive: z.array(z.string()).describe('Labels of data never to store.'),
+    sensitiveRemovedText: z.string().nullable().describe('Text with only sensitive data as [removed]; null if none.'),
+  }),
+  subjects: z
+    .array(
+      z.object({
+        existingId: z.string().nullable().describe('Candidate subject id, or null for a new one.'),
+        newSubject: z
+          .object({
+            kind: z.enum(['organization', 'topic']),
+            name: z.string(),
+            description: z.string().describe('One neutral line.'),
+            // A plain string, checked after the call: an enum here cost grammar the statements needed.
+            category: z.string(),
+            website: z.string().nullable().describe('Official homepage if sure, else null.'),
+          })
+          .nullable(),
+      }),
+    )
+    .describe('Organizations first.'),
+  points: z.array(
+    z.object({
+      matchedPointId: z.string().nullable().describe('Candidate point id, or null if new.'),
+      statement: z.string().describe('The issue, general, in English.'),
+      said: z.string().describe('What this text says about it.'),
+      actionability: z.number().int().describe('0-100.'),
+      subjectIndexes: z.array(z.number().int()).describe('Indexes into subjects.'),
+    }),
+  ),
+  tone: z.enum(['constructive', 'neutral', 'rant']),
+  rantScore: z.number().int().describe('Rants: 1-10 how good a read. Else 0.'),
+  spice: z.number().int().describe('1-5 peppers. 5 is over the line.'),
+  spiceReason: z.string().nullable().describe('When spice is 5: which words. Else null.'),
+  alternatives: z.array(z.string()).describe('When spice is 5: 2-3 rewrites. Else empty.'),
+  actionability: z.number().int().describe('0-100 for the whole.'),
+  // Replaced the old one-sentence `coaching`: the grammar had no room for both.
+  missing: z.array(z.string()).describe('Up to 3 absent details. Else empty.'),
+  suggestedRewrite: z.string().nullable().describe('Below 60: the rewrite. Else null.'),
+  photos: z.array(
+    z.object({
+      index: z.number().int(),
+      ok: z.boolean(),
+      containsPersonalData: z.boolean(),
+    }),
+  ),
+});
+
+/** What the rest of UCS reads: the model's compact output, expanded (see `expand`). */
 export const IntakeResult = z.object({
   language: z.string().describe('BCP-47, e.g. "en", "pt-BR".'),
   englishText: z.string().nullable().describe('English translation, or null if already English.'),
@@ -93,7 +150,8 @@ export const IntakeResult = z.object({
   points: z.array(
     z.object({
       matchedPointId: z.string().nullable().describe('Candidate point id, or null if new.'),
-      statement: z.string().describe('One thing wrong, in English, near the author\'s words.'),
+      statement: z.string().describe('The issue, general, in English.'),
+      said: z.string().describe('What this text says about it.'),
       actionability: z.number().int().describe('0-100.'),
       subjectIndexes: z.array(z.number().int()).describe('Indexes into subjects.'),
     }),
@@ -121,14 +179,15 @@ const INTAKE_SYSTEM = `You are the intake desk of the Universal Complaint System
 
 Your job, for one submission:
 
-1. Subjects. Every point is filed under two kinds of subject:
+1. Subjects. Every issue is filed under two kinds of subject:
    - Organizations it is about: a company, a product line, a government agency, a school (anything with an email domain that could respond). Name them the way the public knows them ("Delta Air Lines", not "delta"). A product gets its own subject only when people would complain about it separately from its maker.
-   - At least one topic: what kind of problem it is, or the thing nobody owns that it is about. Topics are short noun phrases general enough to span organizations, so people can browse them across companies: "Checked bag fees", "Lost luggage", "Customer service hold times", "Self-checkout machines", "Daylight saving time". Never put an organization's name in a topic ("Delta bag fees" is wrong; "Checked bag fees" is right). One or two topics per point is typical; never more than three.
+   - At least one topic: what kind of problem it is, or the thing nobody owns that it is about. Topics are short noun phrases general enough to span organizations, so people can browse them across companies: "Checked bag fees", "Lost luggage", "Customer service hold times", "Self-checkout machines", "Daylight saving time". Never put an organization's name in a topic ("Delta bag fees" is wrong; "Checked bag fees" is right). One or two topics per issue is typical; never more than three.
    Reuse a candidate subject whenever it is the same thing; near-duplicates fragment the record ("Bag fees" vs "Checked bag fees"). Create a new one only when no candidate fits. Every new subject gets one category. Never make a subject out of a private individual.
 
-2. Points. Split the submission into atomic points: each one specific thing that is wrong or could be better. A point matches a candidate point when fixing one would fix the other; matching is the goal, because people supporting the same point is what gives it weight. When the submission adds a new angle to a candidate point (a different cause, place, or consequence), that is a new point. Write each statement in English, as close to the author's own words as possible: you are condensing, not editorializing. A topic point about something nobody owns should also list the organizations that could fix it when they are among the subjects.
+2. Issues (the candidates are candidatePoints). Find the distinct issues the submission raises. An issue is one specific thing that is wrong or could be better, stated generally enough that other people could have it too: "Full Self-Driving disengages with little or no warning", not one drive. Most submissions raise one or two issues; a long story about one thing going wrong is one issue. A cause, a place, a time, a consequence, a symptom or a detail of an issue is never an issue of its own: it belongs in what the submission says about that issue. Match a candidate issue whenever it is the same issue, meaning fixing one would fix the other; matching is the goal, because people sharing an issue is what gives it weight. Only a genuinely different thing wrong is a new issue. A topic issue about something nobody owns should also list the organizations that could fix it when they are among the subjects.
+   For each issue give two things. statement: the issue itself in English, general, close to the author's words, never one person's incident ("Charged an overdraft fee on a pending deposit", not "Wells Fargo charged me $35 on May 3"). said: what this submission says about that issue, in English, one to three sentences. When a person is telling it, keep their own voice (their "I" and "my", never "the author" or "they"); when the text is a record or a summary rather than someone's own words, say it plainly and never invent an "I". Stay as close to the words as possible, keeping their specifics (the product and model, the place, what happened, what it caused) and leaving out personal data. You are excerpting and condensing, not editorializing.
 
-3. Support tickets. "My order #4471 never arrived" is a private case; "orders to Chicago routinely arrive late" is a complaint. If the text is mainly a private case, say so. The author can send it privately to the organization right here in UCS, where the organization can reply and look up their order, so the advice should say that (for example "Send this privately to Delta so they can look up your booking."), never point them to another support channel. Still extract any general pattern in it as a point.
+3. Support tickets. "My order #4471 never arrived" is a private case; "orders to Chicago routinely arrive late" is a complaint. If the text is mainly a private case, say so. The author can send it privately to the organization right here in UCS, where the organization can reply and look up their order, so the advice should say that (for example "Send this privately to Delta so they can look up your booking."), never point them to another support channel. Still extract any general pattern in it as an issue.
 
 4. Personal data. The author will choose whether this goes on the public record or privately to one organization. Flag order numbers, account numbers, phone numbers, emails, addresses, and names of private people (front-line staff included): they are removed if it goes public. Separately flag what must never be stored at all, even privately: payment card numbers and security codes, bank account numbers, government ID numbers, passwords and one-time codes. Public figures and organizations are fine.
 
@@ -141,11 +200,11 @@ Your job, for one submission:
 8. Safety. UCS keeps anger and rants, and harsh criticism of organizations and public figures is exactly what it's for. It never records threats or calls for violence, hate against people for who they are, sexual content, harassment of or accusations against a private individual, or someone's private contact details. Mark those unsafe and say plainly what would have to change. Subject names are always neutral and plain, never insults or jokes.
 
 Fields, since the schema keeps its descriptions short:
-- safety.unsafe is true ONLY for threats or calls for violence, hate against people for who they are, sexual content, harassment or accusations aimed at a private individual, or someone's private contact details. Anger, swearing and harsh criticism of organizations or public figures are not unsafe. reason: one short, plain sentence on what has to change.
-- supportTicket.isTicket: the text is mainly one account, order, booking or case only the organization can resolve privately. advice: one sentence suggesting they send it privately to the organization here so it can look up their case.
+- unsafe is a reason (else null) ONLY for threats or calls for violence, hate against people for who they are, sexual content, harassment or accusations aimed at a private individual, or someone's private contact details. Anger, swearing and harsh criticism of organizations or public figures are not unsafe. The reason is one short, plain sentence on what has to change.
+- ticketAdvice (else null): when the text is mainly one account, order, booking or case only the organization can resolve privately, one sentence suggesting they send it privately to the organization here so it can look up their case.
 - pii.found: short labels ("order number", "phone number", "a private person's name"). redactedText: the submission exactly as written with only that data replaced by [removed]. sensitive: labels of what nobody should ever send ("card number", "card security code", "bank account number", "government ID number", "password", "one-time code"). sensitiveRemovedText: the submission with ONLY those replaced by [removed]; order numbers, emails, addresses and names stay.
-- newSubject.name is neutral and plain: no insults, jokes, slurs, URLs, handles or contact details. category: the one a person browsing would look under.
-- points.statement: one atomic thing that is wrong or could be better. actionability: how specific and fixable, 0-100. subjectIndexes: its organizations and at least one topic.
+- newSubject.name is neutral and plain: no insults, jokes, slurs, URLs, handles or contact details. category: the one a person browsing would look under, exactly one of: ${CATEGORIES.join(', ')}.
+- points: the issues. statement: the issue, general enough to share. said: this submission's own account of it, in the author's voice, specifics kept, no personal data. actionability: how specific and fixable the statement is, 0-100. subjectIndexes: its organizations and at least one topic.
 - missing: up to three specific details the complaint does not give that would help someone act on it, or help other people with the same problem find it. Each is a short phrase said to the author, with no period: "the make and model of your laptop", "which store", "when it happened", "what you want done instead". A complaint about a product almost always needs the exact product: make, model, version or year. List only what is really absent and really useful; a complaint that is specific enough gets an empty list. These are suggestions the author can ignore. Never ask for personal data (order numbers, account numbers, names, addresses, contact details).
 - suggestedRewrite only when actionability is below 60: the same complaint in the author's voice and language, said more clearly, built ONLY from facts the author gave and without personal data. It is offered to post exactly as written and the author cannot edit it, so it must read as a finished complaint: never a placeholder, a bracket, a blank or anything like "[what happened]" for the author to fill in, and never an invented fact. If a clearer version would need facts the author did not give, suggestedRewrite is null and missing names them instead.
 - photos.ok is false for sexual, violent, hateful or irrelevant images; containsPersonalData for readable card numbers, addresses, account numbers, or identifiable faces of bystanders.
@@ -173,7 +232,7 @@ export async function runIntake(input: {
     max_tokens: 6000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
-    output_config: { effort: 'low', format: betaZodOutputFormat(IntakeResult) },
+    output_config: { effort: 'low', format: betaZodOutputFormat(ModelOutput) },
     system: [{ type: 'text', text: INTAKE_SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [
       {
@@ -197,12 +256,39 @@ export async function runIntake(input: {
     throw new HttpsError('failed-precondition', 'This complaint could not be processed. Try rewording it.');
   }
   if (!response.parsed_output) throw new HttpsError('internal', 'The intake model returned nothing usable.');
-  const out = response.parsed_output;
+  const out = expand(response.parsed_output);
   // A suggestion with a blank to fill in is not a suggestion anyone can post.
   if (out.suggestedRewrite && hasPlaceholder(out.suggestedRewrite)) out.suggestedRewrite = null;
   out.alternatives = out.alternatives.filter((a) => !hasPlaceholder(a));
   out.missing = (out.missing ?? []).map((m) => m.trim().replace(/\.$/, '')).filter((m) => m.length > 2 && m.length <= 80).slice(0, 3);
   return out;
+}
+
+/**
+ * The model's output is compact (one nullable string instead of a flag and
+ * its reason, a category as a plain string) because the output grammar has
+ * a size limit. Everything else in UCS reads the fuller shape.
+ */
+function expand(m: z.infer<typeof ModelOutput>): IntakeResult {
+  const { unsafe, notComplaint, ticketAdvice, ...rest } = m;
+  return {
+    ...rest,
+    safety: { unsafe: !!unsafe, reason: unsafe },
+    isComplaint: !notComplaint,
+    notComplaintReason: notComplaint,
+    supportTicket: { isTicket: !!ticketAdvice, advice: ticketAdvice },
+    subjects: m.subjects.map((s) => ({
+      ...s,
+      newSubject: s.newSubject
+        ? {
+            ...s.newSubject,
+            category: (CATEGORIES as readonly string[]).includes(s.newSubject.category)
+              ? (s.newSubject.category as Category)
+              : 'other',
+          }
+        : null,
+    })),
+  };
 }
 
 /**

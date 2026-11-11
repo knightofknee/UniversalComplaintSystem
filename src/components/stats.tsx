@@ -19,13 +19,13 @@ export function Stats({ subject }: { subject: Subject }) {
   const joined = subject.claimed;
   const cells = joined
     ? [
-        { label: 'Problems', value: String(points) },
+        { label: 'Issues', value: String(points) },
         { label: 'Seen', value: pct(seen, points) },
         { label: 'Responded', value: pct(responded, points) },
         { label: 'Fixed', value: String(fixed) },
       ]
     : [
-        { label: 'Problems', value: String(points) },
+        { label: 'Issues', value: String(points) },
         { label: 'People', value: String(supporters) },
       ];
   return (

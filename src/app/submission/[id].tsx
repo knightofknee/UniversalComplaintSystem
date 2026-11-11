@@ -22,7 +22,7 @@ export default function SubmissionScreen() {
   return (
     <Screen>
       <SubmissionCard s={s} />
-      <T variant="label">Recorded as</T>
+      <T variant="label">The issues it raises</T>
       <PointList>
         {points.items.map((p) => (
           <PointCard key={p.id} point={p} />

@@ -37,7 +37,7 @@ export const linkPreview = onRequest({ maxInstances: 5, memory: '256MiB' }, asyn
   if (kind === 'point') {
     const names = ((snap.get('subjectNames') as string[] | undefined) ?? []).slice(0, 3).join(' · ');
     title = clip(snap.get('text') as string, 140);
-    description = `${people((snap.get('supportCount') as number | undefined) ?? 0)} this problem${names ? ` · ${names}` : ''}`;
+    description = `${people((snap.get('supportCount') as number | undefined) ?? 0)} this issue${names ? ` · ${names}` : ''}`;
   } else if (kind === 'subject') {
     const points = (snap.get('stats.points') as number | undefined) ?? 0;
     title = `${snap.get('name') as string}: what could be better`;

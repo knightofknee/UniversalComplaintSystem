@@ -119,7 +119,7 @@ export default function SearchScreen() {
           <SubjectRow
             key={s.id}
             name={s.name}
-            detail={`${s.kind === 'organization' ? 'Organization' : 'Kind of problem'} · ${s.description}`}
+            detail={`${s.kind === 'organization' ? 'Organization' : 'Kind of issue'} · ${s.description}`}
             onPress={() => router.push(`/subject/${s.id}`)}
           />
         ))}
@@ -186,7 +186,7 @@ function Starters({ kind }: { kind: Kind }) {
             key={s.id}
             rank={i + 1}
             name={s.name}
-            detail={`${people(s.stats.supporters ?? 0)} · ${s.stats.points} problem${s.stats.points === 1 ? '' : 's'}`}
+            detail={`${people(s.stats.supporters ?? 0)} · ${s.stats.points} issue${s.stats.points === 1 ? '' : 's'}`}
             onPress={() => router.push(`/subject/${s.id}`)}
           />
         ))}

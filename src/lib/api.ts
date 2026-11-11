@@ -106,6 +106,7 @@ export const setName = call<{ name: string }, { name: string }>('setName');
 
 /** A reader's "Best rant" vote for one complaint. */
 export const loveRant = call<{ submissionId: string; love: boolean }, { loved: boolean; loves: number }>('loveRant');
+export const easyFix = call<{ submissionId: string; easy: boolean }, { easy: boolean; count: number }>('easyFix');
 export const voteFix = call<{ pointId: string; orgId: string; fixed: boolean }, { status: PointStatus }>('voteFix');
 
 export const requestAccess = call<Terms & { subjectId: string; website?: string }, { status: 'approved' | 'pending' }>(

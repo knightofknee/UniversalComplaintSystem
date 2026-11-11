@@ -89,7 +89,7 @@ export async function submitPrivate(
     ? req.data.keepPoints.filter((i: unknown) => Number.isInteger(i))
     : result.points.map((_, i) => i);
   const keptIdx = result.points.map((_, i) => i).filter((i) => keep.includes(i));
-  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one problem.');
+  if (keptIdx.length === 0) throw new HttpsError('invalid-argument', 'Keep at least one issue.');
   const useRewrite = req.data?.useRewrite === true && !!result.suggestedRewrite;
   const finalText = useRewrite ? result.suggestedRewrite! : (result.pii.sensitiveRemovedText ?? draft.text);
 

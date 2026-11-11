@@ -18,6 +18,7 @@ import { FieldValue as AdminFieldValue, type Firestore } from 'firebase-admin/fi
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { CALLABLE, db, FieldValue, requireOperator, Timestamp } from './common';
+import { moveStatements } from './statements';
 
 /**
  * Cosine distance under which two points are probably the same complaint.
@@ -140,6 +141,8 @@ export async function mergePoints(keepId: string, goneId: string) {
       await db.recursiveDelete(d.ref);
     }
   }
+  // What each complaint said about the old issue now reads under the kept one.
+  await moveStatements(goneRef, keepRef);
   // Private complaints linked to the old point follow it.
   const linked = await db.collectionGroup('privatePoints').where('pointId', '==', goneId).get();
   await Promise.all(linked.docs.map((d) => d.ref.update({ pointId: keepId })));

@@ -365,9 +365,10 @@ never delete or edit what you wrote.
 • See if others already said it, and add your support with one tap.
 • Starts full: complaints from public government records (CFPB, NHTSA) are
   already on it, labelled by source.
-• Your complaint is split into specific problems and merged with everyone who
-  shares them, so a hundred people saying the same thing count as one loud
-  point.
+• Your complaint is read for the issues it raises and joined with everyone
+  who has the same issue, so a hundred people saying the same thing become
+  one issue backed by a hundred people.
+• Vote the best rants, and the complaints that look easy peasy to fix.
 • Organizations respond publicly. Each one's page shows how much it has
   seen, answered and fixed.
 • Fixes only count when the people who raised them agree.

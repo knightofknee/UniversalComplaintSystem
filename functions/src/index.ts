@@ -8,6 +8,8 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 20 });
 export { analyzeComplaint, getDraft, processQueue, searchPoints, submitComplaint } from './intake';
 export { flushNotices, recountRising, supportPoint, voteFix } from './points';
 export { loveRant } from './rants';
+export { easyFix } from './easy';
+export { syncStatements } from './statements';
 export { linkPreview } from './share';
 export { proposeFix, rateFix } from './solutions';
 export { nameOptions, setName } from './names';

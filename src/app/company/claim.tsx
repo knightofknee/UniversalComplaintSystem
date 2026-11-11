@@ -78,7 +78,7 @@ export default function ClaimScreen() {
       showAlert(
         res.status === 'approved' ? 'You can respond now' : 'Request received',
         res.status === 'approved'
-          ? `Open any problem about ${subject?.name} to respond.`
+          ? `Open any issue about ${subject?.name} to respond.`
           : `We check ${user?.email?.split('@')[1]} against ${subject?.name}'s website, and a person reviews anything that doesn't match. We'll notify you.`,
       );
       if (res.status === 'approved') router.replace('/company');

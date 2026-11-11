@@ -44,7 +44,7 @@ export async function announceJoin(pointId: string, peopleBefore: number, text: 
   if (!JOIN_MILESTONES.includes(now)) return;
   await notifyPointFollowers(pointId, {
     type: 'joined',
-    text: `${now} people now have this problem: "${text}"`,
+    text: `${now} people now have this issue: "${text}"`,
   });
 }
 
@@ -59,11 +59,11 @@ export const supportPoint = onCall(CALLABLE, async (req) => {
   await db.runTransaction(async (tx) => {
     joined = null;
     const point = await tx.get(ref);
-    if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That problem is gone.');
+    if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That issue is gone.');
     if ((point.get('subjectIds') as string[]).some((s) => responderFor.includes(s))) {
       throw new HttpsError(
         'permission-denied',
-        'You respond for this organization, so you can\'t support problems about it.',
+        'You respond for this organization, so you can\'t support issues about it.',
       );
     }
     const mine = await tx.get(ref.collection('supports').doc(uid));
@@ -137,7 +137,7 @@ export const voteFix = onCall(CALLABLE, async (req) => {
     : 0;
   const outcome = await db.runTransaction(async (tx) => {
     const point = await tx.get(ref);
-    if (!point.exists) throw new HttpsError('not-found', 'That problem is gone.');
+    if (!point.exists) throw new HttpsError('not-found', 'That issue is gone.');
     const entry = point.get(`orgStatus.${orgId}`) as OrgStatus | undefined;
     if (!entry || !FIX_STATES.includes(entry.status) || !entry.fixClaimedAt) {
       throw new HttpsError('failed-precondition', 'Nobody has said this is fixed yet.');
@@ -150,7 +150,7 @@ export const voteFix = onCall(CALLABLE, async (req) => {
         'permission-denied',
         supporter.exists
           ? 'Only people who supported this before the fix was claimed can confirm it.'
-          : 'Only people who have this problem can confirm.',
+          : 'Only people who have this issue can confirm.',
       );
     }
     const voteRef = ref.collection('fixVotes').doc(`${orgId}_${uid}`);

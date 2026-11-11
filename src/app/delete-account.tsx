@@ -50,7 +50,7 @@ export default function DeleteAccountScreen() {
     <Screen>
       <T variant="heading">What gets deleted</T>
       <T>Your private complaints and their conversations.</T>
-      <T>The words, photos and name on your public complaints. The problems they raised stay, without your name, because other people share them.</T>
+      <T>The words, photos and name on your public complaints. The issues they raised stay, without your name, because other people share them. What your complaints said about each issue is deleted with them.</T>
       <T>Your support, your votes, and any fixes you proposed.</T>
       <T>Your sign-in, if you have one.</T>
       <Button label="Delete my account" kind="secondary" onPress={remove} busy={busy} />

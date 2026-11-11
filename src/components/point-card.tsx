@@ -85,7 +85,7 @@ export function Vote({ pointId, count }: { pointId: string; count: number }) {
         onPress={toggle}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={on ? `You support this. ${shown} people have this problem. Tap to take it back.` : `Support this: you have this problem too. ${shown} people do.`}
+        accessibilityLabel={on ? `You support this. ${shown} people have this issue. Tap to take it back.` : `Support this: you have this issue too. ${shown} people do.`}
         accessibilityState={{ selected: on }}
         style={({ pressed }) => [
           styles.vote,
@@ -116,8 +116,8 @@ export function SupportButton({ pointId, count }: { pointId: string; count: numb
         accessibilityRole="button"
         accessibilityLabel={
           on
-            ? `You support this: you have this problem too. ${shown} people do. Tap to take it back.`
-            : `Support this: you have this problem too. ${shown} people do.`
+            ? `You support this: you have this issue too. ${shown} people do. Tap to take it back.`
+            : `Support this: you have this issue too. ${shown} people do.`
         }
         accessibilityState={{ selected: on }}
         style={({ pressed }) => [

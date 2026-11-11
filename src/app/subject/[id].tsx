@@ -135,7 +135,7 @@ function TopicPage({ subject }: { subject: Subject }) {
     <Screen>
       <Header subject={subject} />
       <T variant="small">
-        {people(subject.stats.supporters ?? 0)} · {count(subject.stats.points, 'problem')}
+        {people(subject.stats.supporters ?? 0)} · {count(subject.stats.points, 'issue')}
       </T>
       <RelatedSubjects subjectId={subject.id} points={top.items} kind="organization" title="Who could fix this" />
       <SubjectFeed subject={subject} />
@@ -162,7 +162,7 @@ function OrganizationPage({ subject }: { subject: Subject }) {
           </T>
         </Card>
       )}
-      <RelatedSubjects subjectId={subject.id} points={top.items} kind="topic" title="Kinds of problems" />
+      <RelatedSubjects subjectId={subject.id} points={top.items} kind="topic" title="Kinds of issues" />
       <SubjectFeed subject={subject} />
       <ReportButton target={{ kind: 'subject', id: subject.id }} label="Report this page" />
     </Screen>

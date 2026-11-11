@@ -39,7 +39,7 @@ export default function TermsScreen() {
         {
           heading: 'AI',
           body: [
-            'A model splits complaints into problems, matches them with what others have said, suggests how to file them, and offers clearer wording. It can be wrong. You can leave out problems, change how a complaint is filed, and keep your own words. Every place the model added something to the record is labeled.',
+            'A model finds the issues each complaint raises and what it says about each, matches them with what others have said, suggests how to file them, and offers clearer wording. It can be wrong. You can leave out issues, change how a complaint is filed, and keep your own words. Every place the model added something to the record is labeled.',
           ],
         },
         {

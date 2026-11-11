@@ -174,7 +174,14 @@ async function main() {
       source,
     });
     const pointIds = [...res.matchedPointIds, ...res.addedPointIds];
-    if (display) await db.doc(`submissions/${res.submissionId}`).update({ text: display });
+    if (display) {
+      await db.doc(`submissions/${res.submissionId}`).update({ text: display });
+      // A grouped record is nobody's own words: what it says about each issue
+      // is the record's plain line, never a voice the model made up.
+      for (const id of pointIds) {
+        await db.doc(`points/${id}/statements/${res.submissionId}`).update({ text: display }).catch(() => {});
+      }
+    }
     await addSupports(pointIds, people.slice(1));
     await ref.set({ submissionId: res.submissionId, pointIds, key, at: FieldValue.serverTimestamp() });
     return 'imported';

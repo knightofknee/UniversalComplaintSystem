@@ -36,7 +36,7 @@ export const proposeFix = onCall(CALLABLE, async (req) => {
   await rateLimit(req, 'solution');
   const pointRef = db.doc(`points/${pointId}`);
   const point = await pointRef.get();
-  if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That problem is gone.');
+  if (!point.exists || point.get('removed')) throw new HttpsError('not-found', 'That issue is gone.');
   const authorId = authorIdOf(uid);
   const ref = pointRef.collection('solutions').doc(authorId);
   const existing = await ref.get();
@@ -76,7 +76,7 @@ export const rateFix = onCall(CALLABLE, async (req) => {
   const rating = (RATINGS as readonly string[]).includes(req.data?.rating) ? (req.data.rating as Rating) : null;
   await rateLimit(req, 'support');
   await ensureUser(uid);
-  if (authorIdOf(uid) === fixId) throw new HttpsError('permission-denied', 'The people who have the problem say if your fix worked.');
+  if (authorIdOf(uid) === fixId) throw new HttpsError('permission-denied', 'The people who have the issue say if your fix worked.');
   const pointRef = db.doc(`points/${pointId}`);
   const ref = pointRef.collection('solutions').doc(fixId);
   await db.runTransaction(async (tx) => {
@@ -87,7 +87,7 @@ export const rateFix = onCall(CALLABLE, async (req) => {
     ]);
     if (!fix.exists || fix.get('removed')) throw new HttpsError('not-found', 'That fix is gone.');
     if (!support.exists) {
-      throw new HttpsError('permission-denied', 'Tap the arrow on the problem first: the people who have it say if a fix worked.');
+      throw new HttpsError('permission-denied', 'Tap the arrow on the issue first: the people who have it say if a fix worked.');
     }
     const before = mine.exists ? (mine.get('rating') as Rating) : null;
     if (before === rating) return;
@@ -142,7 +142,7 @@ export async function settleFix(pointId: string, fixId: string): Promise<string>
     await pointRef.update({ status: 'fixed', statusBy: null, fixedBy: fixId, lastActivityAt: FieldValue.serverTimestamp() });
     await notifyPointFollowers(pointId, {
       type: 'status',
-      text: `People who had this problem say it's fixed: "${point.get('text') as string}"`,
+      text: `People who had this issue say it's fixed: "${point.get('text') as string}"`,
     });
     return 'fixed';
   }

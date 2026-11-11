@@ -12,7 +12,7 @@ import { Button, Card, Chip, Field, Notice, Row, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { addDetail, deleteComplaint, errorText, loveRant } from '@/lib/api';
+import { addDetail, deleteComplaint, easyFix, errorText, loveRant } from '@/lib/api';
 import { blockAuthor, unblockAuthor, useBlockedAuthors } from '@/lib/blocks';
 import { db, storage } from '@/lib/firebase';
 import { tapHaptic } from '@/lib/haptics';
@@ -42,26 +42,53 @@ export function PublicPhoto({ path, size = 96 }: { path: string; size?: number }
 }
 
 /**
- * "Best rant": I love this one as a read. Separate from supporting the point
- * (the up arrow, "I have this problem too"). Shown before the server confirms.
+ * A wide vote on a complaint, shown before the server confirms. Two of them
+ * sit side by side on every card a person wrote: "Best rant" and "Easy peasy".
  */
-export function BestRantButton({ submissionId, count }: { submissionId: string; count: number }) {
+function CardVote({
+  path,
+  count,
+  send,
+  emoji,
+  label,
+  color,
+  soft,
+  says,
+  onOwn,
+}: {
+  /** Where the reader's own vote lives (private, readable only by them). */
+  path: string;
+  count: number;
+  send: (on: boolean) => Promise<unknown>;
+  emoji: string;
+  label: string;
+  color: string;
+  soft: string;
+  /** Screen readers: what the vote means. */
+  says: string;
+  /** Set on the author's own complaint when they can't vote on it: what a tap says. */
+  onOwn?: string;
+}) {
   const theme = useTheme();
   const { user } = useAuth();
   const [mine, setMine] = useState<boolean | null>(null);
   const [scale] = useState(() => new Animated.Value(1));
   useEffect(() => {
-    if (!user) return;
+    if (!user || onOwn) return;
     return onSnapshot(
-      doc(db, `submissions/${submissionId}/loves/${user.uid}`),
+      doc(db, `${path}/${user.uid}`),
       (d) => setMine(d.exists()),
       () => setMine(false),
     );
-  }, [submissionId, user]);
+  }, [path, user, onOwn]);
 
-  const vote = useVote(mine, count, (love) => loveRant({ submissionId, love }));
+  const vote = useVote(onOwn ? false : mine, count, send);
   const { on, shown } = vote;
   const toggle = () => {
+    if (onOwn) {
+      showToast(onOwn, undefined, 'info');
+      return;
+    }
     if (!on) {
       tapHaptic();
       scale.setValue(0.94);
@@ -69,27 +96,63 @@ export function BestRantButton({ submissionId, count }: { submissionId: string; 
     }
     void vote.toggle();
   };
-  const ink = on ? theme.background : theme.rant;
+  const ink = on ? theme.background : color;
   return (
     <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
-        accessibilityLabel={
-          on
-            ? `You voted this a best rant. ${shown} so far. Tap to take it back.`
-            : `Vote this a best rant. ${shown} so far.`
-        }
-        style={({ pressed }) => [
-          styles.love,
-          { backgroundColor: on ? theme.rant : theme.rantSoft, opacity: pressed ? 0.85 : 1 },
-        ]}>
-        <Text style={styles.loveEmoji}>🤬</Text>
-        <Text style={[styles.loveLabel, { color: ink }]}>Best rant</Text>
+        accessibilityLabel={on ? `You voted ${label}: ${says}. ${shown} so far. Tap to take it back.` : `${label}: ${says}. ${shown} so far.`}
+        style={({ pressed }) => [styles.love, { backgroundColor: on ? color : soft, opacity: pressed ? 0.85 : 1 }]}>
+        <Text style={styles.loveEmoji}>{emoji}</Text>
+        <Text style={[styles.loveLabel, { color: ink }]} numberOfLines={1}>
+          {label}
+        </Text>
         {shown > 0 && <Text style={[styles.loveCount, { color: ink }]}>{shown.toLocaleString()}</Text>}
       </Pressable>
     </Animated.View>
+  );
+}
+
+/**
+ * "Best rant": I love this one as a read. Separate from supporting the issue
+ * (the up arrow, "I have this too").
+ */
+export function BestRantButton({ submissionId, count }: { submissionId: string; count: number }) {
+  const theme = useTheme();
+  return (
+    <CardVote
+      path={`submissions/${submissionId}/loves`}
+      count={count}
+      send={(love) => loveRant({ submissionId, love })}
+      emoji="🤬"
+      label="Best rant"
+      color={theme.rant}
+      soft={theme.rantSoft}
+      says="a great read"
+    />
+  );
+}
+
+/**
+ * "Easy peasy": from what its author says, this looks easy to fix. Feeds the
+ * Easiest list. Someone else's call: an author can't vote on their own.
+ */
+export function EasyPeasyButton({ submissionId, count, own }: { submissionId: string; count: number; own: boolean }) {
+  const theme = useTheme();
+  return (
+    <CardVote
+      path={`submissions/${submissionId}/easy`}
+      count={count}
+      send={(easy) => easyFix({ submissionId, easy })}
+      emoji="🍋"
+      label="Easy peasy"
+      color={theme.good}
+      soft={theme.goodSoft}
+      says="this looks easy to fix"
+      onOwn={own ? 'Other people decide whether yours is easy to fix.' : undefined}
+    />
   );
 }
 
@@ -261,7 +324,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
         {own && <Chip label="Yours" color={theme.primary} bg={theme.primarySoft} />}
         {source && <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />}
         {s.tone === 'rant' && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
-        {addedPoint && <Chip label="Model added this problem from it" color={theme.new} bg={theme.newSoft} />}
+        {addedPoint && <Chip label="Model added this issue from it" color={theme.new} bg={theme.newSoft} />}
         {s.rewritten && <Chip label="Clearer version" color={theme.textSecondary} bg={theme.background} />}
       </Row>
       <T>{translated && !original ? s.englishText : s.text}</T>
@@ -304,6 +367,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
       ) : (
         <Row style={{ gap: 4 }}>
           <BestRantButton submissionId={s.id} count={loves} />
+          <EasyPeasyButton submissionId={s.id} count={s.easy ?? 0} own={own} />
           {own ? (
             <Pressable
               onPress={() =>
@@ -357,14 +421,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     minHeight: 46,
     borderRadius: 14,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
   },
-  loveEmoji: { fontSize: 18 },
-  loveLabel: { fontFamily: Fonts.bold, fontSize: 16 },
-  loveCount: { fontFamily: Fonts.medium, fontSize: 16 },
+  loveEmoji: { fontSize: 17 },
+  loveLabel: { fontFamily: Fonts.bold, fontSize: 15, flexShrink: 1 },
+  loveCount: { fontFamily: Fonts.medium, fontSize: 15 },
   icon: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
   missing: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
   missingRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },

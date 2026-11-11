@@ -74,7 +74,7 @@ function ProposeBox({ pointId, onDone }: { pointId: string; onDone: () => void }
     <Card>
       <T variant="label">Propose a fix</T>
       <T variant="small">
-        What fixes this, or gets around it. It is public. The people who have the problem are told and say if it worked.
+        What fixes this, or gets around it. It is public. The people who have the issue are told and say if it worked.
       </T>
       <Field multiline autoFocus value={text} onChangeText={setText} placeholder="The fix" maxLength={1000} />
       <TermsCheck checked={agreed} onChange={setAgreed} compact />
@@ -194,8 +194,8 @@ function SolutionCard({ pointId, s, supported }: { pointId: string; s: Solution;
           {total > 0
             ? `${counts.full} fixed it · ${counts.partial} partly · ${counts.none} didn't`
             : own
-              ? 'Waiting for the people who have this problem to say if it worked.'
-              : 'Have this problem? Tap the arrow up top, then say if this worked.'}
+              ? 'Waiting for the people who have this issue to say if it worked.'
+              : 'Have this issue? Tap the arrow up top, then say if this worked.'}
         </T>
       )}
       {!own && <ReportButton target={{ kind: 'solution', id: s.id, pointId }} />}

@@ -25,6 +25,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { authorIdOf, CALLABLE, db, ensureUser, FieldValue, rateLimit, Timestamp, uidOf } from './common';
 import { rantRank } from './rants';
 import { settleFix } from './solutions';
+import { moveEasy } from './easy';
 
 const WEEK_MS = 7 * 24 * 3600_000;
 
@@ -99,6 +100,9 @@ export const mergeAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async (
     }
     await l.ref.delete();
   }
+
+  // "Easy peasy" votes.
+  moved += await moveEasy(from, to);
 
   // Fix confirmations on an organization's claim.
   const votes = await db.collectionGroup('fixVotes').where('uid', '==', from).get();

@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { showAlert, StatusChip, STATUS_LABEL, SupportButton } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
 import { Solutions } from '@/components/solutions';
-import { SubmissionCard } from '@/components/submission-card';
+import { Statements } from '@/components/statements';
 import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -32,36 +32,10 @@ export default function PointScreen() {
     query(collection(db, `points/${id}/responses`), orderBy('createdAt', 'asc')),
     `responses:${id}`,
   );
-  const matched = useCollection<Submission>(
-    query(
-      collection(db, 'submissions'),
-      where('removed', '==', false),
-      where('matchedPointIds', 'array-contains', id),
-      orderBy('createdAt', 'desc'),
-    ),
-    `matched:${id}`,
-  );
-  const added = useCollection<Submission>(
-    query(
-      collection(db, 'submissions'),
-      where('removed', '==', false),
-      where('addedPointIds', 'array-contains', id),
-      orderBy('createdAt', 'desc'),
-    ),
-    `added:${id}`,
-  );
   const blocked = useBlockedAuthors();
-  // Authors the reader hid stay in the list, folded shut (SubmissionCard).
-  const submissions = useMemo(
-    () =>
-      [...added.items, ...matched.items].sort(
-        (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
-      ),
-    [added.items, matched.items],
-  );
-
+  const { data: headlineFrom } = useDoc<Submission>(point ? `submissions/${point.canonical.submissionId}` : null);
   // A hidden author's name shows nowhere until their complaint is opened, the headline's credit included.
-  const headlineBy = submissions.find((s) => s.id === point?.canonical.submissionId)?.authorId;
+  const headlineBy = headlineFrom?.authorId;
   const headlineHidden = !!headlineBy && blocked.ids.has(headlineBy);
 
   // Organizations this person responds for that this point is about.
@@ -88,7 +62,7 @@ export default function PointScreen() {
     }
   }, [point, myOrgs]);
 
-  if (!point) return <Screen><Empty loading={loading} text="This problem isn't on the record (or it was removed)." /></Screen>;
+  if (!point) return <Screen><Empty loading={loading} text="This issue isn't on the record (or it was removed)." /></Screen>;
 
   const seenCount = Object.keys(point.seenBy ?? {}).length;
   // Only present for organizations that chose to publish their private counts.
@@ -104,7 +78,7 @@ export default function PointScreen() {
           headerRight: () => (
             <Pressable
               onPress={() => shareLink(`/point/${point.id}`)}
-              accessibilityLabel="Share this problem"
+              accessibilityLabel="Share this issue"
               hitSlop={10}>
               <Ionicons name="share-outline" size={22} color={theme.primary} />
             </Pressable>
@@ -165,7 +139,8 @@ export default function PointScreen() {
         <T variant="small" color={theme.new} style={{ fontWeight: '700' }}>
           ✨ Worded by the model
         </T>{' '}
-        from the complaints below, which are each in their author&apos;s own words.
+        from the complaints that raise it. Below, what each one says about it, also pulled out by the model; tap one to
+        read that complaint as its author wrote it.
       </T>
       <T variant="small">
         {seenCount > 0
@@ -207,24 +182,16 @@ export default function PointScreen() {
 
       <Solutions pointId={point.id} supported={supported} />
 
-      <T variant="label">Complaints</T>
-      {submissions.length === 0 ? (
-        <Empty text="" loading={matched.loading || added.loading} />
-      ) : (
-        submissions.map((s) => <SubmissionCard key={s.id} s={s} addedPoint={s.addedPointIds.includes(point.id)} />)
-      )}
-      <Button
-        kind="secondary"
-        label="I have more to add"
-        icon="add"
-        onPress={() =>
+      <Statements
+        pointId={point.id}
+        onAdd={() =>
           router.push({
             pathname: '/complain',
             params: point.subjectIds[0] ? { subjectId: point.subjectIds[0], subjectName: point.subjectNames[0] } : {},
           })
         }
       />
-      <ReportButton target={{ kind: 'point', id: point.id }} label="Report this problem" />
+      <ReportButton target={{ kind: 'point', id: point.id }} label="Report this issue" />
     </Screen>
   );
 }
@@ -313,7 +280,7 @@ function FixCheck({
       ) : (
         <T variant="small">
           {supportedAt
-            ? 'You supported this after the fix was claimed, so the call is up to people who had the problem before.'
+            ? 'You supported this after the fix was claimed, so the call is up to people who had the issue before.'
             : 'People who supported this before the fix was claimed decide.'}
         </T>
       )}

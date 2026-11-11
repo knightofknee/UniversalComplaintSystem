@@ -47,6 +47,10 @@ service cloud.firestore {
       match /responses/{responseId} {
         allow read: if true;
       }
+      // What each complaint said about this issue (statements.ts).
+      match /statements/{submissionId} {
+        allow read: if resource.data.removed == false;
+      }
       // Who supports what is private: you can see only your own support.
       match /supports/{uid} {
         allow read: if isMe(uid);
@@ -67,6 +71,10 @@ service cloud.firestore {
       allow read: if resource.data.removed == false;
       // Who voted a complaint "Best rant" is private: you can see only your own vote.
       match /loves/{uid} {
+        allow read: if isMe(uid);
+      }
+      // Who voted it "Easy peasy" is private the same way.
+      match /easy/{uid} {
         allow read: if isMe(uid);
       }
     }

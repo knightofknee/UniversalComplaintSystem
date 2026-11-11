@@ -93,6 +93,8 @@ export type Submission = {
   details?: string[];
   /** Readers' "Best rant" votes. */
   loves?: number;
+  /** Readers' "Easy peasy" votes: looks easy to fix (easy.ts). */
+  easy?: number;
   /** Sort key of "Best rants": votes, then written by a person, then the model's score. 0 = not listed. */
   rantRank?: number;
   /** 1-5 peppers (the language, not the problem). */
@@ -103,6 +105,18 @@ export type Submission = {
 };
 
 /** A fix someone proposed for a point (points/{id}/solutions/{authorId}). */
+/** What one complaint said about one issue (functions/src/statements.ts). Its id is the complaint's. */
+export type Statement = {
+  id: string;
+  text: string;
+  submissionId: string;
+  authorId: string;
+  authorName: string;
+  imported: boolean;
+  removed: boolean;
+  createdAt: Timestamp | null;
+};
+
 export type Solution = {
   /** The proposer's opaque author id: one fix per person per point. */
   id: string;
@@ -172,6 +186,8 @@ export type IntakeResult = {
   points: {
     matchedPointId: string | null;
     statement: string;
+    /** What this complaint says about the issue, specifics kept (statements.ts). */
+    said?: string;
     actionability: number;
     subjectIndexes: number[];
   }[];
