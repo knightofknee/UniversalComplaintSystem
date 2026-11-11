@@ -244,8 +244,9 @@ B to D can be done any time before submitting.
    Key ID from C, and the whole contents of the `.p8` file as Private key.
 4. **Save**.
 
-**E. Tell Claude it is done.** It switches Apple on for the web version
-(`APPLE_ON_WEB` in src/lib/sso.ts) and checks the popup.
+**E. Done (2026-11-11).** Apple is on for the web version (`APPLE_ON_WEB`
+in src/lib/sso.ts), and deleting an account revokes its Apple token on the
+web as well as on iPhone.
 
 What D buys: Apple sign-in on the web, and deleting an account revokes its
 Apple token (Apple's rule 5.1.1(v); the app already does this, and it needs

@@ -29,11 +29,11 @@ const GOOGLE_WEB_CLIENT_ID = '331431699365-ncvmkp2tu0rughge3vsgq1q5vqnn00ks.apps
 const GOOGLE_IOS_CLIENT_ID = '331431699365-kpe37b62dlo7ij9bes558hogd85l5emo.apps.googleusercontent.com';
 
 /**
- * Apple on the web needs a Services ID and key from the Apple developer
- * account, entered in Firebase (docs/STORE-SETUP.md 1h). Flip this once
- * that is done; until then the web shows Google and email only.
+ * Apple on the web runs through the Services ID `com.waldgrave.ucs.web` and
+ * its key, entered in Firebase (docs/STORE-SETUP.md 1h; on since 2026-11-11).
+ * Android has no Apple sign-in.
  */
-const APPLE_ON_WEB = false;
+const APPLE_ON_WEB = true;
 export const appleAvailable = Platform.OS === 'ios' || (Platform.OS === 'web' && APPLE_ON_WEB);
 export const googleAvailable = true;
 
@@ -142,11 +142,26 @@ export async function continueWithApple() {
  * sign-in, so the person confirms with Apple once more. Returns false if
  * they backed out of that sheet (so the deletion should stop too); any
  * other failure is logged and the deletion goes ahead. Needs the Apple key
- * in Firebase (docs/STORE-SETUP.md 1h).
+ * in Firebase (docs/STORE-SETUP.md 1h). iPhone and the web.
  */
 export async function revokeAppleBeforeDelete(): Promise<boolean> {
   const user = auth.currentUser;
-  if (Platform.OS !== 'ios' || !user?.providerData.some((p) => p.providerId === 'apple.com')) return true;
+  if (!user?.providerData.some((p) => p.providerId === 'apple.com')) return true;
+  if (Platform.OS === 'web') {
+    // On the web, Apple's popup once more; Firebase revokes with the access token it returns.
+    try {
+      const { reauthenticateWithPopup } = await import('firebase/auth');
+      const result = await reauthenticateWithPopup(user, new OAuthProvider('apple.com'));
+      const accessToken = OAuthProvider.credentialFromResult(result)?.accessToken;
+      if (accessToken) await revokeAccessToken(auth, accessToken);
+    } catch (e) {
+      if (CLOSED.includes(codeOf(e))) return false;
+      console.warn('Could not revoke the Apple token', e);
+    }
+    return true;
+  }
+  // Android has no Sign in with Apple to confirm with.
+  if (Platform.OS !== 'ios') return true;
   try {
     const Apple = await import('expo-apple-authentication');
     const { authorizationCode } = await Apple.signInAsync({ requestedScopes: [] });
