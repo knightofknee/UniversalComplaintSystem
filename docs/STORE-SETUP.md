@@ -363,8 +363,8 @@ never delete or edit what you wrote.
 
 • Complain in seconds, in any language, no account needed.
 • See if others already said it, and add your support with one tap.
-• Starts full: complaints from public government records (CFPB, NHTSA) are
-  already on it, labelled by source.
+• Starts full: complaints from public government records (CFPB, NHTSA,
+  FCC) are already on it, labelled by source.
 • Your complaint is read for the issues it raises and joined with everyone
   who has the same issue, so a hundred people saying the same thing become
   one issue backed by a hundred people.
