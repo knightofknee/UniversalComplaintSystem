@@ -13,7 +13,7 @@
     },
     "production": {
       "ios": {
-        "autoIncrement": "buildNumber"
+        "autoIncrement": "version"
       },
       "android": {
         "autoIncrement": true
