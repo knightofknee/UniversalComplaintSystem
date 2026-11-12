@@ -120,7 +120,7 @@ export const respondToPoint = call<
 >('respondToPoint');
 
 export type ReportKind = 'point' | 'submission' | 'response' | 'solution' | 'subject' | 'message' | 'thread';
-export type ReportReason = 'abuse' | 'private_person' | 'personal_data' | 'spam' | 'illegal' | 'other';
+export type ReportReason = 'child_safety' | 'abuse' | 'private_person' | 'personal_data' | 'spam' | 'illegal' | 'other';
 export const report = call<
   { kind: ReportKind; id: string; pointId?: string; orgId?: string; threadId?: string; reason: ReportReason; note?: string },
   { ok: boolean }

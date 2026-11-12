@@ -37,6 +37,7 @@ type Report = {
 };
 
 const REASON: Record<string, string> = {
+  child_safety: 'Harms or sexualizes a child',
   abuse: 'Threats, hate or harassment',
   private_person: 'Targets a private person',
   personal_data: 'Shows personal details',

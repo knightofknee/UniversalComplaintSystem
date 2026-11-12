@@ -98,7 +98,7 @@ export function badSubjectName(name: string): string | null {
 
 // ── Reports ─────────────────────────────────────────────────────────────
 
-export const REPORT_REASONS = ['abuse', 'private_person', 'personal_data', 'spam', 'illegal', 'other'] as const;
+export const REPORT_REASONS = ['child_safety', 'abuse', 'private_person', 'personal_data', 'spam', 'illegal', 'other'] as const;
 const KINDS = ['point', 'submission', 'response', 'solution', 'subject', 'message', 'thread'] as const;
 type Kind = (typeof KINDS)[number];
 
@@ -177,7 +177,9 @@ export const report = onCall(CALLABLE, async (req) => {
     },
     { merge: true },
   );
-  await notifyOperator('New reports are waiting for you.', 'reports');
+  // Child safety can't wait for the hourly digest: every one alerts at once.
+  if (reason === 'child_safety') await notifyOperator('Child safety report: review it now.', 'child', 0);
+  else await notifyOperator('New reports are waiting for you.', 'reports');
   return { ok: true };
 });
 

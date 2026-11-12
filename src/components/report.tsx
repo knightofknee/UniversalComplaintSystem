@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { errorText, report, type ReportKind, type ReportReason } from '@/lib/api';
 
 const REASONS: { key: ReportReason; label: string }[] = [
+  { key: 'child_safety', label: 'Harms or sexualizes a child' },
   { key: 'abuse', label: 'Threats, hate or harassment' },
   { key: 'private_person', label: 'It targets a private person' },
   { key: 'personal_data', label: 'It shows personal details' },
