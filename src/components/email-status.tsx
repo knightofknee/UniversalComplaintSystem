@@ -8,6 +8,7 @@ import { Button, Notice, T } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText } from '@/lib/api';
+import { auth } from '@/lib/firebase';
 
 /** How long the "Email verified" note stays if nobody taps OK. */
 const SHOWN_FOR_MS = 4000;
@@ -57,7 +58,8 @@ export function ConfirmEmail({ reason }: { reason?: string }) {
   const resend = async () => {
     setBusy(true);
     try {
-      await sendEmailVerification(user);
+      if (!auth.currentUser) return;
+      await sendEmailVerification(auth.currentUser);
       showToast('Sent again', `Check ${user.email}.`, 'info');
     } catch (e) {
       showToast("Couldn't send it", errorText(e));

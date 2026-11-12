@@ -12,7 +12,7 @@ export { easyFix } from './easy';
 export { syncStatements } from './statements';
 export { linkPreview } from './share';
 export { proposeFix, rateFix } from './solutions';
-export { nameOptions, setName } from './names';
+export { ensureProfile, nameOptions, setName } from './names';
 export { addDetail } from './details';
 export { resolveDuplicate } from './duplicates';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';

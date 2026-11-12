@@ -101,6 +101,7 @@ export const addDetail = call<
 >('addDetail');
 
 /** Random public names to shuffle through; only `setName` changes anything. */
+export const ensureProfile = call<Record<string, never>, { displayName: string }>('ensureProfile');
 export const nameOptions = call<Record<string, never>, { names: string[] }>('nameOptions');
 export const setName = call<{ name: string }, { name: string }>('setName');
 

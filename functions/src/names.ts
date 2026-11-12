@@ -11,6 +11,17 @@ import { authorIdOf, CALLABLE, db, ensureUser, NAME_ADJECTIVES, NAME_NOUNS, rate
 
 const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
 
+/**
+ * A new account gets its name the moment the app sees it has none, not on
+ * its first post: Me shows the name, and "You" there read like a bug.
+ */
+export const ensureProfile = onCall(CALLABLE, async (req) => {
+  const uid = uidOf(req);
+  await rateLimit(req, 'settings');
+  const { displayName } = await ensureUser(uid);
+  return { displayName };
+});
+
 export const nameOptions = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
   await rateLimit(req, 'settings');
