@@ -15,8 +15,6 @@ import {
 import {
   ActionSheetIOS,
   ActivityIndicator,
-  Animated,
-  Easing,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -42,7 +40,14 @@ import { Fonts } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { ConfirmEmail } from "@/components/email-status";
 import { setJustPosted } from "@/lib/just-posted";
-import { rudyFace, useRudy } from "@/lib/rudy";
+import {
+  pick,
+  RUDY_QUIPS,
+  RUDY_READING,
+  rudyVerdict,
+  useRudy,
+} from "@/lib/rudy";
+import { Celebration, Rudy } from "@/components/rudy";
 import { useTheme } from "@/hooks/use-theme";
 import {
   analyzeComplaint,
@@ -243,6 +248,39 @@ export function Composer({ home }: { home?: boolean }) {
   const read = readComplaint(text);
   // Hot the whole time for minutes: Rudy says one kind thing (a hidden extra).
   const rudy = useRudy(read.words > 0 && read.spice >= 3);
+  // Rudy hops each time a goal ticks.
+  const goalCount =
+    Number(read.goals.who || !!params.subjectId) +
+    Number(read.goals.what) +
+    Number(read.goals.better);
+  const [hops, setHops] = useState(0);
+  const lastGoals = useRef(goalCount);
+  useEffect(() => {
+    if (goalCount > lastGoals.current) setHops((h) => h + 1);
+    lastGoals.current = goalCount;
+  }, [goalCount]);
+  // Tap Rudy: one of his spicy one-liners, in the same bubble.
+  const [quip, setQuip] = useState<string | null>(null);
+  useEffect(() => {
+    if (!quip) return;
+    const t = setTimeout(() => setQuip(null), 5000);
+    return () => clearTimeout(t);
+  }, [quip]);
+  // While the model reads it, Rudy says what is happening.
+  const [reading, setReading] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(
+      () => setReading((r) => Math.min(r + 1, RUDY_READING.length - 1)),
+      1700,
+    );
+    return () => clearInterval(t);
+  }, [busy]);
+  // Posted: the cheer, then on to Me.
+  const [celebrate, setCelebrate] = useState<{
+    detail: string;
+    submissionId: string;
+  } | null>(null);
 
   /** Resize, strip metadata (location included), upload. */
   const ingest = async (uri: string) => {
@@ -373,6 +411,7 @@ export function Composer({ home }: { home?: boolean }) {
   }, [draftParam, user]);
 
   const check = async () => {
+    setReading(0);
     setError(null);
     setBusy(true);
     try {
@@ -450,15 +489,42 @@ export function Composer({ home }: { home?: boolean }) {
         // the new complaint marked, so they know where it lives.
         // The box goes away as it is (clearing it first would bring the
         // keyboard back up on the way out); only the kept draft is dropped.
-        keepDraft("");
-        setJustPosted(res.submissionId);
-        if (!leaveTo("me")) reset();
+        // First the cheer; Me comes after it (see `celebrated`).
+        const kept = analysis.result.points.filter((_, i) => !dropped.has(i));
+        const joined = kept
+          .flatMap((pt) =>
+            pt.matchedPointId ? [analysis.matched[pt.matchedPointId]] : [],
+          )
+          .filter(Boolean);
+        const most = joined.reduce(
+          (n, m) => Math.max(n, m?.supportCount ?? 0),
+          0,
+        );
+        setCelebrate({
+          submissionId: res.submissionId,
+          detail:
+            most > 0
+              ? `You're with ${shortCount(most)} ${most === 1 ? "other person" : "other people"} who have this too.`
+              : kept.length > 1
+                ? `You started ${kept.length} new issues. Let's see who joins you.`
+                : "You started a new issue. Let's see who joins you.",
+        });
       }
     } catch (e) {
       setError(errorText(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  /** After the cheer: the box clears and they land on Me, the new complaint marked. */
+  const celebrated = () => {
+    const posted = celebrate;
+    setCelebrate(null);
+    if (!posted) return;
+    keepDraft("");
+    setJustPosted(posted.submissionId);
+    if (!leaveTo("me")) reset();
   };
 
   // Leaving the box for a tab. The box came up from the bottom over the
@@ -760,16 +826,20 @@ export function Composer({ home }: { home?: boolean }) {
                 ))}
               </Row>
             )}
-            {rudy.line && read.words > 0 && !read.quiet && (
+            {!read.quiet && !read.overLine && <Goals goals={goals} />}
+            {(quip || (rudy.line && read.words > 0 && !read.quiet)) && (
               <Pressable
-                onPress={rudy.dismiss}
+                onPress={() => {
+                  setQuip(null);
+                  rudy.dismiss();
+                }}
                 accessibilityRole="button"
-                accessibilityLabel={`Rudy says: ${rudy.line} Tap to dismiss.`}
+                accessibilityLabel={`Rudy says: ${quip ?? rudy.line} Tap to dismiss.`}
                 accessibilityLiveRegion="polite"
                 style={[styles.bubble, { backgroundColor: theme.rantSoft }]}
               >
                 <Text style={[styles.bubbleText, { color: theme.text }]}>
-                  {rudy.line}
+                  {quip ?? rudy.line}
                 </Text>
                 <Ionicons name="close" size={15} color={theme.textSecondary} />
                 <View
@@ -780,12 +850,24 @@ export function Composer({ home }: { home?: boolean }) {
                 />
               </Pressable>
             )}
-            {!read.quiet && !read.overLine && <Goals goals={goals} />}
             {(!read.quiet || busy || !!modelLine) && (
               <View style={styles.live} accessibilityLiveRegion="polite">
                 {/* Rudy: his face follows the peppers, beaming at one, crying
                     at five. While the model reads it, he dances. */}
-                <Rudy spice={modelLine ? 4 : read.spice} dancing={busy} />
+                <View style={styles.rudy}>
+                  <Rudy
+                    spice={modelLine ? 4 : read.spice}
+                    dancing={busy}
+                    hops={hops}
+                    onPress={() =>
+                      setQuip((q) => {
+                        let next = pick(RUDY_QUIPS);
+                        if (next === q) next = pick(RUDY_QUIPS);
+                        return next;
+                      })
+                    }
+                  />
+                </View>
                 <Peppers n={read.spice} size={13} />
                 <Text
                   numberOfLines={modelLine ? 5 : 3}
@@ -800,7 +882,7 @@ export function Composer({ home }: { home?: boolean }) {
                         : theme.textSecondary,
                   }}
                 >
-                  {modelLine ?? read.nudge}
+                  {busy ? RUDY_READING[reading] : (modelLine ?? read.nudge)}
                 </Text>
               </View>
             )}
@@ -893,6 +975,11 @@ export function Composer({ home }: { home?: boolean }) {
       error={error}
       onDismissError={() => setError(null)}
     >
+      <Celebration
+        visible={!!celebrate}
+        detail={celebrate?.detail ?? ""}
+        onDone={celebrated}
+      />
       {reviewing && (
         <Pressable
           onPress={edit}
@@ -992,48 +1079,6 @@ function Goals({
         </View>
       ))}
     </View>
-  );
-}
-
-/** Rudy beside the peppers. While Next is working he dances, beaming. */
-function Rudy({ spice, dancing }: { spice: number; dancing: boolean }) {
-  const [beat] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (!dancing) {
-      beat.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.timing(beat, {
-        toValue: 1,
-        duration: 700,
-        easing: Easing.linear,
-        useNativeDriver: Platform.OS !== "web",
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [dancing, beat]);
-  const rotate = beat.interpolate({
-    inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: ["0deg", "-16deg", "0deg", "16deg", "0deg"],
-  });
-  const translateY = beat.interpolate({
-    inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: [0, -5, 0, -5, 0],
-  });
-  return (
-    <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
-      <Image
-        source={rudyFace(dancing ? 1 : spice)}
-        style={styles.rudy}
-        accessibilityLabel={
-          dancing
-            ? "Rudy the red pepper, dancing while it is read"
-            : "Rudy the red pepper"
-        }
-      />
-    </Animated.View>
   );
 }
 
@@ -1250,6 +1295,14 @@ function ReviewSection(props: {
             <T variant="small">{SPICE_LABELS[result.spice ?? 1]}</T>
           </Row>
         </Row>
+        <Row style={{ gap: 10, alignItems: "center" }}>
+          <Rudy spice={Math.min(result.spice ?? 1, 4)} size={44} />
+          <View style={[styles.says, { backgroundColor: theme.rantSoft }]}>
+            <T color={theme.text} style={{ fontWeight: "600" }}>
+              {rudyVerdict({ ...result, missing: result.missing ?? [] })}
+            </T>
+          </View>
+        </Row>
         {result.suggestedRewrite && (
           <Pressable
             onPress={() => props.setUseRewrite(!props.useRewrite)}
@@ -1377,7 +1430,7 @@ function ReviewSection(props: {
                 <T variant="small" color={hit ? theme.primary : theme.new}>
                   {hit
                     ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} with this issue`
-                    : "New issue · worded by the model"}
+                    : "New issue · title by AI"}
                   {analysis.alsoPrivate?.[i] && !isPrivate
                     ? " · raised privately too"
                     : ""}
@@ -1552,7 +1605,13 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
   },
   live: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rudy: { width: 40, height: 40, marginLeft: -6, marginRight: -4 },
+  rudy: { marginLeft: -6, marginRight: -4 },
+  says: {
+    flex: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
   back: {
     flexDirection: "row",
     alignItems: "center",

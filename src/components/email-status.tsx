@@ -29,7 +29,7 @@ export function VerifiedNotice() {
   }, [justVerified, clearJustVerified]);
   return (
     <Modal visible={justVerified} transparent animationType="fade" onRequestClose={clearJustVerified}>
-      <Pressable style={styles.backdrop} onPress={clearJustVerified}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={clearJustVerified}>
         <Pressable
           style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           onPress={() => {}}>
@@ -79,7 +79,7 @@ export function ConfirmEmail({ reason }: { reason?: string }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16 },
   sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 420, alignSelf: 'center' },
   title: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 });

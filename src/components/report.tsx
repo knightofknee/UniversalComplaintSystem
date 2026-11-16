@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
+import { showToast } from '@/components/toast';
 import { Button, Field, T } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, report, type ReportKind, type ReportReason } from '@/lib/api';
@@ -50,7 +51,11 @@ export function ReportButton({
     try {
       await report({ ...target, reason, ...(note.trim() ? { note: note.trim() } : {}) });
       close();
-      showAlert('Thanks, we’ll look at it', 'Reports go to the people who run UCS, not to the organization. We review every one within a day.');
+      showToast(
+        'Thanks! We’ll take a look within a day.',
+        'Reports go to the people who run UCS, never to the organization.',
+        'info',
+      );
     } catch (e) {
       showAlert("Couldn't send the report", errorText(e));
     } finally {
@@ -69,10 +74,10 @@ export function ReportButton({
         {!compact && <T variant="small">{label}</T>}
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
-        <Pressable style={styles.backdrop} onPress={close}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={close}>
           <Pressable
-          style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-          onPress={() => {}}>
+            style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            onPress={() => {}}>
             <T variant="heading">What&apos;s wrong with it?</T>
             <T variant="small">
               Reports go to the people who run UCS, never to the organization. Disagreeing with a complaint isn&apos;t a
@@ -87,14 +92,29 @@ export function ReportButton({
                     onPress={() => setReason(r.key)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
-                    style={[styles.reason, { borderColor: on ? theme.primary : theme.border, backgroundColor: on ? theme.primarySoft : theme.background }]}>
-                    <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={18} color={on ? theme.primary : theme.textSecondary} />
+                    style={[
+                      styles.reason,
+                      {
+                        borderColor: on ? theme.primary : theme.border,
+                        backgroundColor: on ? theme.primarySoft : theme.background,
+                      },
+                    ]}>
+                    <Ionicons
+                      name={on ? 'radio-button-on' : 'radio-button-off'}
+                      size={18}
+                      color={on ? theme.primary : theme.textSecondary}
+                    />
                     <T>{r.label}</T>
                   </Pressable>
                 );
               })}
             </View>
-            <Field value={note} onChangeText={setNote} placeholder="Anything we should know? (optional)" maxLength={500} />
+            <Field
+              value={note}
+              onChangeText={setNote}
+              placeholder="Anything we should know? (optional)"
+              maxLength={500}
+            />
             <Button label="Send report" onPress={send} busy={busy} disabled={!reason} />
             <Button label="Cancel" kind="quiet" onPress={close} />
           </Pressable>
@@ -108,7 +128,7 @@ const styles = StyleSheet.create({
   trigger: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   compact: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
   // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16 },
   sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 480, alignSelf: 'center' },
   reason: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 12, padding: 12 },
 });

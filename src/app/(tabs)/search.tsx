@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PointCard, PointList } from '@/components/point-card';
-import { Empty, Field, InlineError, Row, Screen, T } from '@/components/ui';
+import { Button, Empty, Field, InlineError, Row, Screen, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, searchPoints } from '@/lib/api';
@@ -105,7 +105,7 @@ export default function SearchScreen() {
       <Field
         value={q}
         onChangeText={setQ}
-        placeholder="A company, a product, a problem…"
+        placeholder="A company, a product, an issue…"
         autoCorrect={false}
         returnKeyType="search"
         accessibilityLabel="Search"
@@ -113,7 +113,7 @@ export default function SearchScreen() {
       <KindPick value={kind} onChange={setKind} />
       <InlineError text={error} />
       {!active && <Starters kind={kind} />}
-      {shownSubjects.length > 0 && <T variant="label">Pages</T>}
+      {shownSubjects.length > 0 && <T variant="label">Companies and topics</T>}
       <View>
         {shownSubjects.map((s) => (
           <SubjectRow
@@ -124,21 +124,34 @@ export default function SearchScreen() {
           />
         ))}
       </View>
-      {shownPoints.length > 0 && <T variant="label">Complaints</T>}
+      {shownPoints.length > 0 && <T variant="label">Issues</T>}
       <PointList>
         {shownPoints.map((p) => (
           <PointCard key={p.id} point={p} />
         ))}
       </PointList>
       {q.trim().length >= 2 && !loading && shownPoints.length === 0 && shownSubjects.length === 0 && !error && (
-        <Empty text="Nothing yet. If it bothers you, complain about it: you'll be the first." />
+        <>
+          <Empty text="Nothing here yet." />
+          <Button kind="secondary" icon="add" label="Complain about it" onPress={() => router.push('/complain')} />
+        </>
       )}
       {active && loading && shownPoints.length === 0 && shownSubjects.length === 0 && <Empty text="" loading />}
     </Screen>
   );
 }
 
-function SubjectRow({ name, detail, rank, onPress }: { name: string; detail: string; rank?: number; onPress: () => void }) {
+function SubjectRow({
+  name,
+  detail,
+  rank,
+  onPress,
+}: {
+  name: string;
+  detail: string;
+  rank?: number;
+  onPress: () => void;
+}) {
   const theme = useTheme();
   return (
     <Pressable
@@ -196,6 +209,12 @@ function Starters({ kind }: { kind: Kind }) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderTopWidth: StyleSheet.hairlineWidth },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 13,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   rank: { fontFamily: Fonts.display, fontSize: 20, width: 26 },
 });

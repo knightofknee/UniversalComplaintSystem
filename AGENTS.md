@@ -153,7 +153,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   unsafe) there is NO dead-end page: the box stays, Rudy says why and what
   would make it one (worried face), and Next waits until the words change.
   Over-the-line still goes to its review, for the alternatives.
-  RUDY DANCES while Next is working (rocks and bobs, beaming).
+  RUDY DANCES while Next is working (rocks and bobs, beaming) and says what
+  is happening (`RUDY_READING`: "Checking who else has this…").
+  RUDY'S PERSONALITY (2026-11-15, the user's direction: "he's spicy
+  himself", make complaining fun): he lives in src/components/rudy.tsx. He
+  hops each time a goal ticks; TAP HIM and he wiggles and says one of his
+  spicy one-liners (`RUDY_QUIPS`: "Careful, I'm hot."), in the same bubble
+  as his kind sayings; on the review he gives his take on the verdict
+  (`rudyVerdict`). His jokes are about himself, never about the writer.
+  POSTING IS CELEBRATED (2026-11-15): `Celebration` covers everything with
+  Rudy jumping, a burst of confetti and peppers, haptics, "Yayyyy! Your
+  complaint is live." and who they joined ("You're with N other people who
+  have this too" / "You started a new issue"), then moves on to Me by itself
+  after ~3s or at a tap. Private sends keep their own after-screen.
   BACK (2026-11-15): every move through the flow (Next, Edit, Edit it
   first, using an alternative) is remembered; a Back pill beside the menu
   walks it in reverse, restoring the text AND its check with no new model
@@ -224,7 +236,8 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   To check motion, record the simulator and read the frames (stills hide
   it). What is typed in the
   main box survives leaving it (`kept.draft` in composer.tsx).
-- Pop-ups (name change, report, "Your complaint is live") sit on a 72% dim
+- Pop-ups (name change, report, the sign-in nudge after posting, the
+  operator's reason prompt) sit on the theme's `scrim` (a 72% dim)
   with their own surface and border, so their words never run into the
   page's.
 - An author can delete one complaint (`deleteComplaint`, account.ts; the

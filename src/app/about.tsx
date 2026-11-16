@@ -13,8 +13,8 @@ export default function AboutScreen() {
     <Screen>
       <T variant="title">How UCS works</T>
       <T>
-        The Universal Complaint System is an independent public record of what&apos;s wrong, about anything: a
-        company, a product, a public service, or something nobody owns. It isn&apos;t run by any of them.
+        The Universal Complaint System is an independent public record of what&apos;s wrong, about anything: a company,
+        a product, a public service, or something nobody owns. It isn&apos;t run by any of them.
       </T>
       <T variant="heading">What we promise</T>
       <T>
@@ -25,8 +25,8 @@ export default function AboutScreen() {
       <T>
         A model reads each complaint for the issues it raises: the distinct things that are wrong. Each issue is matched
         to the same issue already on the record, so a hundred complaints about one thing become one issue backed by a
-        hundred people. Under every issue is what each complaint said about it, pulled out by the model, and each of
-        those opens the complaint in its author&apos;s own words. Wherever the model added a new issue, it is marked.
+        hundred people. Each issue shows the complaints behind it, in their authors&apos; own words. Wherever the model
+        named a new issue, it says so.
       </T>
       <T variant="heading">Organizations</T>
       <T>

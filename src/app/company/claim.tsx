@@ -12,7 +12,12 @@ import { db } from '@/lib/firebase';
 import { useCollection, useDoc } from '@/lib/hooks';
 import type { Subject } from '@/lib/types';
 
-type Claim = { id: string; subjectName: string; status: 'pending' | 'held' | 'approved' | 'denied'; note: string | null };
+type Claim = {
+  id: string;
+  subjectName: string;
+  status: 'pending' | 'held' | 'approved' | 'denied';
+  note: string | null;
+};
 
 const CLAIM_STATUS: Record<Claim['status'], string> = {
   pending: 'Waiting for the daily check',
@@ -74,7 +79,11 @@ export default function ClaimScreen() {
     if (!picked) return;
     setBusy(true);
     try {
-      const res = await requestAccess({ subjectId: picked, website: website.trim() || undefined, ...(agreed ? { acceptTerms: true } : {}) });
+      const res = await requestAccess({
+        subjectId: picked,
+        website: website.trim() || undefined,
+        ...(agreed ? { acceptTerms: true } : {}),
+      });
       showAlert(
         res.status === 'approved' ? 'You can respond now' : 'Request received',
         res.status === 'approved'
@@ -120,10 +129,15 @@ export default function ClaimScreen() {
             </Card>
           ))}
           {name.trim().length >= 2 && results.length === 0 && (
-            <T variant="small">
-              Not here? Organizations appear once someone complains about them. Post a complaint first, or ask us to
-              add it.
-            </T>
+            <T variant="small">Not here yet? It shows up once someone complains about it.</T>
+          )}
+          {name.trim().length >= 2 && results.length === 0 && (
+            <Button
+              kind="secondary"
+              icon="add"
+              label={`Complain about ${name.trim()}`}
+              onPress={() => router.push('/complain')}
+            />
           )}
         </>
       )}
@@ -138,7 +152,12 @@ export default function ClaimScreen() {
             placeholder="https://"
           />
           <TermsCheck checked={agreed} onChange={setAgreed} />
-          <Button label="Request access" onPress={submit} busy={busy} disabled={!verified || (!termsAccepted && !agreed)} />
+          <Button
+            label="Request access"
+            onPress={submit}
+            busy={busy}
+            disabled={!verified || (!termsAccepted && !agreed)}
+          />
         </>
       )}
 

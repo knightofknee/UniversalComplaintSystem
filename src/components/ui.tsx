@@ -50,9 +50,7 @@ export function Screen({
         styles.screen,
         { paddingTop: (topInset ? insets.top : 0) + 16, paddingBottom: insets.bottom + 40 },
       ]}
-      refreshControl={
-        onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} /> : undefined
-      }>
+      refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} /> : undefined}>
       {children}
     </ScrollView>
   );
@@ -101,15 +99,23 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  kind?: 'primary' | 'secondary' | 'quiet';
+  /** danger: for what can't be undone (deleting an account). */
+  kind?: 'primary' | 'secondary' | 'quiet' | 'danger';
   icon?: ComponentProps<typeof Ionicons>['name'];
   disabled?: boolean;
   busy?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
-  const bg = kind === 'primary' ? theme.primaryFill : kind === 'secondary' ? theme.primarySoft : 'transparent';
-  const fg = kind === 'primary' ? theme.onPrimary : theme.primary;
+  const bg =
+    kind === 'primary'
+      ? theme.primaryFill
+      : kind === 'secondary'
+        ? theme.primarySoft
+        : kind === 'danger'
+          ? theme.dangerSoft
+          : 'transparent';
+  const fg = kind === 'primary' ? theme.onPrimary : kind === 'danger' ? theme.danger : theme.primary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -228,7 +234,7 @@ export function Tabs<K extends string>({
           fill && { flex: 1, alignItems: 'center' },
           { backgroundColor: on ? theme.text : theme.backgroundElement },
         ]}>
-        <Text style={{ color: on ? theme.background : theme.text, fontWeight: '600' }}>{o.label}</Text>
+        <Text style={{ color: on ? theme.background : theme.text, fontFamily: Fonts.bold }}>{o.label}</Text>
       </Pressable>
     );
   });
@@ -309,5 +315,12 @@ const styles = StyleSheet.create({
   placeholder: { position: 'absolute', left: 13, right: 13, top: 0, bottom: 0, justifyContent: 'center' },
   tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   notice: { borderRadius: 14, padding: 12, gap: 6 },
-  inlineError: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
 });

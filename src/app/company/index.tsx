@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { collection, limit, orderBy, query, where } from 'firebase/firestore';
-import { useMemo, useState } from 'react';
+import { collection, doc, getDoc, limit, orderBy, query, where } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Switch, Text, View as Box } from 'react-native';
 
 import { PointCard, PointList, showAlert } from '@/components/point-card';
@@ -40,9 +40,33 @@ export default function CompanyScreen() {
   return <Dashboard key={current} subjectId={current} orgs={orgs} onSwitch={setOrgId} />;
 }
 
-function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: string[]; onSwitch: (id: string) => void }) {
+function Dashboard({
+  subjectId,
+  orgs,
+  onSwitch,
+}: {
+  subjectId: string;
+  orgs: string[];
+  onSwitch: (id: string) => void;
+}) {
   const router = useRouter();
   const { data: subject } = useDoc<Subject>(`subjects/${subjectId}`);
+  // Each organization this person responds for, by name, for the switcher.
+  const [names, setNames] = useState<Record<string, string>>({});
+  const orgKey = orgs.join(',');
+  useEffect(() => {
+    if (orgs.length < 2) return;
+    let live = true;
+    Promise.all(
+      orgs.map((o) => getDoc(doc(db, `subjects/${o}`)).then((d) => [o, (d.get('name') as string) ?? ''] as const)),
+    )
+      .then((pairs) => live && setNames(Object.fromEntries(pairs.filter(([, n]) => n))))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgKey]);
   const [section, setSection] = useState<Section>('points');
   const privatePoints = useCollection<PrivatePoint>(
     query(collection(db, `subjects/${subjectId}/privatePoints`), limit(1000)),
@@ -59,7 +83,7 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
     <Screen>
       {orgs.length > 1 && (
         <Tabs
-          options={orgs.map((o) => ({ key: o, label: o === subjectId ? (subject?.name ?? '…') : 'Switch' }))}
+          options={orgs.map((o) => ({ key: o, label: names[o] ?? (o === subjectId ? (subject?.name ?? '…') : '…') }))}
           value={subjectId}
           onChange={onSwitch}
         />
@@ -82,7 +106,12 @@ function Dashboard({ subjectId, orgs, onSwitch }: { subjectId: string; orgs: str
       {section === 'points' && <Points subjectId={subjectId} privatePoints={privatePoints.items} />}
       {section === 'inbox' && <Inbox subjectId={subjectId} threads={inbox.items} loading={inbox.loading} />}
       {section === 'settings' && subject && <Settings subject={subject} />}
-      <Button kind="quiet" icon="add" label="Respond for another organization" onPress={() => router.push('/company/claim')} />
+      <Button
+        kind="quiet"
+        icon="add"
+        label="Respond for another organization"
+        onPress={() => router.push('/company/claim')}
+      />
     </Screen>
   );
 }
@@ -200,7 +229,10 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
     const proposed = points.filter((p) => (p.solutionCount ?? 0) > 0);
     const responded = points.filter((p) => p.respondedBy?.[subjectId]);
     const waits = responded
-      .map((p) => (p.firstRespondedBy?.[subjectId] ?? p.respondedBy[subjectId]).toMillis() - (p.createdAt?.toMillis() ?? 0))
+      .map(
+        (p) =>
+          (p.firstRespondedBy?.[subjectId] ?? p.respondedBy[subjectId]).toMillis() - (p.createdAt?.toMillis() ?? 0),
+      )
       .filter((ms) => ms > 0)
       .sort((a, b) => a - b);
     const sum = (list: Point[], f: (p: Point) => number) => list.reduce((n, p) => n + f(p), 0);
@@ -234,7 +266,18 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
 
   const exportCsv = async () => {
     const rows = [
-      ['Issue', 'People', 'New this week', 'Complaints', 'Status', 'Seen', 'Responded', 'Proposed fixes', 'First raised', 'Filed under'],
+      [
+        'Issue',
+        'People',
+        'New this week',
+        'Complaints',
+        'Status',
+        'Seen',
+        'Responded',
+        'Proposed fixes',
+        'First raised',
+        'Filed under',
+      ],
       ...points.map((p) => [
         p.text,
         p.supportCount,
@@ -257,7 +300,13 @@ function Summary({ points, subjectId, onView }: { points: Point[]; subjectId: st
 
   if (points.length === 0) return null;
   const tiles: { n: number; label: string; sub?: string; view?: View; alert?: boolean }[] = [
-    { n: s.waiting.length, label: 'need a response', sub: `${s.waitingPeople.toLocaleString()} people waiting`, view: 'unanswered', alert: s.waiting.length > 0 },
+    {
+      n: s.waiting.length,
+      label: 'need a response',
+      sub: `${s.waitingPeople.toLocaleString()} people waiting`,
+      view: 'unanswered',
+      alert: s.waiting.length > 0,
+    },
     { n: s.unseen.length, label: 'not yet seen', view: 'unseen' },
     { n: s.claimed.length, label: 'fixes awaiting confirmation', view: 'claimed' },
     { n: s.proposed.length, label: 'have fixes people proposed', view: 'fixes' },
@@ -370,8 +419,8 @@ function Settings({ subject }: { subject: Subject }) {
         <Switch value={on} onValueChange={toggle} disabled={busy} />
       </Row>
       <T variant="small">
-        Public points about {subject.name} would show how many people also raised them privately, and those people
-        could confirm your fixes. What they wrote stays private either way: only the numbers are shown.
+        Public points about {subject.name} would show how many people also raised them privately, and those people could
+        confirm your fixes. What they wrote stays private either way: only the numbers are shown.
       </T>
     </Card>
   );

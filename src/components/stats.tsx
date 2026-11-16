@@ -43,8 +43,8 @@ export function Stats({ subject }: { subject: Subject }) {
       ) : (
         <Notice tone="warn">
           <T variant="small">
-            {subject.name} hasn&apos;t joined UCS yet, so nothing here has been seen or answered by them. Its scoreboard
-            starts when it does. Know someone there? Share this page.
+            {subject.name} isn&apos;t answering here yet, so nothing here has been seen or answered by them. Its
+            scoreboard starts when it joins. Know someone there? Send them this page.
           </T>
         </Notice>
       )}

@@ -205,8 +205,8 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
     <View style={[styles.missing, { borderColor: theme.border }]}>
       <T variant="label">{missing.length ? 'Potentially missing' : 'Add to it'}</T>
       <T variant="small">
-        Optional, and only you see this. What you add shows under your complaint, and it is read again so it is filed
-        and worded to match.
+        Only you see this. Anything you add shows under your complaint, and it&apos;s read again so it&apos;s filed to
+        match.
       </T>
       {[...missing, OTHER].map((m) =>
         answering === m ? (
@@ -295,7 +295,7 @@ function confirmHide(name: string, onYes: () => void) {
 }
 
 /** One person's complaint, in their own words (and in English if they wrote another language). */
-export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: boolean }) {
+export function SubmissionCard({ s }: { s: Submission }) {
   const theme = useTheme();
   const { user, profile } = useAuth();
   const [original, setOriginal] = useState(false);
@@ -338,8 +338,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
         {source && (
           <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />
         )}
-        {s.tone === 'rant' && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
-        {addedPoint && <Chip label="Model added this issue from it" color={theme.new} bg={theme.newSoft} />}
+        {s.tone === 'rant' && <Chip label="🤬 Rant" color={theme.rant} bg={theme.rantSoft} />}
         {s.rewritten && <Chip label="Clearer version" color={theme.textSecondary} bg={theme.background} />}
         <View style={styles.actions}>
           {source ? (
@@ -396,7 +395,7 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
       {translated && (
         <Pressable onPress={() => setOriginal((o) => !o)} accessibilityRole="button" hitSlop={8}>
           <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
-            {original ? 'Show English translation' : `Translated from "${s.language}" · show original`}
+            {original ? 'Show English translation' : `Translated from ${s.language} · Show original`}
           </T>
         </Pressable>
       )}

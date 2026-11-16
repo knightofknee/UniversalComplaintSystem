@@ -24,6 +24,8 @@ export const Colors = {
     goodSoft: '#DCF3E3',
     warning: '#A15C00',
     warningSoft: '#FCEFD8',
+    /** Behind pop-ups: the page dims to 72% so their words never run into it. */
+    scrim: 'rgba(0,0,0,0.72)',
     danger: '#C81E3A',
     dangerSoft: '#FBE2E6',
   },
@@ -48,6 +50,7 @@ export const Colors = {
     goodSoft: '#12301E',
     warning: '#F2B04F',
     warningSoft: '#2B2213',
+    scrim: 'rgba(0,0,0,0.72)',
     danger: '#FF6B81',
     dangerSoft: '#3D1620',
   },

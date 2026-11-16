@@ -245,8 +245,8 @@ export default function PointScreen() {
         ))}
       {publishedPrivate > 0 && (
         <T variant="small">
-          +{publishedPrivate} raised privately (the organization publishes its private counts; what they wrote stays
-          private)
+          +{publishedPrivate} more raised it privately. The organization shares that count; what they wrote stays
+          private.
         </T>
       )}
       <ReportButton target={{ kind: 'point', id: point.id }} label="Report this issue" />

@@ -8,6 +8,17 @@ import { useCollection } from '@/lib/hooks';
 type Removal = { id: string; kind: string; subjectNames: string[]; reason: string; at: Timestamp | null };
 
 /** Every removal from the record, and why. */
+/** The record's own words for what was removed (the log stores the collection's kind). */
+const KIND_WORD: Record<string, string> = {
+  point: 'issue',
+  submission: 'complaint',
+  subject: 'page',
+  response: 'response',
+  solution: 'proposed fix',
+  message: 'private message',
+  thread: 'private conversation',
+};
+
 export default function RemovalsScreen() {
   const { items, loading } = useCollection<Removal>(
     query(collection(db, 'removals'), orderBy('at', 'desc'), limit(200)),
@@ -20,12 +31,12 @@ export default function RemovalsScreen() {
         listed here.
       </T>
       {items.length === 0 ? (
-        <Empty loading={loading} text="Nothing has been removed." />
+        <Empty loading={loading} text="Nothing here yet." />
       ) : (
         items.map((r) => (
           <Card key={r.id}>
             <T style={{ fontWeight: '700' }}>
-              A {r.kind} about {r.subjectNames.join(', ') || 'no subject'}
+              A {KIND_WORD[r.kind] ?? 'post'} about {r.subjectNames.join(', ') || 'no company or topic'}
             </T>
             <T variant="small">
               {r.reason} · {r.at?.toDate().toLocaleDateString()}

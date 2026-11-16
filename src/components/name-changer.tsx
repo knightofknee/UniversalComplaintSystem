@@ -82,7 +82,7 @@ export function NameChanger({ name }: { name: string }) {
         <Ionicons name="shuffle" size={22} color={theme.textSecondary} />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
-        <Pressable style={styles.backdrop} onPress={close}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={close}>
           <Pressable
           style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           onPress={() => {}}>
@@ -101,7 +101,7 @@ export function NameChanger({ name }: { name: string }) {
 const styles = StyleSheet.create({
   name: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start' },
   // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16 },
   sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 420, alignSelf: 'center' },
   candidate: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 36 },
 });

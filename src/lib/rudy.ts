@@ -71,3 +71,63 @@ export function useRudy(hot: boolean) {
   }, [hot]);
   return { line, dismiss: () => setLine(null) };
 }
+
+/**
+ * Tap Rudy and he says something. He is a pepper, and spicy himself: these
+ * are his jokes. Like his kind lines, none is about the writer or could be
+ * wrong about them.
+ */
+export const RUDY_QUIPS = [
+  "Careful, I'm hot.",
+  'I put the pep in pepper.',
+  "I'm not mad. I'm just spicy.",
+  'Scoville rating: emotionally available.',
+  "I've been pickled before. I can handle anything.",
+  'Some people do yoga. I do complaints.',
+  'My cousin is a jalapeño. He is way too chill.',
+  'Every great fix started as a good rant.',
+  'Bring the heat. Aim it at the problem.',
+  'Hot tip: say what would make it better.',
+  "I'd high-five you, but I'm a pepper.",
+  'Complain away. I run on hot air.',
+  'Ow. I mean, hi!',
+  "Tickles. Don't stop typing.",
+];
+
+/** While the model reads it (after Next): what is happening, in his words. */
+export const RUDY_READING = [
+  'Reading it closely…',
+  'Checking who else has this…',
+  'Naming the issue…',
+  'Finding where it belongs…',
+  'Almost there…',
+];
+
+/** After posting: one of these under the cheer. */
+export const RUDY_CHEERS = [
+  'Rudy is doing his victory dance.',
+  'Hot off the grill.',
+  "That's how it's done.",
+  'Loud, clear, and on the record.',
+  'Spicy and published. Chef’s kiss.',
+];
+
+/** His take on the model's verdict, one line on the review. */
+export function rudyVerdict(r: {
+  tone?: string;
+  spice?: number;
+  rantScore?: number | null;
+  actionability?: number;
+  missing?: string[];
+}): string {
+  const fixable = (r.actionability ?? 0) >= 40;
+  if (!fixable && (r.missing ?? []).length > 0)
+    return 'Good start! A detail or two from below would make it hit harder.';
+  if (r.tone === 'rant' && (r.rantScore ?? 0) >= 7) return "Ooh. This one's getting read out loud.";
+  if (r.tone === 'rant' && (r.spice ?? 1) >= 4) return 'Extra hot and it still makes sense. Respect.';
+  if (r.tone === 'rant') return 'A rant with a point. My favorite kind.';
+  if (r.tone === 'constructive') return "Clear and fixable. Chef's kiss.";
+  return 'Just the facts. Very professional.';
+}
+
+export const pick = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];

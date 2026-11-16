@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { PointCard, PointList } from '@/components/point-card';
 import { RelatedSubjects } from '@/components/related-subjects';
@@ -45,7 +45,7 @@ export default function SubjectScreen() {
   if (!subject) {
     return (
       <Screen>
-        <Empty loading={loading} text="Not found." />
+        <Empty loading={loading} text="This isn't here anymore." />
       </Screen>
     );
   }
@@ -60,7 +60,8 @@ function Header({ subject }: { subject: Subject }) {
     <>
       <Stack.Screen
         options={{
-          title: subject.name,
+          // The page's own big title names it; a second one in the header just repeats it.
+          title: '',
           headerRight: () => (
             <Pressable
               onPress={() => shareLink(`/subject/${subject.id}`)}
@@ -75,15 +76,12 @@ function Header({ subject }: { subject: Subject }) {
         {subject.name}
       </T>
       <Row style={{ flexWrap: 'wrap' }}>
-        {org && (
+        {/* Not joined yet is said once, in the notice under the numbers. */}
+        {org && subject.claimed && (
           <Chip
-            label={
-              subject.claimed
-                ? `Responds here · ${subject.domains.map((d) => `@${d}`).join(' ')}`
-                : 'Hasn\'t joined UCS yet'
-            }
-            color={subject.claimed ? theme.good : theme.warning}
-            bg={subject.claimed ? theme.goodSoft : theme.warningSoft}
+            label={`Responds here · ${subject.domains.map((d) => `@${d}`).join(' ')}`}
+            color={theme.good}
+            bg={theme.goodSoft}
           />
         )}
       </Row>
@@ -107,7 +105,7 @@ const SORTS: { key: Sort; label: string }[] = [
 
 /** Hot, top, new: the same sorts as the Complaints tab. */
 function SubjectFeed({ subject }: { subject: Subject }) {
-  const [sort, setSort] = useState<Sort>('top');
+  const [sort, setSort] = useState<Sort>('rising');
   const [count, setCount] = useState(PAGE);
   const points = usePoints(subject.id, sort, count);
   const shown = sort === 'rising' ? points.items.filter((p) => (p.weekSupport ?? 0) > 0) : points.items;
@@ -123,7 +121,9 @@ function SubjectFeed({ subject }: { subject: Subject }) {
           ))}
         </PointList>
       )}
-      {points.items.length >= count && <Button kind="secondary" label="Show more" onPress={() => setCount(count + PAGE)} />}
+      {points.items.length >= count && (
+        <Button kind="secondary" label="Show more" onPress={() => setCount(count + PAGE)} />
+      )}
     </>
   );
 }
@@ -146,6 +146,7 @@ function TopicPage({ subject }: { subject: Subject }) {
 
 /** An organization is a ledger: its scoreboard, then its points. */
 function OrganizationPage({ subject }: { subject: Subject }) {
+  const theme = useTheme();
   const router = useRouter();
   const { profile } = useAuth();
   const top = usePoints(subject.id, 'top');
@@ -156,10 +157,13 @@ function OrganizationPage({ subject }: { subject: Subject }) {
       <Stats subject={subject} />
       {!mine && (
         <Card onPress={() => router.push({ pathname: '/company/claim', params: { subjectId: subject.id } })}>
-          <T variant="small">
-            Work at {subject.name}? Respond with your work email. Organizations can respond here, never remove or
-            edit.
-          </T>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <T style={{ fontWeight: '700' }}>Work at {subject.name}? Respond here</T>
+              <T variant="small">With your work email. Organizations can answer, never remove or edit.</T>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </Row>
         </Card>
       )}
       <RelatedSubjects subjectId={subject.id} points={top.items} kind="topic" title="Kinds of issues" />

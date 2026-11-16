@@ -120,15 +120,12 @@ function KeepItPrompt({ visible, onClose }: { visible: boolean; onClose: () => v
   const theme = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           onPress={() => {}}>
-          <T variant="heading">Your complaint is live.</T>
-          <T>
-            It is posted without an account. To keep your history, sign in: until then your complaints stay with this
-            device only.
-          </T>
+          <T variant="heading">Want to keep your history?</T>
+          <T>It&apos;s up, no account needed. Sign in to keep your complaints with you on any phone.</T>
           <Button
             label="Sign in"
             onPress={() => {
@@ -205,11 +202,12 @@ export default function MeScreen() {
   const anonymous = !!user?.isAnonymous;
   return (
     <Screen topInset scrollRef={scrollRef}>
-      <KeepItPrompt visible={!!posted && anonymous && answered !== posted} onClose={() => setAnswered(posted ?? null)} />
+      <KeepItPrompt
+        visible={!!posted && anonymous && answered !== posted}
+        onClose={() => setAnswered(posted ?? null)}
+      />
       <NameChanger name={profile?.displayName ?? 'You'} />
-      <T variant="small">
-        {anonymous ? 'Not signed in. Sign in to keep your history and to send private complaints.' : user?.email}
-      </T>
+      <T variant="small">{anonymous ? 'Not signed in.' : user?.email}</T>
       {anonymous && <Link icon="person-circle-outline" label="Sign in" href="/account" />}
       <ConfirmEmail />
       <Link
@@ -229,31 +227,35 @@ export default function MeScreen() {
 
       <T variant="label">Your complaints</T>
       {complaints.length === 0 ? (
-        <Empty text="Nothing yet." loading={mine.loading || threads.loading} />
+        <Empty text="Nothing here yet." loading={mine.loading || threads.loading} />
       ) : (
         complaints.map((c) => {
           const fresh = c.key === `s:${posted}`;
           return (
-          <View
-            key={c.key}
-            // The one they just posted is brought into view. It is only a mark: the row works as any other.
-            onLayout={fresh ? (e) => scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - 120), animated: true }) : undefined}>
-          <Card
-            onPress={() => router.push(c.href)}
-            style={fresh ? { borderWidth: 1.5, borderColor: theme.primary } : undefined}>
-            <Row style={{ flexWrap: 'wrap', gap: 6 }}>
-              <Ionicons name={c.isPrivate ? 'lock-closed' : 'earth'} size={14} color={theme.textSecondary} />
-              <T variant="small" style={{ flex: 1 }}>
-                {c.isPrivate ? 'Private' : 'Public'} · {timeAgo(c.at)}
-              </T>
-              {fresh && <Chip label="Just posted" color={theme.primary} bg={theme.primarySoft} />}
-              {c.unread && <Chip label="New reply" color={theme.primary} bg={theme.primarySoft} />}
-              {c.resolved && <Chip label="Resolved" color={theme.good} bg={theme.goodSoft} />}
-            </Row>
-            <T numberOfLines={3}>{c.text}</T>
-            {c.about ? <T variant="small">{c.about}</T> : null}
-          </Card>
-          </View>
+            <View
+              key={c.key}
+              // The one they just posted is brought into view. It is only a mark: the row works as any other.
+              onLayout={
+                fresh
+                  ? (e) => scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - 120), animated: true })
+                  : undefined
+              }>
+              <Card
+                onPress={() => router.push(c.href)}
+                style={fresh ? { borderWidth: 1.5, borderColor: theme.primary } : undefined}>
+                <Row style={{ flexWrap: 'wrap', gap: 6 }}>
+                  <Ionicons name={c.isPrivate ? 'lock-closed' : 'earth'} size={14} color={theme.textSecondary} />
+                  <T variant="small" style={{ flex: 1 }}>
+                    {c.isPrivate ? 'Private' : 'Public'} · {timeAgo(c.at)}
+                  </T>
+                  {fresh && <Chip label="Just posted" color={theme.primary} bg={theme.primarySoft} />}
+                  {c.unread && <Chip label="New reply" color={theme.primary} bg={theme.primarySoft} />}
+                  {c.resolved && <Chip label="Resolved" color={theme.good} bg={theme.goodSoft} />}
+                </Row>
+                <T numberOfLines={3}>{c.text}</T>
+                {c.about ? <T variant="small">{c.about}</T> : null}
+              </Card>
+            </View>
           );
         })
       )}
@@ -288,6 +290,6 @@ export default function MeScreen() {
 
 const styles = StyleSheet.create({
   // Dimmed enough that the page reads as background: a sheet's words must never run into the page's.
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16 },
   sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 420, alignSelf: 'center' },
 });

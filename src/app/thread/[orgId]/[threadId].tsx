@@ -112,7 +112,7 @@ export default function ThreadScreen() {
         {thread.englishText && (
           <Button
             kind="quiet"
-            label={original ? 'Show English translation' : `Translated from "${thread.language}" · show original`}
+            label={original ? 'Show English translation' : `Translated from ${thread.language} · Show original`}
             onPress={() => setOriginal((o) => !o)}
           />
         )}

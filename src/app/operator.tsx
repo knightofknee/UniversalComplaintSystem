@@ -1,7 +1,7 @@
 import { useRouter, type Href } from 'expo-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
-import { useState } from 'react';
-import { Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
@@ -56,9 +56,52 @@ function linkFor(path: string): Href | null {
   return null;
 }
 
-function ask(message: string): string | null {
-  if (Platform.OS === 'web') return window.prompt(message) ?? null;
-  return '';
+/**
+ * Ask the operator for a line of text (a reason). On every platform it is the
+ * same pop-up: the page dims and a field takes the answer. Resolves to null
+ * on Cancel, '' when left empty.
+ */
+let asking: ((q: { message: string; done: (v: string | null) => void } | null) => void) | null = null;
+function ask(message: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!asking) return resolve('');
+    asking({ message, done: resolve });
+  });
+}
+
+function AskHost() {
+  const theme = useTheme();
+  const [q, setQ] = useState<{ message: string; done: (v: string | null) => void } | null>(null);
+  const [text, setText] = useState('');
+  useEffect(() => {
+    asking = (next) => {
+      setText('');
+      setQ(next);
+    };
+    return () => {
+      asking = null;
+    };
+  }, []);
+  const answer = (v: string | null) => {
+    q?.done(v);
+    setQ(null);
+  };
+  return (
+    <Modal visible={!!q} transparent animationType="fade" onRequestClose={() => answer(null)}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={() => answer(null)}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          onPress={() => {}}>
+          <T variant="heading">{q?.message}</T>
+          <Field value={text} onChangeText={setText} placeholder="A short reason" autoFocus />
+          <Row>
+            <Button label="Cancel" kind="quiet" onPress={() => answer(null)} style={{ flex: 1 }} />
+            <Button label="OK" onPress={() => answer(text.trim())} style={{ flex: 1 }} />
+          </Row>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 /**
@@ -71,11 +114,20 @@ export default function OperatorScreen() {
   const [tab, setTab] = useState<'claims' | 'reports' | 'duplicates' | 'spend'>('claims');
   const op = isOperator(user);
   const claims = useCollection<Claim>(
-    op ? query(collection(db, 'claims'), where('status', 'in', ['held', 'pending']), orderBy('createdAt', 'desc'), limit(100)) : null,
+    op
+      ? query(
+          collection(db, 'claims'),
+          where('status', 'in', ['held', 'pending']),
+          orderBy('createdAt', 'desc'),
+          limit(100),
+        )
+      : null,
     'op:claims',
   );
   const reports = useCollection<Report>(
-    op ? query(collection(db, 'reports'), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(100)) : null,
+    op
+      ? query(collection(db, 'reports'), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(100))
+      : null,
     'op:reports',
   );
   // Pairs of points that may say the same thing (functions/src/duplicates.ts).
@@ -92,6 +144,7 @@ export default function OperatorScreen() {
   }
   return (
     <Screen>
+      <AskHost />
       <Tabs
         options={[
           { key: 'claims', label: `Organizations · ${claims.items.length}` },
@@ -110,7 +163,7 @@ export default function OperatorScreen() {
         ))}
       {tab === 'reports' &&
         (reports.items.length === 0 ? (
-          <Empty loading={reports.loading} text="No open reports. Quiet day." />
+          <Empty loading={reports.loading} text="Nothing here yet." />
         ) : (
           reports.items.map((r) => <ReportCard key={r.id} r={r} />)
         ))}
@@ -161,7 +214,13 @@ function DuplicateCard({ d }: { d: Duplicate }) {
         moves the other one&apos;s supporters, complaints, responses and fixes into it.
       </T>
       <Row>
-        <Button label="Not the same" kind="secondary" onPress={() => act('dismiss')} busy={busy === 'dismiss'} style={{ flex: 1 }} />
+        <Button
+          label="Not the same"
+          kind="secondary"
+          onPress={() => act('dismiss')}
+          busy={busy === 'dismiss'}
+          style={{ flex: 1 }}
+        />
         <Button label="Merge" onPress={() => act('merge')} busy={busy === 'merge'} style={{ flex: 1 }} />
       </Row>
     </Card>
@@ -175,14 +234,15 @@ function ClaimCard({ c }: { c: Claim }) {
   const act = async (action: 'approve' | 'deny' | 'website') => {
     let reason: string | undefined;
     if (action === 'deny') {
-      const r = ask('Why? (they see this)');
+      const r = await ask('Why? (they see this)');
       if (r === null) return;
       reason = r || undefined;
     }
     setBusy(true);
     try {
       const res = await operatorClaim({ claimId: c.id, action, reason, ...(action === 'website' ? { website } : {}) });
-      if (action === 'website' && res.status === 'held') showAlert('Saved the website', `${c.domain} still doesn't match it, so it's held.`);
+      if (action === 'website' && res.status === 'held')
+        showAlert('Saved the website', `${c.domain} still doesn't match it, so it's held.`);
     } catch (e) {
       showAlert("Couldn't do that", errorText(e));
     } finally {
@@ -213,7 +273,12 @@ function ClaimCard({ c }: { c: Claim }) {
         domain.
       </T>
       <Row style={{ flexWrap: 'wrap' }}>
-        <Button label="Verify website" kind="secondary" onPress={() => act('website')} disabled={busy || !website.trim()} />
+        <Button
+          label="Verify website"
+          kind="secondary"
+          onPress={() => act('website')}
+          disabled={busy || !website.trim()}
+        />
         <Button label="Approve" onPress={() => act('approve')} disabled={busy} />
         <Button label="Deny" kind="quiet" onPress={() => act('deny')} disabled={busy} />
       </Row>
@@ -229,7 +294,7 @@ function ReportCard({ r }: { r: Report }) {
   const act = async (action: 'remove' | 'dismiss' | 'suspend') => {
     let reason: string | undefined;
     if (action !== 'dismiss') {
-      const x = ask('Reason for the public removal log?');
+      const x = await ask('Reason for the public removal log?');
       if (x === null) return;
       reason = x || undefined;
     }
@@ -256,7 +321,9 @@ function ReportCard({ r }: { r: Report }) {
       {link && <Button kind="quiet" label="Open it" onPress={() => router.push(link)} />}
       <Row style={{ flexWrap: 'wrap' }}>
         <Button label="Remove" onPress={() => act('remove')} disabled={busy} />
-        {r.authorUid && <Button label="Remove + suspend" kind="secondary" onPress={() => act('suspend')} disabled={busy} />}
+        {r.authorUid && (
+          <Button label="Remove + suspend" kind="secondary" onPress={() => act('suspend')} disabled={busy} />
+        )}
         <Button label="Keep it" kind="quiet" onPress={() => act('dismiss')} disabled={busy} />
       </Row>
     </Card>
@@ -265,9 +332,12 @@ function ReportCard({ r }: { r: Report }) {
 
 function Spend() {
   const day = new Date().toISOString().slice(0, 10);
-  const { data: usage } = useDoc<{ costUsd?: number; claudeCalls?: number; calls?: Record<string, number>; pausedAt?: unknown }>(
-    `usage/${day}`,
-  );
+  const { data: usage } = useDoc<{
+    costUsd?: number;
+    claudeCalls?: number;
+    calls?: Record<string, number>;
+    pausedAt?: unknown;
+  }>(`usage/${day}`);
   const { data: config } = useDoc<{ dailyBudgetUsd?: number }>('config/ai');
   const budget = config?.dailyBudgetUsd ?? 25;
   return (
@@ -277,11 +347,16 @@ function Spend() {
         ${(usage?.costUsd ?? 0).toFixed(2)} <T variant="small">of ${budget}</T>
       </T>
       <T variant="small">
-        {usage?.claudeCalls ?? 0} complaints checked · {usage?.calls?.search ?? 0} searches · {usage?.calls?.vision ?? 0}{' '}
-        photos screened
+        {usage?.claudeCalls ?? 0} complaints checked · {usage?.calls?.search ?? 0} searches ·{' '}
+        {usage?.calls?.vision ?? 0} photos screened
       </T>
       {!!usage?.pausedAt && <T variant="small">Hit the ceiling today: new complaints are queued until midnight UTC.</T>}
       <T variant="small">Change the ceiling with npm run usage -- budget 40.</T>
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16 },
+  sheet: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14, width: '100%', maxWidth: 480, alignSelf: 'center' },
+});

@@ -18,7 +18,7 @@ export default function SubmissionScreen() {
       : null,
     `subpoints:${ids.join(',')}`,
   );
-  if (!s) return <Screen><Empty loading={loading} text="Not found." /></Screen>;
+  if (!s) return <Screen><Empty loading={loading} text="This isn't here anymore." /></Screen>;
   return (
     <Screen>
       <SubmissionCard s={s} />
