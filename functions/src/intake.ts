@@ -20,7 +20,7 @@ type VectorValue = { toArray(): number[] };
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
-import { assertAuthor, withdrawComplaint } from './account';
+import { assertAuthor, pointIdsOf, unrecordPoints } from './account';
 import { ANTHROPIC_API_KEY, embed, runIntake, type IntakeResult } from './ai';
 import { BudgetPaused, budgetLeft } from './budget';
 import {
@@ -719,8 +719,10 @@ export async function recordPublic(args: {
   draft: DraftData;
   options: PublicOptions;
   source?: Source;
+  /** Editing: the complaint as it stands. The new wording is recorded onto it, keeping its id, votes and date. */
+  editing?: FirebaseFirestore.DocumentSnapshot;
 }) {
-  const { uid, displayName, responderFor, draft, options, source } = args;
+  const { uid, displayName, responderFor, draft, options, source, editing } = args;
   const { text, photoPaths, result } = draft;
   const imported = uid.includes(':');
   const supportAt = source ? source.date : FieldValue.serverTimestamp();
@@ -742,15 +744,16 @@ export async function recordPublic(args: {
   const added = await Promise.all(options.addSubjectIds.slice(0, 5).map((id) => existingSubject(id, { publish: true })));
   const allSubjects = capFiling([...resolved.filter((s): s is ResolvedSubject => !!s), ...added]);
   if (allSubjects.length === 0) throw new HttpsError('invalid-argument', 'File it under at least one thing.');
-  const submission = db.collection('submissions').doc();
+  const submission = editing ? editing.ref : db.collection('submissions').doc();
   const isRant = result.tone === 'rant';
 
   // Photos the model passed (and that show no personal data) become public.
-  const photos: string[] = [];
+  // An edit keeps the photos it already had and adds any new ones after them.
+  const photos: string[] = editing ? [...((editing.get('photos') as string[] | undefined) ?? [])] : [];
   for (const p of result.photos) {
     const src = photoPaths[p.index];
-    if (!src || !p.ok || p.containsPersonalData) continue;
-    const dest = `public/${submission.id}/${photos.length}.jpg`;
+    if (!src || !p.ok || p.containsPersonalData || photos.length >= 4) continue;
+    const dest = `public/${submission.id}/${editing ? `${Date.now()}-` : ''}${photos.length}.jpg`;
     await bucket().file(src).copy(bucket().file(dest));
     photos.push(dest);
   }
@@ -886,6 +889,9 @@ export async function recordPublic(args: {
 
   const rantScore =
     result.tone === 'rant' && !useRewrite ? Math.max(1, Math.min(10, Math.round(result.rantScore ?? 1))) : 0;
+  // An edit is the same complaint with new words: its votes, date and added details stay.
+  const loves = editing ? ((editing.get('loves') as number | undefined) ?? 0) : 0;
+  const createdAt = editing ? (editing.get('createdAt') as Timestamp) : source ? source.date : FieldValue.serverTimestamp();
   await submission.set({
     authorName: displayName,
     authorId: authorIdOf(uid),
@@ -901,17 +907,23 @@ export async function recordPublic(args: {
     // The model's read of a rant, 1-10; only rants have one.
     rantScore,
     // Readers' "Best rant" votes, and the list's sort key (rants.ts).
-    loves: 0,
-    rantRank: rantRank({ loves: 0, rantScore, imported }),
+    loves,
+    rantRank: rantRank({ loves, rantScore, imported }),
+    ...(editing
+      ? {
+          easy: (editing.get('easy') as number | undefined) ?? 0,
+          editedAt: FieldValue.serverTimestamp(),
+        }
+      : {}),
     // Peppers. The rewrite is the calm version.
     spice: useRewrite ? 1 : Math.max(1, Math.min(5, Math.round(result.spice ?? 1))),
     actionability: result.actionability,
     photos,
     // Details the author adds after posting (details.ts).
-    details: [],
+    details: editing ? ((editing.get('details') as string[] | undefined) ?? []) : [],
     source: source ?? null,
     removed: false,
-    createdAt: source ? source.date : FieldValue.serverTimestamp(),
+    createdAt,
   });
   // Who wrote it stays server-side: for deleting an account and for
   // suspending an abusive one, never shown.
@@ -921,7 +933,7 @@ export async function recordPublic(args: {
     authorId: authorIdOf(uid),
     authorName: displayName,
     imported,
-    createdAt: source ? source.date : FieldValue.serverTimestamp(),
+    createdAt,
     said,
   });
   // The author's own index of what they posted, with what the model thought
@@ -929,10 +941,15 @@ export async function recordPublic(args: {
   // Two points saying the same thing: nominated for the operator to merge (duplicates.ts).
   if (!imported) await flagDuplicates(db, [...addedPointIds, ...matchedPointIds]);
   if (!imported) {
-    await db.doc(`users/${uid}/mine/${submission.id}`).set({
-      at: FieldValue.serverTimestamp(),
-      missing: useRewrite ? [] : (result.missing ?? []).slice(0, 3),
-    });
+    const mine = db.doc(`users/${uid}/mine/${submission.id}`);
+    const dismissed = editing ? (((await mine.get()).get('dismissed') as string[] | undefined) ?? []) : [];
+    await mine.set(
+      {
+        at: FieldValue.serverTimestamp(),
+        missing: useRewrite ? [] : (result.missing ?? []).filter((m) => !dismissed.includes(m)).slice(0, 3),
+      },
+      { merge: true },
+    );
   }
   return { submissionId: submission.id, matchedPointIds, addedPointIds };
 }
@@ -970,7 +987,7 @@ export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
   if ((draft.result.spice ?? 1) >= 5) {
     throw new HttpsError('failed-precondition', draft.result.spiceReason ?? 'Too spicy: the name-calling has to go.');
   }
-  // Editing a posted complaint: the new version goes up, then the old one comes off.
+  // Editing a posted complaint: the new words go onto the same complaint.
   const replaces =
     typeof req.data?.replaces === 'string' && /^[\w-]{1,128}$/.test(req.data.replaces) ? req.data.replaces : '';
   if (replaces) await assertAuthor(uid, replaces, 'edit');
@@ -978,20 +995,25 @@ export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
     if (replaces) throw new HttpsError('invalid-argument', 'An edited complaint stays public. Delete it to send it privately.');
     return submitPrivate(req, { draftRef: draftSnap.ref, ...draft, displayName: user.displayName });
   }
+  const before = replaces ? await db.doc(`submissions/${replaces}`).get() : undefined;
   const res = await recordPublic({
     uid,
     displayName: user.displayName,
     responderFor: user.responderFor,
     draft,
     options: publicOptions(req.data, draft.result),
+    editing: before,
   });
   await draftSnap.ref.delete();
-  if (replaces) {
-    await withdrawComplaint(uid, replaces, {
-      submissionId: res.submissionId,
-      pointIds: [...res.matchedPointIds, ...res.addedPointIds],
-      authorName: user.displayName,
-    });
+  if (before) {
+    // Recorded again on top of itself: take back the first recording, keeping
+    // whatever the new words still raise (account.ts).
+    await unrecordPoints(
+      uid,
+      before.id,
+      { pointIds: pointIdsOf(before), isRant: before.get('tone') === 'rant' },
+      [...res.matchedPointIds, ...res.addedPointIds],
+    );
   }
   return res;
 });

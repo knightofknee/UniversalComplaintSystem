@@ -202,7 +202,7 @@ export function Composer({ home }: { home?: boolean }) {
     subjectId?: string;
     subjectName?: string;
     draft?: string;
-    /** Editing one of your posted complaints: it opens here, and posting replaces it. */
+    /** Editing one of your posted complaints: it opens here, and posting changes it in place. */
     edit?: string;
   }>();
   const editing = params.edit;
@@ -531,7 +531,7 @@ export function Composer({ home }: { home?: boolean }) {
         setCelebrate({
           submissionId: res.submissionId,
           detail: editing
-            ? "Your changes are up. Its photos and support came along."
+            ? "Your edit is up. Its votes, photos and support are all still there."
             : most > 0
               ? `You're with ${shortCount(most)} ${most === 1 ? "other person" : "other people"} who have this too.`
               : kept.length > 1
@@ -750,7 +750,9 @@ export function Composer({ home }: { home?: boolean }) {
               ? `Send to ${privateName}`
               : keptCount === 0
                 ? "Nothing to post"
-                : "Post it"
+                : editing
+                  ? "Save changes"
+                  : "Post it"
           }
           icon={isPrivate ? "lock-closed" : "megaphone"}
           onPress={() => post(analysis!)}
@@ -794,7 +796,7 @@ export function Composer({ home }: { home?: boolean }) {
           {top}
           {editing && (
             <Chip
-              label="Editing your complaint · posting replaces it"
+              label="Editing your complaint"
               color={theme.primary}
               bg={theme.primarySoft}
             />

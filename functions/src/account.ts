@@ -188,52 +188,48 @@ export async function assertAuthor(uid: string, id: string, doing: 'delete' | 'e
   if (!sub.exists || sub.get('removed')) throw new HttpsError('not-found', 'That complaint is gone.');
 }
 
-/**
- * Takes a complaint off the record (see deleteComplaint). Editing is a
- * repost: the new version is recorded first, then the old one comes off
- * here with `successor` set. On the issues the new version also raises, the
- * old one's support and headline credit pass to it rather than being
- * withdrawn (the person still has the issue), and its photos go with it.
- */
-export async function withdrawComplaint(
-  uid: string,
-  id: string,
-  successor?: { submissionId: string; pointIds: string[]; authorName: string },
-) {
-  const ref = db.doc(`submissions/${id}`);
-  const sub = await ref.get();
-  if (!sub.exists) throw new HttpsError('not-found', 'That complaint is gone.');
-  const isRant = sub.get('tone') === 'rant';
-  const pointIds = [
+/** The issues a complaint raised, as stored on it. */
+export function pointIdsOf(sub: FirebaseFirestore.DocumentSnapshot): string[] {
+  return [
     ...new Set([
       ...((sub.get('addedPointIds') as string[] | undefined) ?? []),
       ...((sub.get('matchedPointIds') as string[] | undefined) ?? []),
     ]),
   ];
-  for (const pid of pointIds) {
+}
+
+/**
+ * Takes back what a complaint did to the issues it raised: the count it
+ * added, the support it gave, an issue that existed only because of it.
+ *
+ * Editing records the new wording onto the SAME complaint first (intake.ts,
+ * `recordPublic` with `editing`), then calls this with the old issues and
+ * `still`, the ones the new wording raises too: on those the support,
+ * statement and headline credit simply stay, and only the extra count the
+ * re-recording added comes off. Issues it no longer raises lose it as if
+ * it were deleted.
+ */
+export async function unrecordPoints(
+  uid: string,
+  id: string,
+  old: { pointIds: string[]; isRant: boolean },
+  still?: string[],
+) {
+  for (const pid of old.pointIds) {
     const pointRef = db.doc(`points/${pid}`);
     const point = await pointRef.get();
     if (!point.exists) continue;
     const subjectIds = (point.get('subjectIds') as string[] | undefined) ?? [];
     const update: Record<string, unknown> = {
       submissionCount: FieldValue.increment(-1),
-      ...(isRant ? { rantCount: FieldValue.increment(-1) } : {}),
+      ...(old.isRant ? { rantCount: FieldValue.increment(-1) } : {}),
     };
-    // The support this complaint gave (not support given separately with the arrow).
-    const support = await pointRef.collection('supports').doc(uid).get();
-    const carried = !!successor?.pointIds.includes(pid);
-    if (carried) {
-      // The new version raises it too: its support stays, now the new one's.
-      if (support.exists && support.get('submissionId') === id) {
-        await support.ref.update({ submissionId: successor!.submissionId });
-      }
-      if (point.get('canonical.submissionId') === id) {
-        update['canonical.submissionId'] = successor!.submissionId;
-        update['canonical.authorName'] = successor!.authorName;
-      }
+    if (still?.includes(pid)) {
       await pointRef.update(update);
       continue;
     }
+    // The support this complaint gave (not support given separately with the arrow).
+    const support = await pointRef.collection('supports').doc(uid).get();
     if (support.exists && support.get('submissionId') === id) {
       const recent = Date.now() - ((support.get('at') as Timestamp | undefined)?.toMillis() ?? 0) < WEEK_MS;
       update.supportCount = FieldValue.increment(-1);
@@ -253,27 +249,21 @@ export async function withdrawComplaint(
       for (const sid of subjectIds) {
         await db.doc(`subjects/${sid}`).update({ 'stats.points': FieldValue.increment(-1) }).catch(() => {});
       }
-    } else if (point.get('canonical.submissionId') === id) {
+    } else if (point.get('canonical.submissionId') === id && !still) {
       update['canonical.authorName'] = DELETED;
     }
     await pointRef.update(update);
+    // Edited away from this issue: what it said about it goes too.
+    if (still) await pointRef.collection('statements').doc(id).delete().catch(() => {});
   }
-  // Edited: the photos were already checked when first posted, so they move to the new version.
-  const photos = (sub.get('photos') as string[] | undefined) ?? [];
-  if (successor && photos.length) {
-    const next = db.doc(`submissions/${successor.submissionId}`);
-    const have = ((await next.get()).get('photos') as string[] | undefined) ?? [];
-    const moved: string[] = [];
-    for (const p of photos.slice(0, Math.max(0, 4 - have.length))) {
-      const dest = `public/${successor.submissionId}/${have.length + moved.length}.jpg`;
-      await bucket()
-        .file(p)
-        .copy(bucket().file(dest))
-        .then(() => moved.push(dest))
-        .catch(() => {});
-    }
-    if (moved.length) await next.update({ photos: [...have, ...moved] });
-  }
+}
+
+/** Takes a complaint off the record (see deleteComplaint). */
+export async function withdrawComplaint(uid: string, id: string) {
+  const ref = db.doc(`submissions/${id}`);
+  const sub = await ref.get();
+  if (!sub.exists) throw new HttpsError('not-found', 'That complaint is gone.');
+  await unrecordPoints(uid, id, { pointIds: pointIdsOf(sub), isRant: sub.get('tone') === 'rant' });
   await ref.update({
     text: '[deleted]',
     englishText: null,

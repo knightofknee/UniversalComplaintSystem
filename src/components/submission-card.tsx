@@ -338,7 +338,10 @@ export function SubmissionCard({ s }: { s: Submission }) {
         <T variant="small" style={{ fontWeight: '700' }}>
           {s.authorName}
         </T>
-        <T variant="small">{timeAgo(s.createdAt?.toMillis())}</T>
+        <T variant="small">
+          {timeAgo(s.createdAt?.toMillis())}
+          {s.editedAt ? ' · edited' : ''}
+        </T>
         {own && <Chip label="Yours" color={theme.primary} bg={theme.primarySoft} />}
         {source && (
           <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />

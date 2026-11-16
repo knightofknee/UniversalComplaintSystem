@@ -74,6 +74,8 @@ export type Subject = {
 export type Submission = {
   id: string;
   authorName: string;
+  /** Set when its author changed the words after posting (same complaint, votes kept). */
+  editedAt?: Timestamp | null;
   /** Opaque and stable per author: lets a reader hide one author (Block). */
   authorId?: string;
   /** Imported from a public government record. */

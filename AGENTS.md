@@ -250,14 +250,17 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   user, in all cases"): the pencil and bin icons on their own card, which
   is theirs by `authorId` OR by their `users/{uid}/mine/{id}` index. Delete
   (`deleteComplaint` -> `withdrawComplaint`, account.ts): its support is
-  withdrawn and a point that was its alone goes too. Edit opens it in the
-  box (`/complain?edit=<id>`, "Editing your complaint · posting replaces
-  it"), goes through Next as usual (its own issues read "Already yours", no
-  private option), and `submitComplaint({replaces})` records the new
-  version FIRST, then withdraws the old one with a successor: on issues the
-  new version also raises, support and headline credit pass to it instead
-  of being withdrawn, and its photos move over. Votes on the old wording
-  (Best rant, Easy peasy) do not carry. A point's followers are told when others join,
+  withdrawn and a point that was its alone goes too. AN EDIT CHANGES THE
+  POST, IT IS NEVER A NEW ONE (the user: "we are editing a post. we arent
+  posting a new one"): same id and link, same date, its Best rant / Easy
+  peasy votes, photos and added details all stay; the card says "edited"
+  (`editedAt`). It opens in the box (`/complain?edit=<id>`, "Editing your
+  complaint"), goes through Next as usual (its own issues read "Already
+  yours", no private option, the button says "Save changes"), and
+  `submitComplaint({replaces})` records the new words onto the same
+  document (`recordPublic` with `editing`), then `unrecordPoints` takes
+  back the first recording, keeping whatever the new words still raise.
+  A point's followers are told when others join,
   at milestones only (`announceJoin`, points.ts). Lists page with "Show
   more"; photos open full size; the Me tab carries an unread badge.
 - Company dashboard (src/app/company/index.tsx): `Summary` works out, from
