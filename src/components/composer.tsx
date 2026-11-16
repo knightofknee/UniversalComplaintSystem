@@ -1094,13 +1094,32 @@ function Page({
 function Peppers({ n, size = 16 }: { n: number; size?: number }) {
   return (
     <View
-      style={{ flexDirection: "row", alignItems: "center", gap: 1 }}
+      style={{ flexDirection: "row", alignItems: "center", flexShrink: 0 }}
       accessibilityLabel={`${n} of 5 peppers`}
     >
+      {/* Each pepper in a fixed cell: a device that draws the emoji wide (or
+          as a missing-glyph box) can never push Rudy's line out of the row. */}
       {[1, 2, 3, 4, 5].map((i) => (
-        <Text key={i} style={{ fontSize: size, opacity: i <= n ? 1 : 0.18 }}>
-          🌶️
-        </Text>
+        <View
+          key={i}
+          style={{
+            width: size * 1.25,
+            height: size * 1.4,
+            alignItems: "center",
+            overflow: "hidden",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: size,
+              lineHeight: size * 1.35,
+              opacity: i <= n ? 1 : 0.18,
+            }}
+            numberOfLines={1}
+          >
+            🌶️
+          </Text>
+        </View>
       ))}
     </View>
   );
