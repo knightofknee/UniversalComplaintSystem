@@ -760,7 +760,7 @@ export function Composer({ home }: { home?: boolean }) {
                 <Rudy spice={read.spice} dancing={busy} />
                 <Peppers n={read.spice} size={13} />
                 <Text
-                  numberOfLines={2}
+                  numberOfLines={3}
                   style={{
                     flex: 1,
                     fontSize: 13,

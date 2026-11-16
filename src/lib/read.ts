@@ -152,14 +152,20 @@ export function readComplaint(raw: string): Read {
   const fix = FIX.test(text);
   const hotHeaded = spice >= 3;
 
+  // Rudy's line. The goals above it name who / what happened in a word; for
+  // those he says the longer version, and why it helps. His other lines stay
+  // as they are.
   let nudge: string;
   if (overLine) nudge = 'Swear all you want. Calling people names gets it sent back.';
   else if (CARD.test(text)) nudge = 'If that is a card number, take it out. It would be removed anyway.';
   else if (words < MIN_WORDS) nudge = 'Keep going';
-  else if (kind) nudge = hotHeaded ? `We hear you. Which ${kind}?` : `Which ${kind}? Name it.`;
-  else if (person) nudge = `Which ${person}? A first name is fine.`;
-  else if (vague) nudge = 'Name the target of your complaint.';
-  else if (!what) nudge = 'Keep going';
+  else if (kind)
+    nudge = hotHeaded
+      ? `We hear you. Which ${kind}? Name it so the right people see it and can answer for it.`
+      : `Which ${kind}? Name it so it lands with the people who can fix it.`;
+  else if (person) nudge = `Which ${person}? A first name is fine, and people who know them will know.`;
+  else if (vague) nudge = 'Name the target of your complaint: the company, the place or the person, so it lands somewhere.';
+  else if (!what) nudge = 'Keep going, tell me what happened';
   else if (!fix && hotHeaded) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';
   else if (product) nudge = `Which ${product}? The make and model help, if you know them.`;
