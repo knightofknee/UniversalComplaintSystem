@@ -4,7 +4,7 @@ export default function TermsScreen() {
   return (
     <LegalPage
       title="Terms of use"
-      updated="November 5, 2026"
+      updated="November 15, 2026"
       sections={[
         {
           heading: 'What UCS is (and isn\'t)',
@@ -23,7 +23,7 @@ export default function TermsScreen() {
           heading: 'What you can post',
           body: [
             'Complain about organizations, products, services, public bodies, and things. Be honest and specific: say what happened, not what you imagine.',
-            'Do not: name or target private individuals (front-line staff included); post anything illegal, threatening, harassing, hateful, or sexual; post someone else\'s personal data; post spam, ads, or deliberately false claims; impersonate a person or organization; or try to inflate or deflate counts, for example with multiple accounts.',
+            'Do not: go after private individuals (staff may be named by first name for how they treated you, as in any review, but never by full name, with contact details, or over anything outside that encounter); post anything illegal, threatening, harassing, hateful, or sexual; post someone else\'s personal data; post spam, ads, or deliberately false claims; impersonate a person or organization; or try to inflate or deflate counts, for example with multiple accounts.',
             'Rants are welcome. Abuse is not: UCS has zero tolerance for threats, hate, harassment, sexual content, and posts aimed at private people. They are refused before they are posted, removed when reported, and the accounts behind them are suspended.',
             'Anyone can report anything, and hide an author\'s complaints from themselves. Either side of a private conversation can block the other. We review every report within a day.',
           ],

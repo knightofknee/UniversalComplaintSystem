@@ -166,10 +166,9 @@ export function PointCard({
         <T numberOfLines={4} style={{ fontSize: 16, lineHeight: 22 }}>
           {point.text}
         </T>
-        {(meta || point.hot || point.status !== 'open' || note) && (
+        {(meta || point.status !== 'open' || note) && (
           <Row style={{ flexWrap: 'wrap', gap: 6 }}>
             <StatusChip status={point.status} />
-            {point.hot && <Chip label="🔥 rant" color={theme.rant} bg={theme.rantSoft} />}
             {note && <Chip label={note} color={theme.primary} bg={theme.primarySoft} />}
             {meta ? (
               <T variant="small" numberOfLines={1} style={{ flexShrink: 1 }}>

@@ -64,8 +64,18 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   this issue", "New issue · worded by the model"). Under every issue are its
   STATEMENTS: what each complaint said about it, pulled out by the model at
   intake (`said`, in the author's own voice, specifics kept), stored at
-  `points/{id}/statements/{submissionId}` (functions/src/statements.ts) and
-  listed on the issue's page, each opening its complaint. A cause, place,
+  `points/{id}/statements/{submissionId}` (functions/src/statements.ts).
+  Statements are kept but NOT shown (2026-11-15): THE ISSUE PAGE RESPECTS
+  THE COMPLAINTS (the user: "no respect for the complaint"). Its order is
+  title, support, tags, then the complaints themselves as full cards with
+  Best rant / Easy peasy right there (people before records, most voted,
+  newest; 3, then "Show all N complaints"), "I have more to add", org
+  responses, proposed fixes, and only then one line of AI credit ("Issue
+  title set by AI from X's complaint") and, for organizations only, whether
+  they've seen it. Topics never get a "not seen by anyone" line. No "rant"
+  chip on issues (a complaint is a rant, an issue isn't). On a complaint
+  card, report/hide/delete are icons on the author line so the two votes
+  get the full width. A cause, place,
   consequence or detail is never an issue of its own: it goes in the
   statement. The words must say what the thing is (the user: "we should use
   accurate language"): describe what a list shows rather than label it.
@@ -74,6 +84,14 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   complaint (`syncStatements`: renamed, merged, removed, deleted); merging
   issues moves them (`moveStatements`); a re-read with an added detail
   rewrites them.
+- FIRST NAMES STAY (2026-11-15, the user's direction: "let people name and
+  shame for those in the know"). A staff member's first name is not
+  personal data: the model keeps it in the text and in `said`, and
+  complaints naming the same person at the same place raise the same issue
+  there; issue statements never carry the name. Surnames, full names and
+  contact details of private people are still removed, and going after
+  someone's life outside the encounter or accusing them of a crime is
+  unsafe. The terms and privacy pages (app and waldgrave.com) say so.
 - Data model: `subjects` (organization | topic), `points` (atomic things
   wrong; the unit of support, status, response), `submissions` (a person's
   words, kept as written; `matchedPointIds` / `addedPointIds` record what

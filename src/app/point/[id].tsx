@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { showAlert, StatusChip, STATUS_LABEL, SupportButton } from '@/components/point-card';
 import { ReportButton } from '@/components/report';
 import { Solutions } from '@/components/solutions';
-import { Statements } from '@/components/statements';
+import { SubmissionCard } from '@/components/submission-card';
 import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,6 +21,10 @@ import { shareLink } from '@/lib/share';
 import type { OrgStatus, Point, PointStatus, Response, Submission } from '@/lib/types';
 
 const FIX_STATES: PointStatus[] = ['fix_claimed', 'fixed', 'not_fixed'];
+/** Complaints shown before "Show all". */
+const FIRST = 3;
+/** Read at most this many of each kind; an issue with more shows its newest. */
+const READ = 100;
 
 export default function PointScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +36,40 @@ export default function PointScreen() {
     query(collection(db, `points/${id}/responses`), orderBy('createdAt', 'asc')),
     `responses:${id}`,
   );
+  const matched = useCollection<Submission>(
+    query(
+      collection(db, 'submissions'),
+      where('removed', '==', false),
+      where('matchedPointIds', 'array-contains', id),
+      orderBy('createdAt', 'desc'),
+      limit(READ),
+    ),
+    `matched:${id}`,
+  );
+  const added = useCollection<Submission>(
+    query(
+      collection(db, 'submissions'),
+      where('removed', '==', false),
+      where('addedPointIds', 'array-contains', id),
+      orderBy('createdAt', 'desc'),
+      limit(READ),
+    ),
+    `added:${id}`,
+  );
+  // The best first: what people wrote before public records, then the most
+  // voted (Best rant + Easy peasy), then the newest. Hidden authors stay in
+  // the list, folded shut (SubmissionCard).
+  const complaints = useMemo(() => {
+    const byId = new Map([...added.items, ...matched.items].map((x) => [x.id, x]));
+    const votes = (x: Submission) => (x.loves ?? 0) + (x.easy ?? 0);
+    return [...byId.values()].sort(
+      (a, b) =>
+        Number(!!a.source) - Number(!!b.source) ||
+        votes(b) - votes(a) ||
+        (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
+    );
+  }, [added.items, matched.items]);
+  const [shown, setShown] = useState(FIRST);
   const blocked = useBlockedAuthors();
   const { data: headlineFrom } = useDoc<Submission>(point ? `submissions/${point.canonical.submissionId}` : null);
   // A hidden author's name shows nowhere until their complaint is opened, the headline's credit included.
@@ -62,13 +100,20 @@ export default function PointScreen() {
     }
   }, [point, myOrgs]);
 
-  if (!point) return <Screen><Empty loading={loading} text="This issue isn't on the record (or it was removed)." /></Screen>;
+  if (!point)
+    return (
+      <Screen>
+        <Empty loading={loading} text="This issue isn't on the record (or it was removed)." />
+      </Screen>
+    );
 
   const seenCount = Object.keys(point.seenBy ?? {}).length;
   // Only present for organizations that chose to publish their private counts.
   const publishedPrivate = Object.values(point.privateCounts ?? {}).reduce((n, c) => n + c, 0);
   const respondedCount = Object.keys(point.respondedBy ?? {}).length;
   const nameOf = (sid: string) => point.subjectNames[point.subjectIds.indexOf(sid)] ?? 'An organization';
+  // Organizations, not topics: only an organization can see or answer an issue.
+  const orgIds = point.subjectIds.filter((sid) => !(point.topicIds ?? []).includes(sid));
   const fixClaims = Object.entries(point.orgStatus ?? {}).filter(([, s]) => FIX_STATES.includes(s.status));
 
   return (
@@ -91,7 +136,6 @@ export default function PointScreen() {
       <Row style={{ flexWrap: 'wrap' }}>
         <SupportButton pointId={point.id} count={point.supportCount} />
         <StatusChip status={point.status} />
-        {point.hot && <Chip label="🔥 rant" color={theme.rant} bg={theme.rantSoft} />}
       </Row>
       <Row style={{ flexWrap: 'wrap', gap: 6 }}>
         {point.subjectIds.map((sid, i) => (
@@ -106,55 +150,39 @@ export default function PointScreen() {
           </Pressable>
         ))}
       </Row>
-      {Object.entries(point.orgStatus ?? {}).length > 1 && (
-        <Row style={{ flexWrap: 'wrap' }}>
-          {Object.entries(point.orgStatus ?? {}).map(([sid, s]) => (
-            <T key={sid} variant="small">
-              {nameOf(sid)}: {STATUS_LABEL[s.status]}
-            </T>
-          ))}
-        </Row>
-      )}
-      {publishedPrivate > 0 && (
-        <T variant="small">
-          +{publishedPrivate} raised privately (the organization publishes its private counts; what they wrote stays
-          private)
-        </T>
-      )}
-      <Pressable onPress={() => router.push(`/submission/${point.canonical.submissionId}`)} accessibilityRole="link" hitSlop={6}>
-        <T variant="small">
-          {point.canonical.authorName.endsWith('public record') ? 'From the ' : 'Summarized from '}
-          <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
-            {point.canonical.authorName.endsWith('public record')
-              ? point.canonical.authorName
-              : headlineHidden
-                ? 'a complaint you hid'
-                : `${point.canonical.authorName}'s complaint`}
-          </T>{' '}
-          · {point.submissionCount} complaint{point.submissionCount === 1 ? '' : 's'} · first raised{' '}
-          {timeAgo(point.createdAt?.toMillis())}
-        </T>
-      </Pressable>
-      <T variant="small">
-        <T variant="small" color={theme.new} style={{ fontWeight: '700' }}>
-          ✨ Worded by the model
-        </T>{' '}
-        from the complaints that raise it. Below, what each one says about it, also pulled out by the model; tap one to
-        read that complaint as its author wrote it.
-      </T>
-      <T variant="small">
-        {seenCount > 0
-          ? `Seen by ${seenCount === 1 ? 'the organization' : `${seenCount} organizations`}${
-              respondedCount ? ', responded' : ', no response yet'
-            }.`
-          : point.subjectIds.length
-            ? 'Not yet seen by anyone who can respond.'
-            : ''}
-      </T>
 
       {fixClaims.map(([sid, s]) => (
         <FixCheck key={sid} point={point} orgId={sid} orgName={nameOf(sid)} entry={s} uid={user?.uid} />
       ))}
+
+      {complaints.length === 0 ? (
+        <Empty text="" loading={matched.loading || added.loading} />
+      ) : (
+        complaints.slice(0, shown).map((s) => <SubmissionCard key={s.id} s={s} />)
+      )}
+      {complaints.length > shown && (
+        <Button
+          kind="secondary"
+          label={`Show all ${complaints.length >= READ ? `${READ}+` : complaints.length} complaints`}
+          onPress={() => setShown(complaints.length)}
+        />
+      )}
+      <Button
+        kind="secondary"
+        label="I have more to add"
+        icon="add"
+        onPress={() =>
+          router.push({
+            pathname: '/complain',
+            params: point.subjectIds[0]
+              ? {
+                  subjectId: point.subjectIds[0],
+                  subjectName: point.subjectNames[0],
+                }
+              : {},
+          })
+        }
+      />
 
       {responses.items.length > 0 && <T variant="label">Responses</T>}
       {responses.items
@@ -182,15 +210,45 @@ export default function PointScreen() {
 
       <Solutions pointId={point.id} supported={supported} />
 
-      <Statements
-        pointId={point.id}
-        onAdd={() =>
-          router.push({
-            pathname: '/complain',
-            params: point.subjectIds[0] ? { subjectId: point.subjectIds[0], subjectName: point.subjectNames[0] } : {},
-          })
-        }
-      />
+      <Pressable
+        onPress={() => router.push(`/submission/${point.canonical.submissionId}`)}
+        accessibilityRole="link"
+        hitSlop={6}>
+        <T variant="small">
+          ✨ Issue title set by AI from{' '}
+          <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
+            {point.canonical.authorName.endsWith('public record')
+              ? `the ${point.canonical.authorName}`
+              : headlineHidden
+                ? 'a complaint you hid'
+                : `${point.canonical.authorName}'s complaint`}
+          </T>
+          . First raised {timeAgo(point.createdAt?.toMillis())}.
+        </T>
+      </Pressable>
+      {orgIds.length > 0 && (
+        <T variant="small">
+          {seenCount > 0
+            ? `Seen by ${seenCount === 1 ? 'the organization' : `${seenCount} organizations`}${
+                respondedCount ? ', responded' : ', no response yet'
+              }.`
+            : orgIds.length === 1
+              ? `${nameOf(orgIds[0])} hasn't seen it yet.`
+              : 'None of the organizations has seen it yet.'}
+        </T>
+      )}
+      {Object.entries(point.orgStatus ?? {}).length > 1 &&
+        Object.entries(point.orgStatus ?? {}).map(([sid, st]) => (
+          <T key={sid} variant="small">
+            {nameOf(sid)}: {STATUS_LABEL[st.status]}
+          </T>
+        ))}
+      {publishedPrivate > 0 && (
+        <T variant="small">
+          +{publishedPrivate} raised privately (the organization publishes its private counts; what they wrote stays
+          private)
+        </T>
+      )}
       <ReportButton target={{ kind: 'point', id: point.id }} label="Report this issue" />
     </Screen>
   );
@@ -232,7 +290,8 @@ function FixCheck({
   }, [point.id, orgId, uid]);
 
   const claimedAt = entry.fixClaimedAt?.toMillis() ?? 0;
-  const canVote = (supportedAt != null && supportedAt < claimedAt) || Object.keys(point.privateCounts ?? {}).includes(orgId);
+  const canVote =
+    (supportedAt != null && supportedAt < claimedAt) || Object.keys(point.privateCounts ?? {}).includes(orgId);
   const vote = async (fixed: boolean) => {
     setBusy(true);
     try {
@@ -342,5 +401,10 @@ function RespondBox({ point, subjectId, subjectName }: { point: Point; subjectId
 }
 
 const styles = StyleSheet.create({
-  tag: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  tag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
 });

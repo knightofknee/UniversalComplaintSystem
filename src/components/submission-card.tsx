@@ -92,7 +92,12 @@ function CardVote({
     if (!on) {
       tapHaptic();
       scale.setValue(0.94);
-      Animated.spring(scale, { toValue: 1, friction: 3, tension: 240, useNativeDriver: Platform.OS !== 'web' }).start();
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 3,
+        tension: 240,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
     }
     void vote.toggle();
   };
@@ -103,7 +108,11 @@ function CardVote({
         onPress={toggle}
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
-        accessibilityLabel={on ? `You voted ${label}: ${says}. ${shown} so far. Tap to take it back.` : `${label}: ${says}. ${shown} so far.`}
+        accessibilityLabel={
+          on
+            ? `You voted ${label}: ${says}. ${shown} so far. Tap to take it back.`
+            : `${label}: ${says}. ${shown} so far.`
+        }
         style={({ pressed }) => [styles.love, { backgroundColor: on ? color : soft, opacity: pressed ? 0.85 : 1 }]}>
         <Text style={styles.loveEmoji}>{emoji}</Text>
         <Text style={[styles.loveLabel, { color: ink }]} numberOfLines={1}>
@@ -177,7 +186,11 @@ function MissingDetails({ uid, submissionId }: { uid: string; submissionId: stri
   const send = async (item: string, detail?: string) => {
     setBusy(item);
     try {
-      const res = await addDetail({ submissionId, ...(item === OTHER ? {} : { item }), ...(detail ? { text: detail } : {}) });
+      const res = await addDetail({
+        submissionId,
+        ...(item === OTHER ? {} : { item }),
+        ...(detail ? { text: detail } : {}),
+      });
       setAnswering(null);
       setText('');
       // The model read the complaint again with the detail in it.
@@ -322,10 +335,62 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
         </T>
         <T variant="small">{timeAgo(s.createdAt?.toMillis())}</T>
         {own && <Chip label="Yours" color={theme.primary} bg={theme.primarySoft} />}
-        {source && <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />}
+        {source && (
+          <Chip label={`Public record · ${source.shortName}`} color={theme.textSecondary} bg={theme.background} />
+        )}
         {s.tone === 'rant' && <Chip label="🔥 Rant" color={theme.rant} bg={theme.rantSoft} />}
         {addedPoint && <Chip label="Model added this issue from it" color={theme.new} bg={theme.newSoft} />}
         {s.rewritten && <Chip label="Clearer version" color={theme.textSecondary} bg={theme.background} />}
+        <View style={styles.actions}>
+          {source ? (
+            <ReportButton target={{ kind: 'submission', id: s.id }} compact />
+          ) : (
+            <>
+              {own ? (
+                <Pressable
+                  onPress={() =>
+                    confirmDelete(() =>
+                      deleteComplaint({ submissionId: s.id }).then(
+                        () => showToast('Complaint deleted', undefined, 'info'),
+                        (e) => showToast("Couldn't delete it", errorText(e)),
+                      ),
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete this complaint"
+                  hitSlop={6}
+                  style={styles.icon}>
+                  <Ionicons name="trash-outline" size={19} color={theme.textSecondary} />
+                </Pressable>
+              ) : (
+                <ReportButton target={{ kind: 'submission', id: s.id }} compact />
+              )}
+              {user && s.authorId && !own && (
+                <Pressable
+                  onPress={() =>
+                    hidden
+                      ? unblockAuthor(user.uid, s.authorId!).then(
+                          () => showToast(`${s.authorName} is no longer hidden`, undefined, 'info'),
+                          () => showAlert("Couldn't change that"),
+                        )
+                      : confirmHide(s.authorName, () =>
+                          blockAuthor(user.uid, s.authorId!, s.authorName).then(
+                            // Fold it even if it had been opened before.
+                            () => setOpened(false),
+                            () => showAlert("Couldn't hide them"),
+                          ),
+                        )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={hidden ? 'Stop hiding this author' : 'Hide this author'}
+                  hitSlop={6}
+                  style={styles.icon}>
+                  <Ionicons name={hidden ? 'eye-outline' : 'eye-off-outline'} size={19} color={theme.textSecondary} />
+                </Pressable>
+              )}
+            </>
+          )}
+        </View>
       </Row>
       <T>{translated && !original ? s.englishText : s.text}</T>
       {translated && (
@@ -362,54 +427,10 @@ export function SubmissionCard({ s, addedPoint }: { s: Submission; addedPoint?: 
           ))}
         </Row>
       )}
-      {source ? (
-        <ReportButton target={{ kind: 'submission', id: s.id }} />
-      ) : (
-        <Row style={{ gap: 4 }}>
+      {!source && (
+        <Row style={{ gap: 8 }}>
           <BestRantButton submissionId={s.id} count={loves} />
           <EasyPeasyButton submissionId={s.id} count={s.easy ?? 0} own={own} />
-          {own ? (
-            <Pressable
-              onPress={() =>
-                confirmDelete(() =>
-                  deleteComplaint({ submissionId: s.id }).then(
-                    () => showToast('Complaint deleted', undefined, 'info'),
-                    (e) => showToast("Couldn't delete it", errorText(e)),
-                  ),
-                )
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Delete this complaint"
-              hitSlop={6}
-              style={styles.icon}>
-              <Ionicons name="trash-outline" size={19} color={theme.textSecondary} />
-            </Pressable>
-          ) : (
-            <ReportButton target={{ kind: 'submission', id: s.id }} compact />
-          )}
-          {user && s.authorId && !own && (
-            <Pressable
-              onPress={() =>
-                hidden
-                  ? unblockAuthor(user.uid, s.authorId!).then(
-                      () => showToast(`${s.authorName} is no longer hidden`, undefined, 'info'),
-                      () => showAlert("Couldn't change that"),
-                    )
-                  : confirmHide(s.authorName, () =>
-                      blockAuthor(user.uid, s.authorId!, s.authorName).then(
-                        // Fold it even if it had been opened before.
-                        () => setOpened(false),
-                        () => showAlert("Couldn't hide them"),
-                      ),
-                    )
-              }
-              accessibilityRole="button"
-              accessibilityLabel={hidden ? 'Stop hiding this author' : 'Hide this author'}
-              hitSlop={6}
-              style={styles.icon}>
-              <Ionicons name={hidden ? 'eye-outline' : 'eye-off-outline'} size={19} color={theme.textSecondary} />
-            </Pressable>
-          )}
         </Row>
       )}
     </Card>
@@ -430,10 +451,26 @@ const styles = StyleSheet.create({
   loveLabel: { fontFamily: Fonts.bold, fontSize: 15, flexShrink: 1 },
   loveCount: { fontFamily: Fonts.medium, fontSize: 15 },
   icon: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
+  actions: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto', marginVertical: -12, marginRight: -10 },
   missing: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
-  missingRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },
-  dismiss: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center' },
+  missingRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  dismiss: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    justifyContent: 'center',
+  },
   viewerImage: { width: '100%', height: '100%' },
   folded: {
     flexDirection: 'row',
