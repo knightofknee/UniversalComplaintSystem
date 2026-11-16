@@ -78,6 +78,12 @@ const CHECKS: Check[] = [
   { text: 'the hedge by the path is prickly and overgrown', want: (r) => r.spice < 5, why: 'prickly' },
   { text: 'the self checkout never works when i go there', want: (r) => r.spice === 1, why: '"never" is how often, not anger' },
   { text: 'a b', want: says(/^Keep going/), why: 'too short for anything else' },
+  // People: a first name is all it takes, and a person's action is a complaint like any other.
+  { text: 'my friend missed the goal from two feet away.', want: says(/Which friend\? A first name is fine/), why: 'an unnamed person' },
+  { text: "Brian's shot on goal could've been better.", want: (r) => r.goals.who && r.goals.what && r.goals.better, why: 'a named person, what happened, what could be better' },
+  { text: 'the coach benched Maria for no reason, she should play.', want: (r) => r.goals.who, why: 'named, so the coach needs no name' },
+  { text: 'Comcast charged me twice this month.', want: (r) => r.goals.who && r.goals.what && !r.goals.better, why: 'goals tick separately' },
+  { text: 'a b', want: (r) => r.nudge === 'Keep going', why: 'no period after Keep going' },
   { text: 'Comcast charged me twice this month', want: says(/^Keep going/), why: 'never interrupts mid-sentence' },
   { text: 'Comcast charged me twice this month.', want: says(/make it right/), why: 'a finished sentence gets the next question' },
   { text: 'Mi banco me cobró una comisión que nadie me explicó', want: (r) => r.quiet, why: 'not English: say nothing' },

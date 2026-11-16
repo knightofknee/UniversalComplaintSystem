@@ -133,6 +133,21 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   mounts only after the fonts load (tab labels measured in the fallback
   face truncate). Next runs the model and the review replaces the box on
   the same route; nothing posts until "Post it".
+  GOALS (2026-11-15, the user's direction: "set tangible goals for making
+  anything into something with the minimal structure needed"): above
+  Rudy's line, three goals tick off as they type: Who, What happened,
+  Better how (`read.goals`). Rudy's line asks for the next one missing,
+  including "Which friend? A first name is fine." for an unnamed person.
+  "Keep going" has no period. EVERY COMPLAINT IS TAKEN SERIOUSLY AND AT ITS
+  WORD, a friend's shot on goal included: the issue is what the author said
+  could be better, never a bigger cause they gestured at; a person's first
+  name may stay in the issue statement ("Brian's shots on goal could be
+  more accurate", every Brian pooled), never as a subject.
+  RUDY DANCES while Next is working (rocks and bobs, beaming).
+  BACK (2026-11-15): every move through the flow (Next, Edit, Edit it
+  first, using an alternative) is remembered; a Back pill beside the menu
+  walks it in reverse, restoring the text AND its check with no new model
+  call (each check has its own draft). History clears on reset/post.
   Spice (2026-11-07): every complaint gets 1-5 peppers for how heated the
   LANGUAGE is (not the problem): on-device guess while typing
   (src/lib/read.ts, name-calling regex = 5), the model's `spice` is final.
@@ -421,6 +436,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     blank to fill in: the prompt forbids it and `hasPlaceholder`
     (functions/src/ai.ts) drops any that slips through. Never call it
     "sharper"; the option reads "Post this wording instead" / "Edit it first".
+    A SUGGESTION, NEVER A CLEANUP (2026-11-15, the user's direction): the
+    rewrite only restructures the logic (what happened, why it's wrong,
+    what should change) and keeps the author's words, swearing and heat;
+    if the only change would be tone or word choice it is null. Over-the-
+    line alternatives change only the words that crossed the line.
 - Appearance (2026-11-06): DARK is the default, chosen by the app, not the
   phone (src/lib/appearance.ts; Me > Appearance: Dark / Light / Match phone,
   saved per device). Native: `Appearance.setColorScheme`, so the tab bar,

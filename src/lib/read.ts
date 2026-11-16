@@ -25,6 +25,11 @@ export type Read = {
   what: boolean;
   when: boolean;
   fix: boolean;
+  /**
+   * The three things every complaint needs at minimum, shown as goals that
+   * tick off while typing: who is involved, what happened, what could be better.
+   */
+  goals: { who: boolean; what: boolean; better: boolean };
   /** One productive nudge toward the missing piece. */
   nudge: string;
   /** Not English as far as we can tell: show nothing rather than guess. The model reads any language at Next. */
@@ -65,6 +70,9 @@ const PRODUCT =
 const MAKE_OR_MODEL =
   /\b(apple|iphone|ipad|macbook|imac|mac|samsung|galaxy|pixel|dell|hp|lenovo|thinkpad|asus|acer|msi|surface|microsoft|sony|lg|vizio|tcl|roku|bose|canon|epson|brother|netgear|toyota|honda|ford|chevy|chevrolet|tesla|nissan|hyundai|kia|subaru|bmw|jeep|whirlpool|maytag|bosch|ge|kitchenaid|frigidaire|dyson|shark|roomba|nest|ring|garmin|fitbit|playstation|ps[45]|xbox|switch|nintendo|keurig|ninja|instant pot)\b|\b(?=[a-z-]*\d)(?=\d*[a-z])[a-z0-9-]{2,}\b/i;
 
+/** A person with no name on them: "my friend", "the coach". A first name is all it takes. */
+const PERSON_KIND =
+  /\b(?:my|our|this|that|the)\s+(friend|buddy|roommate|coworker|co-worker|boss|manager|neighbou?r|brother|sister|husband|wife|boyfriend|girlfriend|partner|teammate|kid|son|daughter|dad|mom|mum|teacher|coach|landlord|tenant|ex)\b/i;
 /** Opens on someone unnamed: "They charged me twice", "I hate them". */
 const VAGUE_LEAD = /^(?:\W*[\w'’]+\W+){0,2}(?:they|them|their|theirs|he|she|him)\b/i;
 /** Capitalized only because they start a sentence. */
@@ -98,7 +106,7 @@ const IMPERATIVE =
 /** What would make it right: a wish, a "should", or an instruction to them. */
 const FIX = new RegExp(
   "\\b(?:should|shouldn['’]?t|ought|needs? to|has to|have to|must|want|wish|i['’]?d like|would like|please|expect|instead|bring back|put back|refund|replace|fix|" +
-    'would be (?:nice|better|great|good)|better if|why (?:can[\'’]?t|not|don[\'’]?t|doesn[\'’]?t)|how about|they could|let (?:me|us|people)|give (?:me|us) back|my money back)\\b|' +
+    'would be (?:nice|better|great|good)|could(?: have|[\'’]ve) been better|could be better|better if|why (?:can[\'’]?t|not|don[\'’]?t|doesn[\'’]?t)|how about|they could|let (?:me|us|people)|give (?:me|us) back|my money back)\\b|' +
     // An instruction opening a clause: "Refund it.", "..., show the full price up front".
     `(?:^|[.,;:!?]\\s+)(?:just\\s+|please\\s+|and\\s+)?(?:${IMPERATIVE})\\b`,
   'i',
@@ -132,8 +140,9 @@ export function readComplaint(raw: string): Read {
   // The target is missing only when the text itself shows it: an unnamed
   // kind of organization, or it opens on "they". A topic needs no name.
   const kind = named ? null : (ORG_KIND.exec(text)?.[1].toLowerCase() ?? null);
-  const vague = !named && !kind && VAGUE_LEAD.test(text);
-  const who = !kind && !vague;
+  const person = named || kind ? null : (PERSON_KIND.exec(text)?.[1].toLowerCase() ?? null);
+  const vague = !named && !kind && !person && VAGUE_LEAD.test(text);
+  const who = !kind && !vague && !person;
   // Their own product with nothing saying which one. Recommended, never required.
   const product = named || MAKE_OR_MODEL.test(text) ? null : (PRODUCT.exec(text)?.[1].toLowerCase() ?? null);
   // Enough said to ask the next question: a finished sentence, or eight words. Never mid-thought.
@@ -146,10 +155,11 @@ export function readComplaint(raw: string): Read {
   let nudge: string;
   if (overLine) nudge = 'Swear all you want. Calling people names gets it sent back.';
   else if (CARD.test(text)) nudge = 'If that is a card number, take it out. It would be removed anyway.';
-  else if (words < MIN_WORDS) nudge = 'Keep going.';
+  else if (words < MIN_WORDS) nudge = 'Keep going';
   else if (kind) nudge = hotHeaded ? `We hear you. Which ${kind}?` : `Which ${kind}? Name it.`;
+  else if (person) nudge = `Which ${person}? A first name is fine.`;
   else if (vague) nudge = 'Name the target of your complaint.';
-  else if (!what) nudge = 'Keep going.';
+  else if (!what) nudge = 'Keep going';
   else if (!fix && hotHeaded) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';
   else if (product) nudge = `Which ${product}? The make and model help, if you know them.`;
@@ -157,5 +167,6 @@ export function readComplaint(raw: string): Read {
   else if (words >= 120) nudge = 'Long ones get skimmed. Lead with the main thing.';
   else nudge = hotHeaded ? 'Spicy and fixable. The best kind. Hit Next.' : 'Someone can act on that. Hit Next.';
 
-  return { words, spice, spiceLabel: SPICE_LABELS[spice], overLine, who, product, what, when, fix, nudge, quiet };
+  const goals = { who, what, better: fix };
+  return { words, spice, spiceLabel: SPICE_LABELS[spice], overLine, who, product, what, when, fix, goals, nudge, quiet };
 }

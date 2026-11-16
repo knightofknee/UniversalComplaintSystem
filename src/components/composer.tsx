@@ -15,6 +15,8 @@ import {
 import {
   ActionSheetIOS,
   ActivityIndicator,
+  Animated,
+  Easing,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -55,6 +57,11 @@ import { MIN_WORDS, SPICE_LABELS, readComplaint } from "@/lib/read";
 import type { Analysis } from "@/lib/types";
 
 const MAX_PHOTOS = 4;
+/** How far back the Back button goes. */
+const HISTORY = 30;
+
+/** One place in the flow to come back to: what was written, and the check of it if it had been checked. */
+type Snapshot = { text: string; analysis: Analysis | null };
 
 type Photo = { uri: string; path: string | null };
 /** The unfinished complaint in the main box, while the app is open. */
@@ -129,9 +136,16 @@ function useKeyboard(
         const top = e.endCoordinates.screenY;
         const apply = (bottom: number) => {
           const overlap = Math.max(0, Math.round(bottom - top));
-          if (expectOpen && ios && overlap > 100 && overlap !== rememberedOverlap) {
+          if (
+            expectOpen &&
+            ios &&
+            overlap > 100 &&
+            overlap !== rememberedOverlap
+          ) {
             rememberedOverlap = overlap;
-            void AsyncStorage.setItem(KEYBOARD_KEY, String(overlap)).catch(() => {});
+            void AsyncStorage.setItem(KEYBOARD_KEY, String(overlap)).catch(
+              () => {},
+            );
           }
           setState((was) => {
             // Already laid out for it: nothing moves.
@@ -196,6 +210,11 @@ export function Composer({ home }: { home?: boolean }) {
   const [photoMenu, setPhotoMenu] = useState(false);
   const [focused, setFocused] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "write" });
+  // Every move through the flow (Next, Edit, trying a suggested wording) is
+  // remembered, so Back walks it in reverse: try things, see what the model
+  // makes of them, and return to what you first wrote, its check included,
+  // with no new model call (each check keeps its own draft on the server).
+  const [history, setHistory] = useState<Snapshot[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removePII, setRemovePII] = useState(true);
@@ -253,7 +272,10 @@ export function Composer({ home }: { home?: boolean }) {
         setError("Camera access is off. Allow it in Settings to take a photo.");
         return;
       }
-      const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 });
+      const shot = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+      });
       if (shot.canceled) return;
       await ingest(shot.assets[0].uri);
       return;
@@ -273,7 +295,10 @@ export function Composer({ home }: { home?: boolean }) {
     if (Platform.OS === "web") return void addPhoto("library");
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["Take Photo", "Choose from Library", "Cancel"], cancelButtonIndex: 2 },
+        {
+          options: ["Take Photo", "Choose from Library", "Cancel"],
+          cancelButtonIndex: 2,
+        },
         (i) => {
           if (i === 0) void addPhoto("camera");
           if (i === 1) void addPhoto("library");
@@ -293,6 +318,34 @@ export function Composer({ home }: { home?: boolean }) {
     setVisibility("public");
     setPrivateTo(analysis.subjects.findIndex((s) => s.kind === "organization"));
     setStep({ kind: "review", analysis });
+  };
+
+  /** Remember where the flow is now, before moving on. */
+  const remember = () => {
+    const here: Snapshot = {
+      text,
+      analysis: step.kind === "review" ? step.analysis : null,
+    };
+    setHistory((h) => {
+      const last = h[h.length - 1];
+      if (last && last.text === here.text && last.analysis === here.analysis)
+        return h;
+      return [...h, here].slice(-HISTORY);
+    });
+  };
+  const goBack = () => {
+    const last = history[history.length - 1];
+    if (!last) return;
+    setHistory((h) => h.slice(0, -1));
+    setError(null);
+    setText(last.text);
+    if (last.analysis) review(last.analysis);
+    else setStep({ kind: "write" });
+  };
+  /** Back to the box to change what was written. */
+  const edit = () => {
+    remember();
+    setStep({ kind: "write" });
   };
 
   // A queued complaint that has since been checked (from its notification).
@@ -326,6 +379,7 @@ export function Composer({ home }: { home?: boolean }) {
         void offerPush("posted", !!profile?.pushOn);
         return;
       }
+      remember();
       review(res);
     } catch (e) {
       setError(errorText(e));
@@ -335,6 +389,7 @@ export function Composer({ home }: { home?: boolean }) {
   };
 
   const reset = () => {
+    setHistory([]);
     setText("");
     setPhotos([]);
     setError(null);
@@ -413,21 +468,42 @@ export function Composer({ home }: { home?: boolean }) {
   // The menu button always lands on the Complaints tab, whichever tab was open before.
   const leave = () => leaveTo("browse");
 
-  // The main screen carries nothing but the box: a menu button out, a way to get help.
-  const top = home ? (
-    <Row style={{ justifyContent: "space-between", marginHorizontal: -6 }}>
+  const back =
+    history.length > 0 ? (
       <Pressable
-        onPress={leave}
+        onPress={goBack}
         accessibilityRole="button"
-        accessibilityLabel="Everything else: complaints, search, your account"
+        accessibilityLabel="Back to your last version"
         hitSlop={8}
         style={({ pressed }) => [
-          styles.help,
+          styles.back,
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Ionicons name="menu" size={26} color={theme.textSecondary} />
+        <Ionicons name="arrow-back" size={20} color={theme.text} />
+        <Text style={[styles.backText, { color: theme.text }]}>Back</Text>
       </Pressable>
+    ) : null;
+
+  // The main screen carries nothing but the box: a menu button out, a way to
+  // get help, and Back once there is somewhere to go back to.
+  const top = home ? (
+    <Row style={{ justifyContent: "space-between", marginHorizontal: -6 }}>
+      <Row style={{ gap: 8 }}>
+        <Pressable
+          onPress={leave}
+          accessibilityRole="button"
+          accessibilityLabel="Everything else: complaints, search, your account"
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.help,
+            { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="menu" size={26} color={theme.textSecondary} />
+        </Pressable>
+        {back}
+      </Row>
       <Pressable
         onPress={() => router.push("/help")}
         accessibilityRole="button"
@@ -438,10 +514,16 @@ export function Composer({ home }: { home?: boolean }) {
           { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
         ]}
       >
-        <Ionicons name="help-circle-outline" size={26} color={theme.textSecondary} />
+        <Ionicons
+          name="help-circle-outline"
+          size={26}
+          color={theme.textSecondary}
+        />
       </Pressable>
     </Row>
-  ) : null;
+  ) : (
+    back && <Row>{back}</Row>
+  );
 
   // ---- After posting -------------------------------------------------------
   if (step.kind === "queued" || step.kind === "sent") {
@@ -504,11 +586,7 @@ export function Composer({ home }: { home?: boolean }) {
           onPress={reset}
         />
         {home && (
-          <Button
-            label="See all complaints"
-            kind="quiet"
-            onPress={leave}
-          />
+          <Button label="See all complaints" kind="quiet" onPress={leave} />
         )}
       </Page>
     );
@@ -537,11 +615,7 @@ export function Composer({ home }: { home?: boolean }) {
 
   const bar = reviewing ? (
     blocked ? (
-      <Button
-        label="Edit it"
-        kind="secondary"
-        onPress={() => setStep({ kind: "write" })}
-      />
+      <Button label="Edit it" kind="secondary" onPress={edit} />
     ) : (
       <>
         <TermsCheck checked={agreed} onChange={setAgreed} compact />
@@ -669,21 +743,21 @@ export function Composer({ home }: { home?: boolean }) {
                 </Text>
                 <Ionicons name="close" size={15} color={theme.textSecondary} />
                 <View
-                  style={[styles.bubbleTail, { backgroundColor: theme.rantSoft }]}
+                  style={[
+                    styles.bubbleTail,
+                    { backgroundColor: theme.rantSoft },
+                  ]}
                 />
               </Pressable>
             )}
-            {read.words > 0 && !read.quiet && (
-              <View
-                style={styles.live}
-                accessibilityLiveRegion="polite"
-              >
-                {/* Rudy: his face follows the peppers, beaming at one, crying at five. */}
-                <Image
-                  source={rudyFace(read.spice)}
-                  style={styles.rudy}
-                  accessibilityLabel="Rudy the red pepper"
-                />
+            {read.words > 0 && !read.quiet && !read.overLine && (
+              <Goals goals={read.goals} />
+            )}
+            {((read.words > 0 && !read.quiet) || busy) && (
+              <View style={styles.live} accessibilityLiveRegion="polite">
+                {/* Rudy: his face follows the peppers, beaming at one, crying
+                    at five. While the model reads it, he dances. */}
+                <Rudy spice={read.spice} dancing={busy} />
                 <Peppers n={read.spice} size={13} />
                 <Text
                   numberOfLines={2}
@@ -789,7 +863,7 @@ export function Composer({ home }: { home?: boolean }) {
     >
       {reviewing && (
         <Pressable
-          onPress={() => setStep({ kind: "write" })}
+          onPress={edit}
           accessibilityRole="button"
           accessibilityLabel="Edit what you wrote"
         >
@@ -834,14 +908,100 @@ export function Composer({ home }: { home?: boolean }) {
           setRemovePII={setRemovePII}
           useRewrite={useRewrite}
           setUseRewrite={setUseRewrite}
-          onEdit={() => setStep({ kind: "write" })}
+          onEdit={edit}
           onUseAlternative={(alt) => {
+            remember();
             setText(alt);
             setStep({ kind: "write" });
           }}
         />
       )}
     </Page>
+  );
+}
+
+/**
+ * The least a complaint needs, as goals that tick off while typing: who is
+ * involved, what happened, and what could be better. Rudy's line asks for
+ * the next one missing.
+ */
+function Goals({
+  goals,
+}: {
+  goals: { who: boolean; what: boolean; better: boolean };
+}) {
+  const theme = useTheme();
+  const items: [boolean, string][] = [
+    [goals.who, "Who"],
+    [goals.what, "What happened"],
+    [goals.better, "Better how"],
+  ];
+  return (
+    <View
+      style={styles.goals}
+      accessible
+      accessibilityLabel={`Goals: ${items.map(([done, label]) => `${label} ${done ? "done" : "still to say"}`).join(", ")}`}
+    >
+      {items.map(([done, label]) => (
+        <View key={label} style={styles.goal}>
+          <Ionicons
+            name={done ? "checkmark-circle" : "ellipse-outline"}
+            size={15}
+            color={done ? theme.good : theme.textSecondary}
+          />
+          <Text
+            style={[
+              styles.goalText,
+              { color: done ? theme.text : theme.textSecondary },
+            ]}
+          >
+            {label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Rudy beside the peppers. While Next is working he dances, beaming. */
+function Rudy({ spice, dancing }: { spice: number; dancing: boolean }) {
+  const [beat] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!dancing) {
+      beat.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(beat, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dancing, beat]);
+  const rotate = beat.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: ["0deg", "-16deg", "0deg", "16deg", "0deg"],
+  });
+  const translateY = beat.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0, -5, 0, -5, 0],
+  });
+  return (
+    <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
+      <Image
+        source={rudyFace(dancing ? 1 : spice)}
+        style={styles.rudy}
+        accessibilityLabel={
+          dancing
+            ? "Rudy the red pepper, dancing while it is read"
+            : "Rudy the red pepper"
+        }
+      />
+    </Animated.View>
   );
 }
 
@@ -968,7 +1128,10 @@ function ReviewSection(props: {
           </T>
         </View>
         {(result.alternatives ?? []).length > 0 && (
-          <Section title="Same heat, aimed at the problem" hint="Tap one to use it, then edit it however you like.">
+          <Section
+            title="Same heat, aimed at the problem"
+            hint="Tap one to use it, then edit it however you like."
+          >
             {result.alternatives!.map((alt, i) => (
               <Pressable
                 key={i}
@@ -981,7 +1144,11 @@ function ReviewSection(props: {
                 ]}
               >
                 <T>{alt}</T>
-                <T variant="small" color={theme.primary} style={{ fontWeight: "700" }}>
+                <T
+                  variant="small"
+                  color={theme.primary}
+                  style={{ fontWeight: "700" }}
+                >
                   Use this
                 </T>
               </Pressable>
@@ -1091,7 +1258,11 @@ function ReviewSection(props: {
               </Row>
             ))}
           </View>
-          <Button kind="secondary" label="Go back and add" onPress={props.onEdit} />
+          <Button
+            kind="secondary"
+            label="Go back and add"
+            onPress={props.onEdit}
+          />
         </Section>
       )}
 
@@ -1113,7 +1284,10 @@ function ReviewSection(props: {
         </View>
       )}
 
-      <Section title="The issues it raises" hint="Each one collects everyone who has it. Tap one to leave it out.">
+      <Section
+        title="The issues it raises"
+        hint="Each one collects everyone who has it. Tap one to leave it out."
+      >
         {result.points.map((p, i) => {
           const hit = p.matchedPointId ? matched[p.matchedPointId] : null;
           const kept = !dropped.has(i);
@@ -1141,7 +1315,9 @@ function ReviewSection(props: {
                 color={kept ? theme.good : theme.textSecondary}
               />
               <View style={{ flex: 1, gap: 3 }}>
-                <T style={{ fontWeight: "600" }}>{hit ? hit.text : p.statement}</T>
+                <T style={{ fontWeight: "600" }}>
+                  {hit ? hit.text : p.statement}
+                </T>
                 {!!p.said && (
                   <T variant="small" color={theme.text}>
                     You said: {p.said}
@@ -1326,6 +1502,19 @@ const styles = StyleSheet.create({
   },
   live: { flexDirection: "row", alignItems: "center", gap: 8 },
   rudy: { width: 40, height: 40, marginLeft: -6, marginRight: -4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  backText: { fontFamily: Fonts.bold, fontSize: 15 },
+  goals: { flexDirection: "row", flexWrap: "wrap", columnGap: 12, rowGap: 4 },
+  goal: { flexDirection: "row", alignItems: "center", gap: 4 },
+  goalText: { fontSize: 13, fontWeight: "600" },
   bubble: {
     flexDirection: "row",
     alignItems: "center",
@@ -1362,12 +1551,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   nextText: { fontFamily: Fonts.bold, fontSize: 16 },
-  tool: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
+  tool: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
   toolText: { fontSize: 14, fontWeight: "700" },
   quote: { borderLeftWidth: 3, paddingLeft: 12, gap: 6 },
   quoteText: { fontFamily: Fonts.medium, fontSize: 19, lineHeight: 26 },
   thumb: { width: 64, height: 64, borderRadius: 12 },
-  uploading: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12, opacity: 0.5 },
+  uploading: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+    opacity: 0.5,
+  },
   remove: {
     position: "absolute",
     top: -6,
