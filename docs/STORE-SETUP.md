@@ -68,7 +68,7 @@ then run `eas init` again.
 
 ### 0b2. Make yourself the operator (once)
 
-In the UCS app: Me > Sign in > Sign up with **bricarlis@gmail.com**, then click the link in the email (the app notices by itself).
+In the UCS app: Me > Sign in or sign up > email and password > Continue with **bricarlis@gmail.com**, then click the link in the email (the app notices by itself).
 That account then sees **Operator queue** in Me (organization requests to
 check, reports, AI spend) and gets the daily "Needs you" notification at
 6:00 Chicago time whenever something waits. Apple expects reports to be

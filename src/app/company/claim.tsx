@@ -1,29 +1,38 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 
-import { showAlert } from '@/components/point-card';
-import { TermsCheck, useTermsAccepted } from '@/components/terms-check';
-import { Button, Card, Field, Notice, Screen, T } from '@/components/ui';
-import { ConfirmEmail } from '@/components/email-status';
-import { useAuth } from '@/hooks/use-auth';
-import { errorText, requestAccess } from '@/lib/api';
-import { db } from '@/lib/firebase';
-import { useCollection, useDoc } from '@/lib/hooks';
-import type { Subject } from '@/lib/types';
+import { showAlert } from "@/components/point-card";
+import { Toaster } from "@/components/toast";
+import { TermsCheck, useTermsAccepted } from "@/components/terms-check";
+import { Button, Card, Field, Notice, Screen, T } from "@/components/ui";
+import { ConfirmEmail } from "@/components/email-status";
+import { useAuth } from "@/hooks/use-auth";
+import { errorText, requestAccess } from "@/lib/api";
+import { db } from "@/lib/firebase";
+import { useCollection, useDoc } from "@/lib/hooks";
+import type { Subject } from "@/lib/types";
 
 type Claim = {
   id: string;
   subjectName: string;
-  status: 'pending' | 'held' | 'approved' | 'denied';
+  status: "pending" | "held" | "approved" | "denied";
   note: string | null;
 };
 
-const CLAIM_STATUS: Record<Claim['status'], string> = {
-  pending: 'Waiting for the daily check',
-  held: 'Being reviewed by hand',
-  approved: 'Approved',
-  denied: 'Not approved',
+const CLAIM_STATUS: Record<Claim["status"], string> = {
+  pending: "Waiting for the daily check",
+  held: "Being reviewed by hand",
+  approved: "Approved",
+  denied: "Not approved",
 };
 
 /**
@@ -36,37 +45,43 @@ export default function ClaimScreen() {
   const params = useLocalSearchParams<{ subjectId?: string }>();
   const router = useRouter();
   const { user } = useAuth();
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [results, setResults] = useState<Subject[]>([]);
   const [picked, setPicked] = useState<string | null>(params.subjectId ?? null);
   const [typedWebsite, setWebsite] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const termsAccepted = useTermsAccepted();
   const [agreed, setAgreed] = useState(false);
-  const { data: subject } = useDoc<Subject>(picked ? `subjects/${picked}` : null);
+  const { data: subject } = useDoc<Subject>(
+    picked ? `subjects/${picked}` : null,
+  );
   const claims = useCollection<Claim>(
-    user ? query(collection(db, 'claims'), where('uid', '==', user.uid), limit(20)) : null,
+    user
+      ? query(collection(db, "claims"), where("uid", "==", user.uid), limit(20))
+      : null,
     `claims:${user?.uid}`,
   );
 
-  const website = typedWebsite ?? subject?.website ?? '';
+  const website = typedWebsite ?? subject?.website ?? "";
   useEffect(() => {
     const lower = name.trim().toLowerCase();
     if (lower.length < 2) return;
     const t = setTimeout(() => {
       getDocs(
         query(
-          collection(db, 'subjects'),
-          where('removed', '==', false),
-          orderBy('nameLower'),
-          where('nameLower', '>=', lower),
-          where('nameLower', '<', `${lower}`),
+          collection(db, "subjects"),
+          where("removed", "==", false),
+          orderBy("nameLower"),
+          where("nameLower", ">=", lower),
+          where("nameLower", "<", `${lower}`),
           limit(8),
         ),
       )
         .then((s) =>
           setResults(
-            s.docs.map((d) => ({ id: d.id, ...d.data() }) as Subject).filter((x) => x.kind === 'organization'),
+            s.docs
+              .map((d) => ({ id: d.id, ...d.data() }) as Subject)
+              .filter((x) => x.kind === "organization"),
           ),
         )
         .catch(() => setResults([]));
@@ -85,92 +100,112 @@ export default function ClaimScreen() {
         ...(agreed ? { acceptTerms: true } : {}),
       });
       showAlert(
-        res.status === 'approved' ? 'You can respond now' : 'Request received',
-        res.status === 'approved'
+        res.status === "approved" ? "You can respond now" : "Request received",
+        res.status === "approved"
           ? `Open any issue about ${subject?.name} to respond.`
-          : `We check ${user?.email?.split('@')[1]} against ${subject?.name}'s website, and a person reviews anything that doesn't match. We'll notify you.`,
+          : `We check ${user?.email?.split("@")[1]} against ${subject?.name}'s website, and a person reviews anything that doesn't match. We'll notify you.`,
       );
-      if (res.status === 'approved') router.replace('/company');
+      if (res.status === "approved") router.replace("/company");
     } catch (e) {
-      showAlert('Not yet', errorText(e));
+      showAlert("Not yet", errorText(e));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Screen>
-      <T>
-        Respond publicly for your organization: acknowledge points, say what&apos;s planned, mark fixes. You can&apos;t
-        remove or edit anything people wrote.
-      </T>
-      {!verified && (!user || user.isAnonymous) && (
-        <Notice tone="warn">
-          <T>First, sign up with your work email.</T>
-          <Button label="Sign up" kind="secondary" onPress={() => router.push('/account')} />
-        </Notice>
-      )}
-      <ConfirmEmail reason="so we know it is your work address" />
-      {verified && <T variant="small">Applying as {user!.email}</T>}
-
-      {subject ? (
-        <Card>
-          <T variant="heading">{subject.name}</T>
-          <T variant="small">{subject.description}</T>
-          <Button label="Change" kind="quiet" onPress={() => setPicked(null)} />
-        </Card>
-      ) : (
-        <>
-          <Field label="Organization" value={name} onChangeText={setName} placeholder="Start typing its name" />
-          {(name.trim().length >= 2 ? results : []).map((r) => (
-            <Card key={r.id} onPress={() => setPicked(r.id)}>
-              <T style={{ fontWeight: '700' }}>{r.name}</T>
-              <T variant="small">{r.description}</T>
-            </Card>
-          ))}
-          {name.trim().length >= 2 && results.length === 0 && (
-            <T variant="small">Not here yet? It shows up once someone complains about it.</T>
-          )}
-          {name.trim().length >= 2 && results.length === 0 && (
+    <View style={{ flex: 1 }}>
+      <Screen>
+        <T>
+          Respond publicly for your organization: acknowledge points, say
+          what&apos;s planned, mark fixes. You can&apos;t remove or edit
+          anything people wrote.
+        </T>
+        {!verified && (!user || user.isAnonymous) && (
+          <Notice tone="warn">
+            <T>First, sign in with your work email.</T>
             <Button
+              label="Sign in or sign up"
               kind="secondary"
-              icon="add"
-              label={`Complain about ${name.trim()}`}
-              onPress={() => router.push('/complain')}
+              onPress={() => router.push("/account")}
             />
-          )}
-        </>
-      )}
-      {subject && (
-        <>
-          <Field
-            label="Organization's website (helps us check)"
-            value={website}
-            onChangeText={setWebsite}
-            autoCapitalize="none"
-            keyboardType="url"
-            placeholder="https://"
-          />
-          <TermsCheck checked={agreed} onChange={setAgreed} />
-          <Button
-            label="Request access"
-            onPress={submit}
-            busy={busy}
-            disabled={!verified || (!termsAccepted && !agreed)}
-          />
-        </>
-      )}
+          </Notice>
+        )}
+        <ConfirmEmail reason="so we know it is your work address" />
+        {verified && <T variant="small">Applying as {user!.email}</T>}
 
-      {claims.items.length > 0 && <T variant="label">Your requests</T>}
-      {claims.items.map((c) => (
-        <Card key={c.id}>
-          <T style={{ fontWeight: '700' }}>{c.subjectName}</T>
-          <T variant="small">
-            {CLAIM_STATUS[c.status]}
-            {c.note ? ` · ${c.note}` : ''}
-          </T>
-        </Card>
-      ))}
-    </Screen>
+        {subject ? (
+          <Card>
+            <T variant="heading">{subject.name}</T>
+            <T variant="small">{subject.description}</T>
+            <Button
+              label="Change"
+              kind="quiet"
+              onPress={() => setPicked(null)}
+            />
+          </Card>
+        ) : (
+          <>
+            <Field
+              label="Organization"
+              value={name}
+              onChangeText={setName}
+              placeholder="Start typing its name"
+            />
+            {(name.trim().length >= 2 ? results : []).map((r) => (
+              <Card key={r.id} onPress={() => setPicked(r.id)}>
+                <T style={{ fontWeight: "700" }}>{r.name}</T>
+                <T variant="small">{r.description}</T>
+              </Card>
+            ))}
+            {name.trim().length >= 2 && results.length === 0 && (
+              <T variant="small">
+                Not here yet? It shows up once someone complains about it.
+              </T>
+            )}
+            {name.trim().length >= 2 && results.length === 0 && (
+              <Button
+                kind="secondary"
+                icon="add"
+                label={`Complain about ${name.trim()}`}
+                onPress={() => router.push("/complain")}
+              />
+            )}
+          </>
+        )}
+        {subject && (
+          <>
+            <Field
+              label="Organization's website (helps us check)"
+              value={website}
+              onChangeText={setWebsite}
+              autoCapitalize="none"
+              keyboardType="url"
+              placeholder="https://"
+            />
+            <TermsCheck checked={agreed} onChange={setAgreed} />
+            <Button
+              label="Request access"
+              onPress={submit}
+              busy={busy}
+              disabled={!verified || (!termsAccepted && !agreed)}
+            />
+          </>
+        )}
+
+        {claims.items.length > 0 && <T variant="label">Your requests</T>}
+        {claims.items.map((c) => (
+          <Card key={c.id}>
+            <T style={{ fontWeight: "700" }}>{c.subjectName}</T>
+            <T variant="small">
+              {CLAIM_STATUS[c.status]}
+              {c.note ? ` · ${c.note}` : ""}
+            </T>
+          </Card>
+        ))}
+      </Screen>
+      {/* A sheet: toasts drawn by the root layout would be hidden behind it on iOS. */}
+      <Toaster />
+    </View>
   );
 }

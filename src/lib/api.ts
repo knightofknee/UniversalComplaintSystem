@@ -163,6 +163,26 @@ export const resolveReport = call<
 >('resolveReport');
 
 /** The message a callable threw, for showing to the person. */
+/** Firebase sign-in failures, in words (its own messages read "Firebase: Error (auth/...)"). */
+const AUTH_ERRORS: Record<string, string> = {
+  'auth/invalid-email': "That email doesn't look right. Check it for typos.",
+  'auth/missing-email': 'Type your email first.',
+  'auth/missing-password': 'Type your password.',
+  'auth/wrong-password': "That password isn't right.",
+  'auth/invalid-credential': "That email and password don't match.",
+  'auth/invalid-login-credentials': "That email and password don't match.",
+  'auth/user-not-found': "That email and password don't match.",
+  'auth/weak-password': 'Pick a longer password: at least 8 characters.',
+  'auth/password-does-not-meet-requirements': 'Pick a longer password: at least 8 characters.',
+  'auth/email-already-in-use': 'That email already has an account.',
+  'auth/credential-already-in-use': 'That sign-in already belongs to another account.',
+  'auth/too-many-requests': 'Too many tries in a row. Wait a few minutes, or reset your password.',
+  'auth/user-disabled': 'This account has been turned off.',
+  'auth/network-request-failed': "Can't reach UCS right now. Check your connection and try again.",
+  'auth/popup-blocked': 'Your browser blocked the sign-in window. Allow pop-ups for this site and try again.',
+  'auth/requires-recent-login': 'Sign in again first, then try that once more.',
+};
+
 /**
  * What to tell a person when a call fails: the server's own sentence when it
  * wrote one for people, otherwise a plain one. Never a code.
@@ -170,6 +190,7 @@ export const resolveReport = call<
 export function errorText(e: unknown): string {
   const err = e as { message?: string; code?: string };
   const code = (err?.code ?? '').replace(/^functions\//, '');
+  if (code.startsWith('auth/')) return AUTH_ERRORS[code] ?? "Couldn't sign you in. Try again.";
   const m = (err?.message ?? '').replace(/\s*\[\d+\]\s*$/, '').trim();
   if (code === 'unavailable' || /network|fetch|offline/i.test(m)) return "Can't reach UCS right now. Check your connection and try again.";
   if (code === 'resource-exhausted') return m || 'Easy there. Too many tries in a row; give it a minute.';

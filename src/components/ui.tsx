@@ -166,14 +166,25 @@ export function Chip({ label, color, bg }: { label: string; color: string; bg: s
   );
 }
 
-export function Field(props: TextInputProps & { label?: string }) {
+export function Field(
+  props: TextInputProps & {
+    label?: string;
+    /** iOS's put-the-keyboard-away button. Off where the keyboard hides nothing (the sign-in sheet). */
+    keyboardButton?: boolean;
+  },
+) {
   const theme = useTheme();
-  const { label, style, placeholder, onFocus, onBlur, ...rest } = props;
+  const { label, style, placeholder, onFocus, onBlur, keyboardButton = true, secureTextEntry, ...rest } = props;
+  // A password field has a show/hide eye in that spot instead, on every
+  // platform: people need to check what they typed.
+  const password = !!secureTextEntry;
+  const [shown, setShown] = useState(false);
   // iOS's keyboard has no hide key, so a focused field carries its own,
   // inside it on the right. (Not a bar on the keyboard: React Native reloads
   // a keyboard that has an accessory bar on every keystroke, which flips it
   // from numbers back to letters after each digit.)
-  const hideButton = Platform.OS === 'ios';
+  const hideButton = Platform.OS === 'ios' && keyboardButton && !password;
+  const slot = hideButton || password;
   const [focused, setFocused] = useState(false);
   // On iOS a one-line field draws its own placeholder a few points lower
   // than typed text whenever it isn't focused, so the words jump when
@@ -197,18 +208,19 @@ export function Field(props: TextInputProps & { label?: string }) {
             onBlur?.(e);
           }}
           {...rest}
+          secureTextEntry={password && !shown}
           style={[
             styles.field,
             { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
             // One line: a fixed height and no vertical padding, so the text sits centered.
             rest.multiline ? { minHeight: 120, textAlignVertical: 'top' } : styles.oneLine,
-            // Room for the hide button, always, so the text never shifts when it appears.
-            hideButton && { paddingRight: 46 },
+            // Room for the button on the right, always, so the text never shifts when it appears.
+            slot && { paddingRight: 46 },
             style,
           ]}
         />
         {own && !rest.value && !!placeholder && (
-          <View pointerEvents="none" style={[styles.placeholder, { right: 46 }]} accessible={false} importantForAccessibility="no">
+          <View pointerEvents="none" style={[styles.placeholder, { right: slot ? 46 : 12 }]} accessible={false} importantForAccessibility="no">
             <Text numberOfLines={1} style={{ fontSize: 16, color: theme.textSecondary }}>
               {placeholder}
             </Text>
@@ -226,6 +238,16 @@ export function Field(props: TextInputProps & { label?: string }) {
               pressed && { opacity: 0.6 },
             ]}>
             <MaterialCommunityIcons name="keyboard-close-outline" size={22} color={theme.textSecondary} />
+          </Pressable>
+        )}
+        {password && (
+          <Pressable
+            onPress={() => setShown((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={shown ? 'Hide password' : 'Show password'}
+            hitSlop={6}
+            style={({ pressed }) => [styles.hide, { top: 0, bottom: 0 }, pressed && { opacity: 0.6 }]}>
+            <Ionicons name={shown ? 'eye-off-outline' : 'eye-outline'} size={22} color={theme.textSecondary} />
           </Pressable>
         )}
       </View>

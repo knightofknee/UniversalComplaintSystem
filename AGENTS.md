@@ -22,7 +22,18 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   email+password to that same account (src/lib/sso.ts, src/app/account.tsx:
   a row of two compact buttons, the logo and one word, "Google" | "Apple",
   the same style as the user's other apps and never "Continue with ...";
-  then "Sign up" | "I have an account" for email). If that identity already has an account it signs in to it
+  then ONE email form with ONE "Continue" button, 2026-11-16, the user: "signing
+  in versus signing up is fucking stupid": `continueWithEmail` in sso.ts signs
+  in if the email has an account, makes it if not, and an email with an
+  account and another password is "already has an account, and that isn't
+  its password" plus a reset link (`resetPassword`); never a silent second
+  account. EVERY OUTCOME IS SAID INSIDE THE SHEET (inline under the button):
+  on iOS a sheet covers the root Toaster, so each sheet (account,
+  company/claim) mounts its own `<Toaster />` and only the newest one shows
+  toasts. Firebase auth errors are worded in `AUTH_ERRORS` (api.ts), never
+  "Firebase: Error (auth/...)". Password fields have a show/hide eye in the
+  keyboard button's place; the sign-in sheet has no keyboard button
+  (`keyboardButton={false}`). If that identity already has an account it signs in to it
   instead AND THE DEVICE'S SIGNED-OUT ACTIVITY MOVES INTO IT (`switchAccount`
   in sso.ts, `mergeAccount` in functions/src/merge.ts: complaints, support,
   votes, fixes, ratings; duplicates count once; the anonymous account is

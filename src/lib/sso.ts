@@ -1,5 +1,10 @@
 import {
+  createUserWithEmailAndPassword,
+  EmailAuthProvider,
   GoogleAuthProvider,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   linkWithCredential,
   linkWithPopup,
   OAuthProvider,
@@ -55,6 +60,48 @@ export async function switchAccount(signIn: () => Promise<unknown>) {
   const fromToken = leaving?.isAnonymous ? await leaving.getIdToken().catch(() => null) : null;
   await signIn();
   if (fromToken) await mergeAccount({ fromToken }).catch((e) => console.warn('Could not bring this device\'s activity over', e));
+}
+
+/** The email has an account, and the password typed isn't its password. */
+export class WrongPassword extends Error {
+  constructor(public email: string) {
+    super(`${email} already has an account, and that isn't its password. If you made it with Google or Apple, use that button instead.`);
+  }
+}
+
+/** Sign-in said no without saying why (Firebase hides whether an email has an account). */
+const NO_MATCH = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found', 'auth/wrong-password'];
+
+/**
+ * Email and password, one way in: there is no "sign up" versus "sign in" to
+ * pick. It signs in if the email has an account (bringing over what this
+ * device did signed out, `switchAccount`); otherwise it makes the account,
+ * on this device's own account so nothing is lost, and sends the link to
+ * confirm the email. An email that has an account with a different password
+ * is a `WrongPassword`, never a silent second account.
+ */
+export async function continueWithEmail(email: string, password: string): Promise<'signed-in' | 'created'> {
+  try {
+    await switchAccount(() => signInWithEmailAndPassword(auth, email, password));
+    return 'signed-in';
+  } catch (e) {
+    if (!NO_MATCH.includes(codeOf(e))) throw e;
+  }
+  const user = auth.currentUser;
+  try {
+    if (user?.isAnonymous) await linkWithCredential(user, EmailAuthProvider.credential(email, password));
+    else await createUserWithEmailAndPassword(auth, email, password);
+  } catch (e) {
+    if (TAKEN.includes(codeOf(e))) throw new WrongPassword(email);
+    throw e;
+  }
+  if (auth.currentUser) await sendEmailVerification(auth.currentUser).catch((e) => console.warn('Could not send the link', e));
+  return 'created';
+}
+
+/** A link to set a new password. Firebase says nothing about whether the email has an account, and neither do we. */
+export async function resetPassword(email: string) {
+  await sendPasswordResetEmail(auth, email);
 }
 
 async function applyCredential(credential: AuthCredential, fromError: (e: never) => AuthCredential | null) {

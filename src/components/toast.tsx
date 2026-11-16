@@ -8,7 +8,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 type Toast = { id: number; title: string; message?: string; tone: 'error' | 'info' };
 let next = 1;
-const listeners = new Set<(t: Toast) => void>();
+/**
+ * Every mounted Toaster, newest last. Only the newest shows a toast: on iOS a
+ * sheet (sign in, help, respond for an organization) covers the root view, so
+ * a toast drawn there would be hidden behind it. Each sheet mounts its own.
+ */
+const listeners: ((t: Toast) => void)[] = [];
 
 /**
  * A short note that slides in at the top and leaves on its own. Used instead
@@ -16,10 +21,10 @@ const listeners = new Set<(t: Toast) => void>();
  */
 export function showToast(title: string, message?: string, tone: Toast['tone'] = 'error') {
   const t = { id: next++, title, message, tone };
-  listeners.forEach((l) => l(t));
+  listeners[listeners.length - 1]?.(t);
 }
 
-/** Mounted once, in the root layout. */
+/** Mounted in the root layout, and again inside each sheet (see `listeners`). */
 export function Toaster() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -28,9 +33,10 @@ export function Toaster() {
 
   useEffect(() => {
     const l = (t: Toast) => setToast(t);
-    listeners.add(l);
+    listeners.push(l);
     return () => {
-      listeners.delete(l);
+      const i = listeners.indexOf(l);
+      if (i >= 0) listeners.splice(i, 1);
     };
   }, []);
 

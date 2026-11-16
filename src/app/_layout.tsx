@@ -122,7 +122,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="account"
-              options={{ title: "Sign in", ...SHEET }}
+              options={{ title: "Sign in or sign up", ...SHEET }}
             />
             <Stack.Screen
               name="delete-account"
