@@ -143,6 +143,10 @@ the iOS app → **App Store ID**: paste the number from the listing URL
   No to everything else. Expect a teen-or-older rating; accept whatever it
   computes.
 - Privacy Policy URL, Support URL, Marketing URL: from the table above.
+- China mainland AIGC question: **No**, and leave China mainland out of
+  Pricing and Availability. UCS does generate text with a model (issue
+  wording, suggested rewrites, alternatives), so offering it there would
+  need a CAC filing and an ICP filing we don't have.
 
 ### 1d. App Privacy ("nutrition label")
 
