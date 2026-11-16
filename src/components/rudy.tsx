@@ -12,7 +12,7 @@ const native = Platform.OS !== 'web';
 /**
  * Rudy beside the peppers. His face follows the peppers (beaming at one,
  * crying at five). He hops whenever `hops` goes up (a goal ticked), dances
- * while Next is working, and wiggles when tapped.
+ * a whole routine while Next is working (`routine`), and wiggles when tapped.
  */
 export function Rudy({
   spice,
@@ -28,22 +28,39 @@ export function Rudy({
   size?: number;
   onPress?: () => void;
 }) {
-  const [beat] = useState(() => new Animated.Value(0));
+  const [moves] = useState(() => ({
+    rot: new Animated.Value(0),
+    spin: new Animated.Value(0),
+    x: new Animated.Value(0),
+    y: new Animated.Value(0),
+    sx: new Animated.Value(1),
+    sy: new Animated.Value(1),
+  }));
   const [hop] = useState(() => new Animated.Value(0));
   const [wiggle] = useState(() => new Animated.Value(0));
   const firstHop = useRef(hops);
 
   useEffect(() => {
+    const { rot, spin, x, y, sx, sy } = moves;
+    const rest = () => {
+      rot.setValue(0);
+      spin.setValue(0);
+      x.setValue(0);
+      y.setValue(0);
+      sx.setValue(1);
+      sy.setValue(1);
+    };
     if (!dancing) {
-      beat.setValue(0);
+      rest();
       return;
     }
-    const loop = Animated.loop(
-      Animated.timing(beat, { toValue: 1, duration: 700, easing: Easing.linear, useNativeDriver: native }),
-    );
+    const loop = Animated.loop(routine(moves));
     loop.start();
-    return () => loop.stop();
-  }, [dancing, beat]);
+    return () => {
+      loop.stop();
+      rest();
+    };
+  }, [dancing, moves]);
 
   useEffect(() => {
     if (hops === firstHop.current) return;
@@ -61,17 +78,23 @@ export function Rudy({
     onPress?.();
   };
 
-  const rotate = Animated.add(beat, wiggle).interpolate({
-    inputRange: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
-    outputRange: ['0deg', '-16deg', '0deg', '16deg', '0deg', '-16deg', '0deg', '16deg', '0deg'],
+  const tilt = wiggle.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -16, 0, 16, 0] });
+  const rotate = Animated.add(moves.rot, tilt).interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['-360deg', '360deg'],
   });
-  const dance = beat.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -5, 0, -5, 0] });
+  const turn = moves.spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const jump = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -9] });
-  const translateY = Animated.add(dance, jump);
-  const scale = hop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const translateY = Animated.add(moves.y, jump);
+  const grow = hop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const scaleX = Animated.multiply(moves.sx, grow);
+  const scaleY = Animated.multiply(moves.sy, grow);
 
   const face = (
-    <Animated.View style={{ transform: [{ translateY }, { rotate }, { scale }] }}>
+    <Animated.View
+      style={{
+        transform: [{ translateX: moves.x }, { translateY }, { rotate }, { rotate: turn }, { scaleX }, { scaleY }],
+      }}>
       <Image
         source={rudyFace(dancing ? 1 : spice)}
         style={{ width: size, height: size }}
@@ -91,7 +114,54 @@ export function Rudy({
   );
 }
 
-const CONFETTI = ['🌶️', '🎉', '✨', '🔥', '🎊', '⭐', '🌶️', '💥'];
+type Moves = Record<'rot' | 'spin' | 'x' | 'y' | 'sx' | 'sy', Animated.Value>;
+
+/**
+ * Rudy's dance while the model reads, about six seconds and then again: a
+ * sway, a double hop with a squash before each jump, a full spin, a quick
+ * shimmy, a lean-back bob, and a big finish. Long enough that a wait looks
+ * like the show, not a stall.
+ */
+function routine({ rot, spin, x, y, sx, sy }: Moves) {
+  const to = (v: Animated.Value, toValue: number, duration: number, easing = Easing.inOut(Easing.quad)) =>
+    Animated.timing(v, { toValue, duration, easing, useNativeDriver: native });
+  const all = (...a: Animated.CompositeAnimation[]) => Animated.parallel(a);
+  const squash = (w: number, h: number, ms: number) => all(to(sx, w, ms), to(sy, h, ms));
+  const hopOnce = () => Animated.sequence([
+    squash(1.14, 0.84, 110),
+    all(to(y, -16, 200, Easing.out(Easing.quad)), squash(0.9, 1.12, 200)),
+    all(to(y, 0, 170, Easing.in(Easing.quad)), squash(1.12, 0.88, 170)),
+    squash(1, 1, 110),
+  ]);
+  return Animated.sequence([
+    // Sway.
+    all(to(rot, -14, 240), to(x, -5, 240)),
+    all(to(rot, 14, 420), to(x, 5, 420)),
+    all(to(rot, -14, 420), to(x, -5, 420)),
+    all(to(rot, 0, 240), to(x, 0, 240)),
+    // Double hop.
+    hopOnce(),
+    hopOnce(),
+    // Spin.
+    all(to(spin, 1, 640, Easing.inOut(Easing.cubic)), Animated.sequence([to(y, -8, 320), to(y, 0, 320)])),
+    to(spin, 0, 0),
+    // Shimmy.
+    ...[-6, 6, -6, 6, -6, 6, 0].map((d) => all(to(x, d, 70, Easing.linear), to(rot, d / 2, 70, Easing.linear))),
+    // Lean back and bob.
+    all(to(rot, 12, 300), to(x, -6, 300)),
+    to(y, -5, 160),
+    to(y, 0, 160),
+    to(y, -5, 160),
+    to(y, 0, 160),
+    all(to(rot, 0, 260), to(x, 0, 260)),
+    // Big finish.
+    all(to(y, -10, 220, Easing.out(Easing.back(2))), squash(1.16, 1.16, 220)),
+    all(to(y, 0, 320, Easing.bounce), squash(1, 1, 320)),
+    Animated.delay(260),
+  ]);
+}
+
+const CONFETTI =['🌶️', '🎉', '✨', '🔥', '🎊', '⭐', '🌶️', '💥'];
 const PIECES = 30;
 
 type Piece = { emoji: string; x: number; y: number; spin: number; delay: number; size: number };

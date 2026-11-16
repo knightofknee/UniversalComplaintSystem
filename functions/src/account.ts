@@ -175,8 +175,31 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
 export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, async (req) => {
   const uid = uidOf(req);
   const id = typeof req.data?.submissionId === 'string' && /^[\w-]{1,128}$/.test(req.data.submissionId) ? req.data.submissionId : '';
-  const author = await db.doc(`authors/${id}`).get();
-  if (!id || author.get('uid') !== uid) throw new HttpsError('permission-denied', 'Only the author can delete a complaint.');
+  await assertAuthor(uid, id, 'delete');
+  await withdrawComplaint(uid, id);
+  return { deleted: true };
+});
+
+/** Throws unless this account wrote that (public, still standing) complaint. */
+export async function assertAuthor(uid: string, id: string, doing: 'delete' | 'edit') {
+  const author = id ? await db.doc(`authors/${id}`).get() : null;
+  if (!author || author.get('uid') !== uid) throw new HttpsError('permission-denied', `Only the author can ${doing} a complaint.`);
+  const sub = await db.doc(`submissions/${id}`).get();
+  if (!sub.exists || sub.get('removed')) throw new HttpsError('not-found', 'That complaint is gone.');
+}
+
+/**
+ * Takes a complaint off the record (see deleteComplaint). Editing is a
+ * repost: the new version is recorded first, then the old one comes off
+ * here with `successor` set. On the issues the new version also raises, the
+ * old one's support and headline credit pass to it rather than being
+ * withdrawn (the person still has the issue), and its photos go with it.
+ */
+export async function withdrawComplaint(
+  uid: string,
+  id: string,
+  successor?: { submissionId: string; pointIds: string[]; authorName: string },
+) {
   const ref = db.doc(`submissions/${id}`);
   const sub = await ref.get();
   if (!sub.exists) throw new HttpsError('not-found', 'That complaint is gone.');
@@ -198,6 +221,19 @@ export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
     };
     // The support this complaint gave (not support given separately with the arrow).
     const support = await pointRef.collection('supports').doc(uid).get();
+    const carried = !!successor?.pointIds.includes(pid);
+    if (carried) {
+      // The new version raises it too: its support stays, now the new one's.
+      if (support.exists && support.get('submissionId') === id) {
+        await support.ref.update({ submissionId: successor!.submissionId });
+      }
+      if (point.get('canonical.submissionId') === id) {
+        update['canonical.submissionId'] = successor!.submissionId;
+        update['canonical.authorName'] = successor!.authorName;
+      }
+      await pointRef.update(update);
+      continue;
+    }
     if (support.exists && support.get('submissionId') === id) {
       const recent = Date.now() - ((support.get('at') as Timestamp | undefined)?.toMillis() ?? 0) < WEEK_MS;
       update.supportCount = FieldValue.increment(-1);
@@ -222,6 +258,22 @@ export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
     }
     await pointRef.update(update);
   }
+  // Edited: the photos were already checked when first posted, so they move to the new version.
+  const photos = (sub.get('photos') as string[] | undefined) ?? [];
+  if (successor && photos.length) {
+    const next = db.doc(`submissions/${successor.submissionId}`);
+    const have = ((await next.get()).get('photos') as string[] | undefined) ?? [];
+    const moved: string[] = [];
+    for (const p of photos.slice(0, Math.max(0, 4 - have.length))) {
+      const dest = `public/${successor.submissionId}/${have.length + moved.length}.jpg`;
+      await bucket()
+        .file(p)
+        .copy(bucket().file(dest))
+        .then(() => moved.push(dest))
+        .catch(() => {});
+    }
+    if (moved.length) await next.update({ photos: [...have, ...moved] });
+  }
   await ref.update({
     text: '[deleted]',
     englishText: null,
@@ -236,6 +288,5 @@ export const deleteComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
   await db.recursiveDelete(ref.collection('loves'));
   await db.recursiveDelete(ref.collection('easy'));
   await db.doc(`users/${uid}/mine/${id}`).delete();
-  await author.ref.delete();
-  return { deleted: true };
-});
+  await db.doc(`authors/${id}`).delete();
+}

@@ -1,7 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode, RefObject } from 'react';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useState, type ComponentProps, type ReactNode, type RefObject } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Platform,
   Pressable,
   RefreshControl,
@@ -18,7 +19,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
-import { useKeyboardBar } from '@/components/keyboard-bar';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Scrolling page, centered and capped in width on wide (web) screens. */
@@ -168,8 +168,13 @@ export function Chip({ label, color, bg }: { label: string; color: string; bg: s
 
 export function Field(props: TextInputProps & { label?: string }) {
   const theme = useTheme();
-  const { label, style, placeholder, ...rest } = props;
-  const bar = useKeyboardBar();
+  const { label, style, placeholder, onFocus, onBlur, ...rest } = props;
+  // iOS's keyboard has no hide key, so a focused field carries its own,
+  // inside it on the right. (Not a bar on the keyboard: React Native reloads
+  // a keyboard that has an accessory bar on every keystroke, which flips it
+  // from numbers back to letters after each digit.)
+  const hideButton = Platform.OS === 'ios';
+  const [focused, setFocused] = useState(false);
   // On iOS a one-line field draws its own placeholder a few points lower
   // than typed text whenever it isn't focused, so the words jump when
   // someone starts typing. We draw the placeholder ourselves, centered the
@@ -183,26 +188,47 @@ export function Field(props: TextInputProps & { label?: string }) {
           placeholderTextColor={theme.textSecondary}
           placeholder={own ? undefined : placeholder}
           accessibilityLabel={rest.accessibilityLabel ?? label ?? placeholder}
-          // Every field gets the bar with the hide-keyboard button.
-          inputAccessoryViewID={bar.id}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
           {...rest}
           style={[
             styles.field,
             { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
             // One line: a fixed height and no vertical padding, so the text sits centered.
             rest.multiline ? { minHeight: 120, textAlignVertical: 'top' } : styles.oneLine,
+            // Room for the hide button, always, so the text never shifts when it appears.
+            hideButton && { paddingRight: 46 },
             style,
           ]}
         />
         {own && !rest.value && !!placeholder && (
-          <View pointerEvents="none" style={styles.placeholder} accessible={false} importantForAccessibility="no">
+          <View pointerEvents="none" style={[styles.placeholder, { right: 46 }]} accessible={false} importantForAccessibility="no">
             <Text numberOfLines={1} style={{ fontSize: 16, color: theme.textSecondary }}>
               {placeholder}
             </Text>
           </View>
         )}
+        {hideButton && focused && (
+          <Pressable
+            onPress={Keyboard.dismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Hide keyboard"
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.hide,
+              rest.multiline ? { top: 2 } : { top: 0, bottom: 0 },
+              pressed && { opacity: 0.6 },
+            ]}>
+            <MaterialCommunityIcons name="keyboard-close-outline" size={22} color={theme.textSecondary} />
+          </Pressable>
+        )}
       </View>
-      {bar.element}
     </View>
   );
 }
@@ -311,6 +337,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '700' },
   field: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
   oneLine: { height: 44, paddingVertical: 0 },
+  hide: { position: 'absolute', right: 2, width: 42, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   // Over the field's text area: same inset as `field` (padding 12 + border 1), centered like the text.
   placeholder: { position: 'absolute', left: 13, right: 13, top: 0, bottom: 0, justifyContent: 'center' },
   tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },

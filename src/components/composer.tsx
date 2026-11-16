@@ -4,6 +4,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
 import {
   useEffect,
@@ -55,7 +56,7 @@ import {
   getDraft,
   submitComplaint,
 } from "@/lib/api";
-import { storage } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { successHaptic } from "@/lib/haptics";
 import { offerPush } from "@/lib/push";
 import { MIN_WORDS, SPICE_LABELS, readComplaint } from "@/lib/read";
@@ -195,14 +196,19 @@ export function Composer({ home }: { home?: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const canSendPrivately = !!user && !user.isAnonymous && user.emailVerified;
   const termsAccepted = useTermsAccepted();
   const [agreed, setAgreed] = useState(false);
   const params = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
     draft?: string;
+    /** Editing one of your posted complaints: it opens here, and posting replaces it. */
+    edit?: string;
   }>();
+  const editing = params.edit;
+  // An edit stays public: a private complaint is a conversation, not a repost.
+  const canSendPrivately =
+    !editing && !!user && !user.isAnonymous && user.emailVerified;
   // What is typed in the main box survives leaving it (the menu button, a
   // tab, coming back later): closing a screen should never cost someone
   // their words. Kept for the session; cleared once it is posted.
@@ -410,6 +416,26 @@ export function Composer({ home }: { home?: boolean }) {
     };
   }, [draftParam, user]);
 
+  // Editing: the complaint as it was posted, ready to change.
+  const [editPoints, setEditPoints] = useState<string[]>([]);
+  useEffect(() => {
+    if (!editing) return;
+    let live = true;
+    getDoc(doc(db, "submissions", editing))
+      .then((d) => {
+        if (!live || !d.exists()) return;
+        setTextState(d.get("text") as string);
+        setEditPoints([
+          ...((d.get("matchedPointIds") as string[] | undefined) ?? []),
+          ...((d.get("addedPointIds") as string[] | undefined) ?? []),
+        ]);
+      })
+      .catch((e) => setError(errorText(e)));
+    return () => {
+      live = false;
+    };
+  }, [editing]);
+
   const check = async () => {
     setReading(0);
     setError(null);
@@ -451,11 +477,12 @@ export function Composer({ home }: { home?: boolean }) {
     setPhotos([]);
     setError(null);
     setStep({ kind: "write" });
-    if (params.subjectId || params.draft)
+    if (params.subjectId || params.draft || params.edit)
       router.setParams({
         subjectId: undefined,
         subjectName: undefined,
         draft: undefined,
+        edit: undefined,
       });
   };
 
@@ -477,6 +504,7 @@ export function Composer({ home }: { home?: boolean }) {
           ? { privateTo }
           : {}),
         ...(agreed ? { acceptTerms: true } : {}),
+        ...(editing && visibility === "public" ? { replaces: editing } : {}),
       });
       successHaptic();
       void offerPush(
@@ -502,8 +530,9 @@ export function Composer({ home }: { home?: boolean }) {
         );
         setCelebrate({
           submissionId: res.submissionId,
-          detail:
-            most > 0
+          detail: editing
+            ? "Your changes are up. Its photos and support came along."
+            : most > 0
               ? `You're with ${shortCount(most)} ${most === 1 ? "other person" : "other people"} who have this too.`
               : kept.length > 1
                 ? `You started ${kept.length} new issues. Let's see who joins you.`
@@ -763,6 +792,13 @@ export function Composer({ home }: { home?: boolean }) {
           ]}
         >
           {top}
+          {editing && (
+            <Chip
+              label="Editing your complaint · posting replaces it"
+              color={theme.primary}
+              bg={theme.primarySoft}
+            />
+          )}
           {params.subjectName && (
             <Chip
               label={`About ${params.subjectName}`}
@@ -1022,6 +1058,7 @@ export function Composer({ home }: { home?: boolean }) {
           privateTo={privateTo}
           setPrivateTo={setPrivateTo}
           canSendPrivately={canSendPrivately}
+          ownPointIds={editing ? editPoints : undefined}
           signedOut={!user || user.isAnonymous}
           removePII={removePII}
           setRemovePII={setRemovePII}
@@ -1185,6 +1222,8 @@ function ReviewSection(props: {
   privateTo: number | null;
   setPrivateTo: (i: number) => void;
   canSendPrivately: boolean;
+  /** Editing: the issues the posted version already raises (they're the author's own, not someone to join). */
+  ownPointIds?: string[];
   /** No email on the account yet (vs. one that isn't confirmed). */
   signedOut: boolean;
   removePII: boolean;
@@ -1370,7 +1409,7 @@ function ReviewSection(props: {
         </Section>
       )}
 
-      {result.supportTicket.isTicket && orgIndexes.length > 0 && !isPrivate && (
+      {result.supportTicket.isTicket && orgIndexes.length > 0 && !isPrivate && !props.ownPointIds && (
         <View style={[styles.tip, { backgroundColor: theme.warningSoft }]}>
           <T>
             {result.supportTicket.advice ??
@@ -1428,9 +1467,13 @@ function ReviewSection(props: {
                   </T>
                 )}
                 <T variant="small" color={hit ? theme.primary : theme.new}>
-                  {hit
-                    ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} with this issue`
-                    : "New issue · title by AI"}
+                  {hit && props.ownPointIds?.includes(p.matchedPointId!)
+                    ? hit.supportCount > 1
+                      ? `Already yours, with ${shortCount(hit.supportCount - 1)} ${hit.supportCount === 2 ? "other person" : "other people"}`
+                      : "Already yours"
+                    : hit
+                      ? `Joins ${shortCount(hit.supportCount)} ${hit.supportCount === 1 ? "person" : "people"} with this issue`
+                      : "New issue · title by AI"}
                   {analysis.alsoPrivate?.[i] && !isPrivate
                     ? " · raised privately too"
                     : ""}
@@ -1459,7 +1502,8 @@ function ReviewSection(props: {
         }
       />
 
-      {orgIndexes.length > 0 && (
+      {/* An edit stays public: a private complaint is a conversation, not a repost. */}
+      {orgIndexes.length > 0 && !props.ownPointIds && (
         <Section title="Who sees it">
           <Tabs
             options={[

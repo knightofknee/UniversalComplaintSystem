@@ -20,6 +20,7 @@ type VectorValue = { toArray(): number[] };
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
+import { assertAuthor, withdrawComplaint } from './account';
 import { ANTHROPIC_API_KEY, embed, runIntake, type IntakeResult } from './ai';
 import { BudgetPaused, budgetLeft } from './budget';
 import {
@@ -969,7 +970,12 @@ export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
   if ((draft.result.spice ?? 1) >= 5) {
     throw new HttpsError('failed-precondition', draft.result.spiceReason ?? 'Too spicy: the name-calling has to go.');
   }
+  // Editing a posted complaint: the new version goes up, then the old one comes off.
+  const replaces =
+    typeof req.data?.replaces === 'string' && /^[\w-]{1,128}$/.test(req.data.replaces) ? req.data.replaces : '';
+  if (replaces) await assertAuthor(uid, replaces, 'edit');
   if (req.data?.visibility === 'private') {
+    if (replaces) throw new HttpsError('invalid-argument', 'An edited complaint stays public. Delete it to send it privately.');
     return submitPrivate(req, { draftRef: draftSnap.ref, ...draft, displayName: user.displayName });
   }
   const res = await recordPublic({
@@ -980,5 +986,12 @@ export const submitComplaint = onCall({ ...CALLABLE, timeoutSeconds: 120 }, asyn
     options: publicOptions(req.data, draft.result),
   });
   await draftSnap.ref.delete();
+  if (replaces) {
+    await withdrawComplaint(uid, replaces, {
+      submissionId: res.submissionId,
+      pointIds: [...res.matchedPointIds, ...res.addedPointIds],
+      authorName: user.displayName,
+    });
+  }
   return res;
 });

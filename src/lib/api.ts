@@ -44,6 +44,8 @@ export const submitComplaint = call<
     visibility: 'public' | 'private';
     /** For private: index into the analysis's subjects of the organization it goes to. */
     privateTo?: number;
+    /** Editing: the posted complaint this new version replaces. */
+    replaces?: string;
   },
   | { visibility?: undefined; submissionId: string; matchedPointIds: string[]; addedPointIds: string[] }
   | {

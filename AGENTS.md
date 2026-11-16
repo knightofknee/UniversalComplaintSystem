@@ -153,7 +153,9 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   unsafe) there is NO dead-end page: the box stays, Rudy says why and what
   would make it one (worried face), and Next waits until the words change.
   Over-the-line still goes to its review, for the alternatives.
-  RUDY DANCES while Next is working (rocks and bobs, beaming) and says what
+  RUDY DANCES while Next is working, a ~6s routine on loop (`routine` in
+  rudy.tsx: sway, double squash-hop, spin, shimmy, lean-back bob, big
+  finish; 2026-11-16, so the wait looks like the show, beaming) and says what
   is happening (`RUDY_READING`: "Checking who else has this…").
   RUDY'S PERSONALITY (2026-11-15, the user's direction: "he's spicy
   himself", make complaining fun): he lives in src/components/rudy.tsx. He
@@ -216,13 +218,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - Test company: `npm run tester -- someone@tester.com [--wait]` makes
   "Tester Company" and lets that account respond for it with its email
   marked verified. The account is made in the app, never by the script.
-- KEYBOARDS (2026-11-10): every text field has an obvious way to put the
-  keyboard away: a bar on top of it with a hide button
-  (`useKeyboardBar`, src/components/keyboard-bar.tsx; `Field` has it built
-  in, any bare TextInput must add it). THE ONE EXCEPTION is the complaint
-  box: everything about the complaint is already visible with the keyboard
-  up, so a hide bar there only costs a line of space. One bar per field: a shared one only
-  attaches to the first field. Scrolling a `Screen` dismisses it too.
+- KEYBOARDS (2026-11-10, reworked 2026-11-16): every text field has an
+  obvious way to put the keyboard away: on iOS a focused `Field` shows a
+  hide-keyboard button INSIDE it on the right (room for it is always
+  reserved, so text never shifts). NEVER an InputAccessoryView /
+  `inputAccessoryViewID`: React Native (prebuilt core, so no patch) reloads
+  a keyboard with an accessory view on every keystroke, which flipped the
+  number keyboard back to letters after each digit (passwords included).
+  THE ONE EXCEPTION is the complaint box: everything about the complaint
+  is already visible with the keyboard up. Scrolling a `Screen` dismisses
+  it too.
 - TRANSITIONS (2026-11-10): tabs switch with no animation (peers); going
   deeper slides sideways (the stack default); the complaint box is a task
   that covers the tab bar, so it rises from the bottom and drops back down
@@ -240,9 +245,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   operator's reason prompt) sit on the theme's `scrim` (a 72% dim)
   with their own surface and border, so their words never run into the
   page's.
-- An author can delete one complaint (`deleteComplaint`, account.ts; the
-  bin icon on their own card): its support is withdrawn and a point that
-  was its alone goes too. A point's followers are told when others join,
+- An author can EDIT or delete their own complaint, signed in or not
+  (2026-11-16, the user's direction: "if we know it is still the same
+  user, in all cases"): the pencil and bin icons on their own card, which
+  is theirs by `authorId` OR by their `users/{uid}/mine/{id}` index. Delete
+  (`deleteComplaint` -> `withdrawComplaint`, account.ts): its support is
+  withdrawn and a point that was its alone goes too. Edit opens it in the
+  box (`/complain?edit=<id>`, "Editing your complaint · posting replaces
+  it"), goes through Next as usual (its own issues read "Already yours", no
+  private option), and `submitComplaint({replaces})` records the new
+  version FIRST, then withdraws the old one with a successor: on issues the
+  new version also raises, support and headline credit pass to it instead
+  of being withdrawn, and its photos move over. Votes on the old wording
+  (Best rant, Easy peasy) do not carry. A point's followers are told when others join,
   at milestones only (`announceJoin`, points.ts). Lists page with "Show
   more"; photos open full size; the Me tab carries an unread badge.
 - Company dashboard (src/app/company/index.tsx): `Summary` works out, from
@@ -318,6 +333,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   Signed out, a prompt says the complaint is live without an account and
   that signing in keeps the history (once per post). Private and queued
   complaints keep their own after-screens.
+- ME ORDER (2026-11-16, the user's direction): name, "Not signed in." and
+  a "Sign in or sign up" button on top, then Your complaints (the latest 3,
+  the one just posted always among them, then "Show all N complaints"),
+  then the settings (notifications, appearance, respond for an org, hidden
+  authors, sign out, About).
 - Me lists "Your complaints" as ONE list, public and private in the same
   row form (a globe or lock label), newest activity first; there is no
   separate private-complaints screen. No category browsing and no

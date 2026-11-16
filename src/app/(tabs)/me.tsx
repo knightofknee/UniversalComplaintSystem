@@ -97,6 +97,9 @@ function AppearancePicker() {
   );
 }
 
+/** Complaints shown before "Show all". */
+const RECENT = 3;
+
 /** One of my complaints, public or private: the same row either way. */
 type Mine = {
   key: string;
@@ -148,6 +151,7 @@ export default function MeScreen() {
   const posted = useJustPosted();
   const scrollRef = useRef<ScrollView>(null);
   const [answered, setAnswered] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const blocked = useBlockedAuthors();
   const unread = useCollection<Notification>(
     user ? query(collection(db, `users/${user.uid}/notifications`), where('read', '==', false), limit(50)) : null,
@@ -198,6 +202,14 @@ export default function MeScreen() {
       resolved: t.status === 'resolved',
     })),
   ].sort((a, b) => b.at - a.at);
+  // The latest three, then "Show all". The one just posted is always among them.
+  const first = complaints.slice(0, RECENT);
+  const shown =
+    showAll || complaints.length <= RECENT
+      ? complaints
+      : posted && !first.some((c) => c.key === `s:${posted}`)
+        ? [...first, ...complaints.filter((c) => c.key === `s:${posted}`)]
+        : first;
   const responder = (profile?.responderFor ?? []).length > 0;
   const anonymous = !!user?.isAnonymous;
   return (
@@ -208,28 +220,15 @@ export default function MeScreen() {
       />
       <NameChanger name={profile?.displayName ?? 'You'} />
       <T variant="small">{anonymous ? 'Not signed in.' : user?.email}</T>
-      {anonymous && <Link icon="person-circle-outline" label="Sign in" href="/account" />}
+      {anonymous && <Button label="Sign in or sign up" onPress={() => router.push('/account')} />}
       <ConfirmEmail />
-      <Link
-        icon="notifications-outline"
-        label="Notifications"
-        detail={unread.items.length ? `${unread.items.length} new` : undefined}
-        href="/notifications"
-      />
-      <PushSwitch on={!!profile?.pushOn} />
-      <AppearancePicker />
-      <Link
-        icon="briefcase-outline"
-        label={responder ? 'Respond for your organization' : 'Work somewhere? Respond for it'}
-        href={responder ? '/company' : '/company/claim'}
-      />
-      {isOperator(user) && <Link icon="shield-half-outline" label="Operator queue" href="/operator" />}
 
+      {/* What they complained about comes first; the settings are below it. */}
       <T variant="label">Your complaints</T>
       {complaints.length === 0 ? (
         <Empty text="Nothing here yet." loading={mine.loading || threads.loading} />
       ) : (
-        complaints.map((c) => {
+        shown.map((c) => {
           const fresh = c.key === `s:${posted}`;
           return (
             <View
@@ -259,6 +258,28 @@ export default function MeScreen() {
           );
         })
       )}
+      {complaints.length > shown.length && (
+        <Button
+          label={`Show all ${complaints.length} complaints`}
+          kind="quiet"
+          onPress={() => setShowAll(true)}
+        />
+      )}
+
+      <Link
+        icon="notifications-outline"
+        label="Notifications"
+        detail={unread.items.length ? `${unread.items.length} new` : undefined}
+        href="/notifications"
+      />
+      <PushSwitch on={!!profile?.pushOn} />
+      <AppearancePicker />
+      <Link
+        icon="briefcase-outline"
+        label={responder ? 'Respond for your organization' : 'Work somewhere? Respond for it'}
+        href={responder ? '/company' : '/company/claim'}
+      />
+      {isOperator(user) && <Link icon="shield-half-outline" label="Operator queue" href="/operator" />}
 
       {blocked.list.length > 0 && (
         <>

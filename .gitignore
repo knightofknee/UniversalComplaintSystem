@@ -47,3 +47,4 @@ functions/lib/
 
 # App review credentials (npm run reviewer)
 .reviewer.local
+store/screenshots/upload-ios/

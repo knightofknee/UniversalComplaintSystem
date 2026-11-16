@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getDownloadURL, ref } from 'firebase/storage';
 import { useEffect, useState } from 'react';
@@ -298,6 +299,7 @@ function confirmHide(name: string, onYes: () => void) {
 export function SubmissionCard({ s }: { s: Submission }) {
   const theme = useTheme();
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [original, setOriginal] = useState(false);
   const [opened, setOpened] = useState(false);
   const blocked = useBlockedAuthors();
@@ -305,7 +307,10 @@ export function SubmissionCard({ s }: { s: Submission }) {
   const source = s.source;
   const hidden = !!s.authorId && blocked.ids.has(s.authorId);
   const loves = s.loves ?? 0;
-  const own = !!s.authorId && s.authorId === profile?.authorId;
+  // Yours if the account wrote it: by its public author id, or by its own
+  // private index of what it posted (which is there signed in or not).
+  const { data: indexed } = useDoc<{ at?: unknown }>(user && !s.source ? `users/${user.uid}/mine/${s.id}` : null);
+  const own = (!!s.authorId && s.authorId === profile?.authorId) || !!indexed;
 
   // An author you hid: folded shut, never gone. You can still see that
   // someone you hid weighed in, and open it if this is the one time you want
@@ -345,6 +350,16 @@ export function SubmissionCard({ s }: { s: Submission }) {
             <ReportButton target={{ kind: 'submission', id: s.id }} compact />
           ) : (
             <>
+              {own && (
+                <Pressable
+                  onPress={() => router.push({ pathname: '/complain', params: { edit: s.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit this complaint"
+                  hitSlop={6}
+                  style={styles.icon}>
+                  <Ionicons name="create-outline" size={20} color={theme.textSecondary} />
+                </Pressable>
+              )}
               {own ? (
                 <Pressable
                   onPress={() =>
