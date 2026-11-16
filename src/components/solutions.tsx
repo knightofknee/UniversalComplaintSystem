@@ -47,7 +47,7 @@ export function Solutions({ pointId, supported }: { pointId: string; supported: 
       {writing ? (
         <ProposeBox pointId={pointId} onDone={() => setWriting(false)} />
       ) : (
-        !mine && <Button kind="secondary" icon="construct-outline" label="Propose a fix" onPress={() => setWriting(true)} />
+        !mine && <Button kind="quiet" icon="construct-outline" label="Propose a fix" onPress={() => setWriting(true)} />
       )}
     </>
   );

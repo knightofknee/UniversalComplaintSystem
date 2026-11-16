@@ -8,9 +8,9 @@ import { PointCard, PointList } from '@/components/point-card';
 import { Button, Empty, Field, InlineError, Row, Screen, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, searchPoints } from '@/lib/api';
+import { errorText, searchPoints, type ComplaintHit } from '@/lib/api';
 import { db } from '@/lib/firebase';
-import { people, useCollection } from '@/lib/hooks';
+import { people, timeAgo, useCollection } from '@/lib/hooks';
 import type { PointHit, Subject } from '@/lib/types';
 
 type SubjectHit = { id: string; name: string; kind: string; description: string };
@@ -56,12 +56,16 @@ export default function SearchScreen() {
   const [kind, setKind] = useState<Kind>('both');
   const [points, setPoints] = useState<PointHit[]>([]);
   const [subjects, setSubjects] = useState<SubjectHit[]>([]);
+  const [complaints, setComplaints] = useState<ComplaintHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
   const active = q.trim().length >= 2;
   const shownSubjects = active ? subjects.filter((s) => kind === 'both' || s.kind === kind) : [];
   const shownPoints = active ? points : [];
+  // What people said comes first; the Companies / Topics pick narrows to pages, so they show under Both.
+  const shownComplaints = active && kind === 'both' ? complaints : [];
+  const nothing = shownPoints.length === 0 && shownSubjects.length === 0 && shownComplaints.length === 0;
 
   useEffect(() => {
     const term = q.trim();
@@ -83,13 +87,16 @@ export default function SearchScreen() {
               limit(8),
             ),
           ),
-          term.length >= 4 ? searchPoints({ query: term }) : Promise.resolve({ points: [], subjects: [] }),
+          term.length >= 4
+            ? searchPoints({ query: term, complaints: true })
+            : Promise.resolve({ points: [], subjects: [], complaints: [] }),
         ]);
         if (mine !== seq.current) return;
         const named = byName.docs.map((d) => ({ id: d.id, ...d.data() }) as SubjectHit);
         const seen = new Set(named.map((s) => s.id));
         setSubjects([...named, ...byMeaning.subjects.filter((s) => !seen.has(s.id))]);
         setPoints(byMeaning.points);
+        setComplaints(byMeaning.complaints ?? []);
       } catch (e) {
         if (mine === seq.current) setError(errorText(e));
       } finally {
@@ -113,6 +120,12 @@ export default function SearchScreen() {
       <KindPick value={kind} onChange={setKind} />
       <InlineError text={error} />
       {!active && <Starters kind={kind} />}
+      {shownComplaints.length > 0 && <T variant="label">What people said</T>}
+      <View>
+        {shownComplaints.map((c) => (
+          <ComplaintRow key={c.id} c={c} onPress={() => router.push(`/submission/${c.id}`)} />
+        ))}
+      </View>
       {shownSubjects.length > 0 && <T variant="label">Companies and topics</T>}
       <View>
         {shownSubjects.map((s) => (
@@ -130,13 +143,13 @@ export default function SearchScreen() {
           <PointCard key={p.id} point={p} />
         ))}
       </PointList>
-      {q.trim().length >= 2 && !loading && shownPoints.length === 0 && shownSubjects.length === 0 && !error && (
+      {q.trim().length >= 2 && !loading && nothing && !error && (
         <>
           <Empty text="Nothing here yet." />
           <Button kind="secondary" icon="add" label="Complain about it" onPress={() => router.push('/complain')} />
         </>
       )}
-      {active && loading && shownPoints.length === 0 && shownSubjects.length === 0 && <Empty text="" loading />}
+      {active && loading && nothing && <Empty text="" loading />}
     </Screen>
   );
 }
@@ -168,6 +181,26 @@ function SubjectRow({
         </T>
       </View>
       <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+    </Pressable>
+  );
+}
+
+/** One complaint found by its words: the words first, then who, when and what it's about. */
+function ComplaintRow({ c, onPress }: { c: ComplaintHit; onPress: () => void }) {
+  const theme = useTheme();
+  const votes = [c.loves ? `🤬 ${c.loves}` : '', c.easy ? `🍋 ${c.easy}` : ''].filter(Boolean).join('  ');
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      style={({ pressed }) => [styles.complaint, { borderTopColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
+      <T numberOfLines={3}>{c.text}</T>
+      <T variant="small" numberOfLines={1}>
+        {[c.source ? `Public record · ${c.source}` : c.authorName, timeAgo(c.createdAt ?? undefined), c.subjectNames.join(' · ')]
+          .filter(Boolean)
+          .join(' · ')}
+      </T>
+      {votes ? <T variant="small">{votes}</T> : null}
     </Pressable>
   );
 }
@@ -217,4 +250,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   rank: { fontFamily: Fonts.display, fontSize: 20, width: 26 },
+  complaint: { gap: 4, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

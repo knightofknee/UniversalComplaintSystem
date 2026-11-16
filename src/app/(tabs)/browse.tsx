@@ -4,11 +4,11 @@ import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ComplaintCard, useHotComplaints, useNewComplaints } from '@/components/complaint-feed';
 import { PointCard, PointList } from '@/components/point-card';
 import { Button, Empty, Row, Screen, T } from '@/components/ui';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useBlockedAuthors } from '@/lib/blocks';
 import { db } from '@/lib/firebase';
 import { useCollection } from '@/lib/hooks';
 import type { Point, Submission } from '@/lib/types';
@@ -36,7 +36,12 @@ const FEEDS: { key: Feed; label: string }[] = [
 /** Said plainly, with no joke and no finger pointed: an empty list is nobody's fault. */
 const EMPTY = 'Nothing here yet.';
 
-/** Complaints: everything people complained about, sorted in ways worth scrolling. */
+/**
+ * Complaints: everything people complained about, sorted in ways worth
+ * scrolling. Hot, Best rants, Easiest and New list the complaints
+ * themselves, in their authors' words; Top and Fixed list issues (what many
+ * complaints share).
+ */
 export default function RecordScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -49,8 +54,9 @@ export default function RecordScreen() {
   const points = collection(db, 'points');
   const live = where('removed', '==', false);
 
+  const issueFeed = feed === 'top' || feed === 'fixed';
   const pointList = useCollection<Point>(
-    feed === 'rants' || feed === 'easy'
+    !issueFeed
       ? null
       : query(
           points,
@@ -59,13 +65,9 @@ export default function RecordScreen() {
           // from the imported public records, and at equal real support
           // what a person raised comes before what was imported. The
           // public records only fill in below.
-          ...(feed === 'hot'
-            ? [orderBy('weekPeople', 'desc'), orderBy('imported', 'asc'), orderBy('weekSupport', 'desc')]
-            : feed === 'top'
-              ? [orderBy('people', 'desc'), orderBy('imported', 'asc'), orderBy('supportCount', 'desc')]
-              : feed === 'fixed'
-                ? [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]
-                : [orderBy('imported', 'asc'), orderBy('createdAt', 'desc')]),
+          ...(feed === 'top'
+            ? [orderBy('people', 'desc'), orderBy('imported', 'asc'), orderBy('supportCount', 'desc')]
+            : [where('status', '==', 'fixed'), orderBy('lastActivityAt', 'desc')]),
           limit(count),
         ),
     `record:${feed}:${count}`,
@@ -105,7 +107,9 @@ export default function RecordScreen() {
           0,
           ENOUGH_VOTED,
         );
-  const shownPoints = feed === 'hot' ? pointList.items.filter((p) => (p.weekSupport ?? 0) > 0) : pointList.items;
+  const hot = useHotComplaints(undefined, count, feed === 'hot');
+  const fresh = useNewComplaints(undefined, count, feed === 'new');
+  const complaints = feed === 'hot' ? hot : fresh;
 
   return (
     <Screen topInset>
@@ -142,7 +146,18 @@ export default function RecordScreen() {
         shownRants.length === 0 ? (
           <Empty loading={rants.loading} text={EMPTY} />
         ) : (
-          shownRants.map((s, i) => <RantCard key={s.id} s={s} rank={i + 1} />)
+          shownRants.map((s, i) => <ComplaintCard key={s.id} s={s} rank={i + 1} kind="rant" />)
+        )
+      ) : feed === 'hot' || feed === 'new' ? (
+        complaints.items.length === 0 ? (
+          <Empty loading={complaints.loading} text={EMPTY} />
+        ) : (
+          <>
+            {complaints.items.map((s, i) => (
+              <ComplaintCard key={s.id} s={s} kind={feed} rank={feed === 'hot' ? i + 1 : undefined} />
+            ))}
+            {complaints.more && <Button kind="secondary" label="Show more" onPress={() => setCount(count + LIST)} />}
+          </>
         )
       ) : feed === 'easy' ? (
         easy.items.length === 0 ? (
@@ -150,20 +165,20 @@ export default function RecordScreen() {
         ) : (
           <>
             {easy.items.map((s, i) => (
-              <RantCard key={s.id} s={s} rank={i + 1} easy />
+              <ComplaintCard key={s.id} s={s} rank={i + 1} kind="easy" />
             ))}
             {easy.items.length >= count && (
               <Button kind="secondary" label="Show more" onPress={() => setCount(count + LIST)} />
             )}
           </>
         )
-      ) : shownPoints.length === 0 ? (
+      ) : pointList.items.length === 0 ? (
         <Empty loading={pointList.loading} text={EMPTY} />
       ) : (
         <>
           <PointList>
-            {shownPoints.map((p, i) => (
-              <PointCard key={p.id} point={p} rank={feed === 'new' ? undefined : i + 1} />
+            {pointList.items.map((p, i) => (
+              <PointCard key={p.id} point={p} rank={i + 1} />
             ))}
           </PointList>
           {pointList.items.length >= count && (
@@ -175,47 +190,7 @@ export default function RecordScreen() {
   );
 }
 
-/** A complaint in its author's words, with its votes: a rant's heat, or how easy it looks to fix. */
-function RantCard({ s, rank, easy }: { s: Submission; rank: number; easy?: boolean }) {
-  const theme = useTheme();
-  const router = useRouter();
-  const score = s.rantScore ?? 0;
-  const loves = s.loves ?? 0;
-  const blocked = useBlockedAuthors();
-  const hidden = !!s.authorId && blocked.ids.has(s.authorId);
-  return (
-    <Pressable
-      onPress={() => router.push(`/submission/${s.id}`)}
-      style={({ pressed }) => [styles.rant, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.85 : 1 }]}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Text style={[styles.rantRank, { color: easy ? theme.good : theme.rant }]}>#{rank}</Text>
-        {easy ? (
-          <Text style={{ color: theme.good, fontFamily: Fonts.bold, fontSize: 14 }}>🍋 {(s.easy ?? 0).toLocaleString()}</Text>
-        ) : loves > 0 ? (
-          <Text style={{ color: theme.rant, fontFamily: Fonts.bold, fontSize: 14 }}>🤬 {loves.toLocaleString()}</Text>
-        ) : (
-          <Text style={{ color: theme.new, fontFamily: Fonts.bold, fontSize: 14 }}>✨ Model&apos;s pick · {score}/10</Text>
-        )}
-      </Row>
-      {hidden ? (
-        <T variant="small">Hidden by you. Tap to open it anyway.</T>
-      ) : (
-        <Text style={[styles.rantText, { color: theme.text }]} numberOfLines={8}>
-          {s.text}
-        </Text>
-      )}
-      <T variant="small" numberOfLines={1}>
-        {hidden ? '' : `${s.authorName} · `}
-        {s.subjectNames.slice(0, 3).join(' · ')}
-      </T>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   plus: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   feed: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
-  rant: { borderRadius: 18, padding: 16, gap: 10 },
-  rantRank: { fontFamily: Fonts.display, fontSize: 20 },
-  rantText: { fontFamily: Fonts.medium, fontSize: 19, lineHeight: 26 },
 });

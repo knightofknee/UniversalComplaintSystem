@@ -103,33 +103,39 @@ export function Vote({ pointId, count }: { pointId: string; count: number }) {
 }
 
 /**
- * The one big support button on a point's own page: the same up arrow and
- * count as the rows, larger, and no words. Filled once it's yours.
+ * The big support button on an issue's own page, the page's main action:
+ * full width and filled, "I have this too" with the count. Once it's yours
+ * it settles into a quieter "You have this too" (tap again to take it
+ * back). List rows keep the compact arrow box (`Vote`).
  */
 export function SupportButton({ pointId, count }: { pointId: string; count: number }) {
   const theme = useTheme();
   const { on, shown, toggle, scale } = useSupport(pointId, count);
+  const ink = on ? theme.primary : theme.onPrimary;
   return (
-    <Animated.View style={{ transform: [{ scale }], alignSelf: 'flex-start' }}>
+    <Animated.View style={{ transform: [{ scale }], alignSelf: 'stretch' }}>
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
         accessibilityLabel={
           on
-            ? `You support this: you have this issue too. ${shown} people do. Tap to take it back.`
-            : `Support this: you have this issue too. ${shown} people do.`
+            ? `You have this issue too, with ${shown} people. Tap to take it back.`
+            : `I have this too. ${shown} people do.`
         }
         accessibilityState={{ selected: on }}
         style={({ pressed }) => [
           styles.hero,
           {
-            backgroundColor: on ? theme.primaryFill : theme.backgroundElement,
-            borderColor: on ? theme.primaryFill : theme.border,
+            backgroundColor: on ? theme.primarySoft : theme.primaryFill,
+            borderColor: on ? theme.primary : theme.primaryFill,
             opacity: pressed ? 0.85 : 1,
           },
         ]}>
-        <Ionicons name="arrow-up" size={24} color={on ? theme.onPrimary : theme.primary} />
-        <Text style={[styles.heroCount, { color: on ? theme.onPrimary : theme.text }]}>{shown.toLocaleString()}</Text>
+        <Ionicons name={on ? 'checkmark' : 'arrow-up'} size={22} color={ink} />
+        <Text style={[styles.heroLabel, { color: ink }]} numberOfLines={1}>
+          {on ? 'You have this too' : 'I have this too'}
+        </Text>
+        <Text style={[styles.heroCount, { color: ink }]}>{shown.toLocaleString()}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -205,13 +211,12 @@ const styles = StyleSheet.create({
   hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    minWidth: 96,
-    justifyContent: 'center',
+    gap: 10,
     borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    minHeight: 56,
   },
-  heroCount: { fontFamily: Fonts.bold, fontSize: 22 },
+  heroLabel: { fontFamily: Fonts.bold, fontSize: 18, flex: 1 },
+  heroCount: { fontFamily: Fonts.bold, fontSize: 20 },
 });

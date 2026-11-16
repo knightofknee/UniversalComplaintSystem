@@ -84,9 +84,69 @@ async function ranks() {
   console.log(`${u} of ${users.size} accounts given their public author id.`);
 }
 
+/**
+ * 2026-11-16: Hot and New list complaints. `npm run migrate hot` runs only this.
+ * - every submission has `source` (null = a person wrote it), so New can
+ *   list people's complaints first (`where('source', '==', null)`);
+ * - `hotRank` is worked out once now; recountRising keeps it every 6 hours.
+ */
+async function hot() {
+  const { db } = await import('../functions/src/common');
+  const { rankHot } = await import('../functions/src/points');
+  const subs = await db.collection('submissions').select('source').get();
+  const writer = db.bulkWriter();
+  let n = 0;
+  for (const s of subs.docs) {
+    if (s.get('source') !== undefined) continue;
+    void writer.update(s.ref, { source: null });
+    n++;
+  }
+  await writer.close();
+  console.log(`${n} of ${subs.size} complaints given source: null.`);
+  await rankHot();
+  console.log('Hot ranks worked out.');
+}
+
+/**
+ * 2026-11-16: Search finds complaints by what they say. `npm run migrate
+ * search` gives every public complaint a person wrote its vector in the
+ * server-only `complaintVectors` (new ones get it when posted). Public
+ * records are skipped unless `--imported` is added: they are seed data that
+ * will stop being shown, and there are many more of them.
+ */
+async function searchVectors() {
+  const { db } = await import('../functions/src/common');
+  const { embed } = await import('../functions/src/ai');
+  const { saveComplaintVector } = await import('../functions/src/intake');
+  const withImported = process.argv.includes('--imported');
+  const [subs, have] = await Promise.all([
+    db.collection('submissions').where('removed', '==', false).select('text', 'source').get(),
+    db.collection('complaintVectors').select().get(),
+  ]);
+  const done = new Set(have.docs.map((d) => d.id));
+  const imported = subs.docs.filter((s) => !!s.get('source')).length;
+  const todo = subs.docs.filter(
+    (s) => !done.has(s.id) && (withImported || !s.get('source')) && s.get('text') !== '[deleted]',
+  );
+  console.log(
+    `${subs.size} public complaints (${imported} from public records), ${done.size} already searchable, ${todo.length} to embed.`,
+  );
+  // 100 per call: each call counts once against the day's embedding cap.
+  for (let i = 0; i < todo.length; i += 100) {
+    const batch = todo.slice(i, i + 100);
+    const vectors = await embed(batch.map((s) => s.get('text') as string));
+    await Promise.all(batch.map((s, j) => saveComplaintVector(s.id, vectors[j])));
+    console.log(`  ${Math.min(i + 100, todo.length)} of ${todo.length}`);
+  }
+  if (!withImported && imported) console.log(`Public records skipped; add --imported to include them.`);
+}
+
 async function main() {
+  if (process.argv[2] === 'search') return searchVectors();
   if (process.argv[2] === 'ranks') return ranks();
+  if (process.argv[2] === 'hot') return hot();
   await ranks();
+  await hot();
   const { authorIdOf, db, FieldValue } = await import('../functions/src/common');
 
   const mine = await db.collectionGroup('mine').get();

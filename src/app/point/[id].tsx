@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, documentId, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
@@ -70,6 +70,18 @@ export default function PointScreen() {
     );
   }, [added.items, matched.items]);
   const [shown, setShown] = useState(FIRST);
+  // The reader's own complaint here, if they wrote one: by author id, or by
+  // their own index of what they posted (there signed in or not).
+  const firstIds = complaints.slice(0, 30).map((c) => c.id);
+  const indexed = useCollection<{ id: string }>(
+    user && firstIds.length
+      ? query(collection(db, `users/${user.uid}/mine`), where(documentId(), 'in', firstIds))
+      : null,
+    `mine-here:${user?.uid}:${firstIds.join(',')}`,
+  );
+  const mine =
+    complaints.find((c) => !c.source && !!c.authorId && c.authorId === profile?.authorId) ??
+    complaints.find((c) => indexed.items.some((m) => m.id === c.id));
   const blocked = useBlockedAuthors();
   const { data: headlineFrom } = useDoc<Submission>(point ? `submissions/${point.canonical.submissionId}` : null);
   // A hidden author's name shows nowhere until their complaint is opened, the headline's credit included.
@@ -133,10 +145,12 @@ export default function PointScreen() {
       <T variant="title" style={{ fontSize: 28, lineHeight: 33 }}>
         {point.text}
       </T>
-      <Row style={{ flexWrap: 'wrap' }}>
-        <SupportButton pointId={point.id} count={point.supportCount} />
-        <StatusChip status={point.status} />
-      </Row>
+      <SupportButton pointId={point.id} count={point.supportCount} />
+      {point.status !== 'open' && (
+        <Row>
+          <StatusChip status={point.status} />
+        </Row>
+      )}
       <Row style={{ flexWrap: 'wrap', gap: 6 }}>
         {point.subjectIds.map((sid, i) => (
           <Pressable
@@ -167,22 +181,32 @@ export default function PointScreen() {
           onPress={() => setShown(complaints.length)}
         />
       )}
-      <Button
-        kind="secondary"
-        label="I have more to add"
-        icon="add"
-        onPress={() =>
-          router.push({
-            pathname: '/complain',
-            params: point.subjectIds[0]
-              ? {
-                  subjectId: point.subjectIds[0],
-                  subjectName: point.subjectNames[0],
-                }
-              : {},
-          })
-        }
-      />
+      {/* The support button above is the page's main action; these are quieter. */}
+      {mine ? (
+        <Button
+          kind="quiet"
+          label="Edit my complaint"
+          icon="create-outline"
+          onPress={() => router.push({ pathname: '/complain', params: { edit: mine.id } })}
+        />
+      ) : (
+        <Button
+          kind="quiet"
+          label="I have more to add"
+          icon="add"
+          onPress={() =>
+            router.push({
+              pathname: '/complain',
+              params: point.subjectIds[0]
+                ? {
+                    subjectId: point.subjectIds[0],
+                    subjectName: point.subjectNames[0],
+                  }
+                : {},
+            })
+          }
+        />
+      )}
 
       {responses.items.length > 0 && <T variant="label">Responses</T>}
       {responses.items

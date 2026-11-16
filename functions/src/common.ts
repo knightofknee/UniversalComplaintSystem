@@ -172,6 +172,7 @@ async function limitKey(key: string, bucketName: string, { max, windowMs }: { ma
 export type NoticeInput = {
   type: string;
   pointId?: string;
+  submissionId?: string;
   subjectId?: string;
   threadId?: string;
   draftId?: string;
@@ -183,9 +184,36 @@ export function linkFor(n: NoticeInput): string {
   if (n.threadId && n.subjectId) return `/thread/${n.subjectId}/${n.threadId}`;
   if (n.draftId) return `/complain?draft=${n.draftId}`;
   if (n.pointId) return `/point/${n.pointId}`;
+  if (n.submissionId) return `/submission/${n.submissionId}`;
   if (n.type === 'operator') return '/operator';
   if (n.subjectId) return `/subject/${n.subjectId}`;
   return '/notifications';
+}
+
+/**
+ * The kinds of notification a person can turn off one by one (Me > Settings):
+ * a notice's `type` maps to its kind. Turned off, it is neither written to
+ * their notifications nor sent to their phone (`users.notifyOff`).
+ */
+export const NOTICE_KINDS = ['votes', 'joined', 'response', 'status', 'fix', 'thread', 'draft', 'access'] as const;
+export type NoticeKind = (typeof NOTICE_KINDS)[number];
+export function kindOf(type: string): NoticeKind | null {
+  if (type === 'love' || type === 'easy') return 'votes';
+  return (NOTICE_KINDS as readonly string[]).includes(type) ? (type as NoticeKind) : null;
+}
+
+/** Those of `uids` who haven't turned off this kind of notification. */
+async function wanting(uids: string[], type: string): Promise<string[]> {
+  const kind = kindOf(type);
+  if (!kind || uids.length === 0) return uids;
+  const keep: string[] = [];
+  for (let i = 0; i < uids.length; i += 100) {
+    const snaps = await db.getAll(...uids.slice(i, i + 100).map((u) => db.doc(`users/${u}`)), { fieldMask: ['notifyOff'] });
+    for (const s of snaps) {
+      if (!((s.get('notifyOff') as string[] | undefined) ?? []).includes(kind)) keep.push(s.id);
+    }
+  }
+  return keep;
 }
 
 /**
@@ -193,7 +221,7 @@ export function linkFor(n: NoticeInput): string {
  * those who turned them on. Push is best effort and never fails the call.
  */
 export async function notify(uids: string[], n: NoticeInput) {
-  const unique = [...new Set(uids)].filter((u) => !u.includes(':'));
+  const unique = await wanting([...new Set(uids)].filter((u) => !u.includes(':')), n.type);
   const link = linkFor(n);
   for (let i = 0; i < unique.length; i += 400) {
     const batch = db.batch();

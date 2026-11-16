@@ -99,6 +99,8 @@ export type Submission = {
   easy?: number;
   /** Sort key of "Best rants": votes, then written by a person, then the model's score. 0 = not listed. */
   rantRank?: number;
+  /** Sort key of "Hot" (last 7 days; `rankHot` in functions/src/points.ts). 0 or missing = not listed. */
+  hotRank?: number;
   /** 1-5 peppers (the language, not the problem). */
   spice?: number;
   actionability: number;

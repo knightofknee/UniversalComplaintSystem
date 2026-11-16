@@ -11,6 +11,7 @@
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { CALLABLE, db, ensureUser, FieldValue, rateLimit, uidOf } from './common';
+import { announceVote } from './rants';
 
 export const easyFix = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
@@ -22,7 +23,7 @@ export const easyFix = onCall(CALLABLE, async (req) => {
   const author = await db.doc(`authors/${submissionId}`).get();
   if (author.get('uid') === uid) throw new HttpsError('failed-precondition', 'That one is yours. Others decide if it is easy.');
   const ref = db.doc(`submissions/${submissionId}`);
-  return db.runTransaction(async (tx) => {
+  const res = await db.runTransaction(async (tx) => {
     const sub = await tx.get(ref);
     if (!sub.exists || sub.get('removed')) throw new HttpsError('not-found', 'That complaint is gone.');
     if (sub.get('source')) throw new HttpsError('failed-precondition', 'Public records can\'t be voted on.');
@@ -33,8 +34,10 @@ export const easyFix = onCall(CALLABLE, async (req) => {
     if (easy) tx.set(mine.ref, { uid, at: FieldValue.serverTimestamp() });
     else tx.delete(mine.ref);
     tx.update(ref, { easy: count });
-    return { easy, count };
+    return { easy, count, changed: true, text: sub.get('text') as string };
   });
+  if ('changed' in res && res.easy) await announceVote(submissionId, uid, 'easy', res.count, res.text ?? '').catch(() => {});
+  return { easy: res.easy, count: res.count };
 });
 
 /** Deleting an account withdraws its Easy peasy votes (account.ts). */

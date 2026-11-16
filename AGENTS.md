@@ -45,10 +45,22 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   claim page, private sending) with "Send the link again". The sign-in
   sheet closes once someone is signed in; there is no signed-in Account
   page. Deleting an account is
-  its own screen (/delete-account), reached only through Me > About, never
-  on the Me tab or the sign-in page. Me has a "Sign out" button (signed in
-  only) above the single "About" row (src/app/more.tsx: how it works,
-  help, removal log, privacy, terms, delete account).
+  its own screen (/delete-account), reached only through Me > Settings,
+  never on the Me tab or the sign-in page. Me has a "Sign out" button
+  (signed in only) above the single "Settings" row (src/app/more.tsx,
+  2026-11-16: How UCS works and Help first, then Notifications (the phone
+  switch, then one switch per kind), then About: removal log, privacy,
+  terms, delete account).
+- NOTIFICATION SWITCHES (2026-11-16, the user's direction: "users should
+  be able to disable different types of notifications"): every kind has
+  its own switch in Settings (`NOTICE_KINDS` / `kindOf` in common.ts,
+  mirrored in more.tsx: votes, joined, fix, status, response, thread,
+  draft, access). `setNotify` (push.ts) keeps `users.notifyOff`; `notify`
+  skips anyone who turned that kind off (neither the in-app notice nor the
+  phone). A new notification type must map to a kind and get a switch.
+  VOTES ON YOUR COMPLAINT NOTIFY ITS AUTHOR (`announceVote`, rants.ts):
+  Best rant and Easy peasy, at milestones only (1, 3, 5, 10, 25, ...), each
+  once (`authors/{id}.notified`), never for their own vote.
 - Names (functions/src/names.ts): random two-word names from the lists in
   common.ts, never typed. Me shows the name with a shuffle button
   (`NameChanger`): shuffle through `nameOptions`, nothing changes until
@@ -187,6 +199,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   plus reason; category a plain string) and `expand` turns it into the
   `IntakeResult` everything else reads (2026-11-11, to make room for
   `said`).
+  THE REVIEW NEVER JUDGES THE AUTHOR (2026-11-16, the user: "we support
+  complaints, we dont judge except for when we know something is violating
+  a line"): no verdict heading, tone chip or fixability score; the peppers,
+  Rudy and his take (`rudyVerdict`, which backs the person and never
+  grades the complaint), and "Filed under" folded to one line with Change.
   Copy is fun and pushes toward improvement, not criticism. Errors are
   inline lines or toasts (`showToast`, src/components/toast.tsx), never
   pop-up alerts, never codes (`errorText` in src/lib/api.ts).
@@ -293,9 +310,13 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   good or is simply kind; NONE implies the writer is doing something wrong.
 - Lists: flush rows with hairlines (`PointList` + `PointCard`) and a compact
   vote box on the right (`Vote`: arrow over count). The big one
-  (`SupportButton`) is only on a point's own page. SUPPORT HAS NO WORDS
-  (2026-11-09): the up arrow and a count, nothing else. "Same here" is
-  retired, like "Me too" before it; in prose say "support". A point's page
+  (`SupportButton`) is only on a point's own page. IN LISTS SUPPORT HAS NO
+  WORDS (2026-11-09): the up arrow and a count. ON THE ISSUE PAGE
+  (2026-11-16, the user's direction) it is the obvious full-width filled
+  button: arrow, "I have this too" and the count; once supported, "You
+  have this too" (tap to undo). "I have more to add" (or "Edit my
+  complaint" for its author) and "Propose a fix" are quiet buttons.
+  "Same here" and "Me too" stay retired; in prose say "support". A point's page
   has no header title (blank beats "Point").
 - TWO SEPARATE VOTES (2026-11-09). The arrow on a POINT means "I have this
   problem too" (`supportPoint`). "🤬 Best rant" on a COMPLAINT means "I
@@ -321,12 +342,24 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   topped up with rants the model scored 7+ (`rantScore`, 1-10, only rants
   get one), labeled "Model's pick". New fields on old data:
   `npm run migrate ranks`.
+- COMPLAINTS FIRST IN LISTS (2026-11-16, the user's direction): the
+  Complaints tab shows people's COMPLAINTS in their own words
+  (`ComplaintCard`, src/components/complaint-feed.tsx) for 🔥 Hot, 🤬 Best
+  rants, 🍋 Easiest and 🆕 New; only 🏆 Top and ✅ Fixed list issues.
+  Organization and topic pages: title, description, "Complain about X",
+  then 🔥 Hot / 🏆 Top / 🆕 New (Hot and New are complaints about it), and
+  only after the list the stats, the "isn't answering yet" notice and the
+  "Work at X?" card. No "Kinds of issues" carousel.
 - Complaints (`/browse`, tabs: New → `/`, Complaints, Search, Me) sorts by
-  🔥 Hot (`weekPeople`, `imported`, `weekSupport`; recounted every 6h by
-  `recountRising`), 🤬 Best rants (submissions by `rantRank`), 🍋 Easiest
-  (submissions by `easy`), 🏆 Top
-  (`people`, `imported`, `supportCount`; never "Most shared"), ✅ Fixed,
-  🆕 New (`imported`, `createdAt`). A sort is its name and nothing else: no
+  🔥 Hot (complaints by `hotRank`, rankHot in points.ts every 6h: a person's
+  complaint +1,000,000 over any record, log engagement (Best rant, Easy
+  peasy, people on its biggest issue) plus recency; last 7 days; topped up
+  with the newest person-written ones; fresh posts ranked on the device),
+  🤬 Best rants (submissions by `rantRank`), 🍋 Easiest (submissions by
+  `easy`), 🏆 Top (issues by `people`, `imported`, `supportCount`; never
+  "Most shared"), ✅ Fixed (issues), 🆕 New (complaints, person-written
+  first: `source == null`, then `createdAt`). Old data: `npm run migrate
+  hot`. A sort is its name and nothing else: no
   line of description under it. Empty lists say "Nothing here yet." with
   no joke and no finger pointed at anyone (2026-11-10).
 - AFTER POSTING (2026-11-10) there is no "Posted" screen: the box clears
@@ -339,14 +372,21 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
 - ME ORDER (2026-11-16, the user's direction): name, "Not signed in." and
   a "Sign in or sign up" button on top, then Your complaints (the latest 3,
   the one just posted always among them, then "Show all N complaints"),
-  then the settings (notifications, appearance, respond for an org, hidden
-  authors, sign out, About).
+  each showing what it has gathered ("⬆ N have this · 🤬 N Best rant ·
+  🍋 N Easy peasy"), then notifications, appearance, respond for an org,
+  hidden authors, sign out, Settings.
 - Me lists "Your complaints" as ONE list, public and private in the same
   row form (a globe or lock label), newest activity first; there is no
   separate private-complaints screen. No category browsing and no
   "biggest topics" grid: topics are tags on points, reachable from them.
   Topic and organization pages use the same sorts. Search opens on "Most
-  complained about" (subjects by supporters). The small Companies / Topics
+  complained about" (subjects by supporters). SEARCH FINDS WHAT PEOPLE SAID
+  (2026-11-16): results lead with "What people said" (complaints by
+  meaning, under Both): each public complaint's vector is kept server-only
+  in `complaintVectors/{id}` (reused from analysis, so posting costs
+  nothing extra; dropped when it is deleted, `forgetComplaintVector`) and
+  `searchPoints({complaints: true})` runs one more nearest lookup. Old
+  data: `npm run migrate search -- --imported`. The small Companies / Topics
   / Both pick sits under the search box and is ALWAYS visible, with or
   without results; it filters the list and the pages in search results.
 - Type: Bricolage Grotesque (`Fonts` in src/constants/theme.ts) for titles,

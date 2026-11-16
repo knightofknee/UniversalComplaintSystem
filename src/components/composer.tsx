@@ -10,6 +10,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ComponentProps,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -1306,35 +1307,18 @@ function ReviewSection(props: {
     );
   }
 
-  const tone =
-    result.tone === "rant"
-      ? { label: "🔥 Rant", color: theme.rant, bg: theme.rantSoft }
-      : result.tone === "constructive"
-        ? { label: "🛠 Constructive", color: theme.good, bg: theme.goodSoft }
-        : {
-            label: "😐 Matter-of-fact",
-            color: theme.textSecondary,
-            bg: theme.backgroundElement,
-          };
-  const fixability = Math.round((result.actionability ?? 0) / 10);
   const unpostablePhotos = result.photos.filter(
     (p) => !p.ok || p.containsPersonalData,
   ).length;
 
   return (
     <View style={{ gap: 22 }}>
-      <Section title="The verdict">
-        <Row style={{ flexWrap: "wrap" }}>
-          <Chip label={tone.label} color={tone.color} bg={tone.bg} />
-          <Chip
-            label={`Fixability ${fixability}/10`}
-            color={theme.primary}
-            bg={theme.primarySoft}
-          />
-          <Row style={{ gap: 6 }}>
-            <Peppers n={result.spice ?? 1} size={14} />
-            <T variant="small">{SPICE_LABELS[result.spice ?? 1]}</T>
-          </Row>
+      {/* No verdict, no score: we back complaints, we don't grade them.
+          Rudy's take and the heat are all there is, plus a wording to try. */}
+      <View style={{ gap: 10 }}>
+        <Row style={{ gap: 6 }}>
+          <Peppers n={result.spice ?? 1} size={14} />
+          <T variant="small">{SPICE_LABELS[result.spice ?? 1]}</T>
         </Row>
         <Row style={{ gap: 10, alignItems: "center" }}>
           <Rudy spice={Math.min(result.spice ?? 1, 4)} size={44} />
@@ -1381,7 +1365,7 @@ function ReviewSection(props: {
             </Pressable>
           </Pressable>
         )}
-      </Section>
+      </View>
 
       {(result.missing ?? []).length > 0 && (
         <Section
@@ -1486,7 +1470,7 @@ function ReviewSection(props: {
         })}
       </Section>
 
-      <FiledUnder
+      <FoldedTags
         tags={subjects}
         removed={props.untagged}
         onRemove={(i) => props.setUntagged((u) => new Set(u).add(i))}
@@ -1604,6 +1588,41 @@ function Section({
       </View>
       {children}
     </View>
+  );
+}
+
+/**
+ * Where it's filed, folded to one line: the tags the model picked and a
+ * "Change" that opens the editor. Filing is the app's job; it shouldn't be
+ * a chore standing between someone and posting.
+ */
+function FoldedTags(props: ComponentProps<typeof FiledUnder>) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  if (open) return <FiledUnder {...props} />;
+  const names = [
+    ...props.tags.filter((_, i) => !props.removed.has(i)).map((t) => t.name),
+    ...props.added.map((t) => t.name),
+  ];
+  return (
+    <Row style={{ gap: 8, alignItems: "flex-start" }}>
+      <T variant="small" style={{ flex: 1 }}>
+        Filed under{" "}
+        <T variant="small" color={theme.text} style={{ fontWeight: "600" }}>
+          {names.join(" · ") || "nothing yet"}
+        </T>
+      </T>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Change where it's filed"
+        hitSlop={8}
+      >
+        <T variant="small" color={theme.primary} style={{ fontWeight: "700" }}>
+          Change
+        </T>
+      </Pressable>
+    </Row>
   );
 }
 

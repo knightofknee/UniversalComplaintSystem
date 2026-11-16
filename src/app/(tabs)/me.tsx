@@ -3,7 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { collection, documentId, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ConfirmEmail } from '@/components/email-status';
 import { NameChanger } from '@/components/name-changer';
@@ -18,7 +18,6 @@ import { timeAgo, useCollection } from '@/lib/hooks';
 import { useJustPosted } from '@/lib/just-posted';
 import { isOperator } from '@/lib/operator';
 import { type AppearancePref, setAppearance, useAppearancePref } from '@/lib/appearance';
-import { pushSupported, turnOffPush, turnOnPush } from '@/lib/push';
 import type { MyThread, Notification, Submission } from '@/lib/types';
 
 function Link({
@@ -46,37 +45,6 @@ function Link({
   );
 }
 
-function PushSwitch({ on }: { on: boolean }) {
-  const theme = useTheme();
-  const [busy, setBusy] = useState(false);
-  if (!pushSupported) return null;
-  const flip = async (next: boolean) => {
-    setBusy(true);
-    try {
-      if (!next) await turnOffPush();
-      else {
-        const r = await turnOnPush();
-        if (r === 'denied') showAlert('Notifications are off', 'Turn them on for this app in your phone’s settings.');
-        if (r === 'unsupported') showAlert('Not available here', 'Phone notifications need the app on a real phone.');
-      }
-    } catch (e) {
-      showAlert("Couldn't change that", errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Card>
-      <Row>
-        <Ionicons name="phone-portrait-outline" size={20} color={theme.primary} />
-        <T style={{ flex: 1, fontWeight: '600' }}>Phone notifications</T>
-        <Switch value={on} onValueChange={flip} disabled={busy} />
-      </Row>
-      <T variant="small">When an organization responds, says it fixed something, or replies to you privately.</T>
-    </Card>
-  );
-}
-
 const LOOKS: { key: AppearancePref; label: string }[] = [
   { key: 'dark', label: 'Dark' },
   { key: 'light', label: 'Light' },
@@ -97,6 +65,22 @@ function AppearancePicker() {
   );
 }
 
+/** What one of your complaints has gathered, at a glance: people with its issues and the votes on it. */
+function Gathered({ people, loves, easy }: { people: number; loves: number; easy: number }) {
+  const theme = useTheme();
+  const bits = [
+    people > 1 ? `⬆ ${people.toLocaleString('en-US')} have this` : null,
+    loves > 0 ? `🤬 ${loves.toLocaleString('en-US')} Best rant` : null,
+    easy > 0 ? `🍋 ${easy.toLocaleString('en-US')} Easy peasy` : null,
+  ].filter(Boolean);
+  if (bits.length === 0) return null;
+  return (
+    <T variant="small" color={theme.primary} style={{ fontWeight: '700' }}>
+      {bits.join('  ·  ')}
+    </T>
+  );
+}
+
 /** Complaints shown before "Show all". */
 const RECENT = 3;
 
@@ -111,6 +95,10 @@ type Mine = {
   href: Href;
   unread?: boolean;
   resolved?: boolean;
+  /** What it has gathered: people who have its issues, Best rant and Easy peasy votes. */
+  people?: number;
+  loves?: number;
+  easy?: number;
 };
 
 /**
@@ -166,6 +154,8 @@ export default function MeScreen() {
     `threads:${user?.uid}`,
   );
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  // How many people have each issue they raise (the most, per complaint).
+  const [support, setSupport] = useState<Map<string, number>>(new Map());
   const ids = mine.items.map((m) => m.id).join(',');
 
   useEffect(() => {
@@ -173,9 +163,17 @@ export default function MeScreen() {
     if (list.length === 0) return;
     // `in` takes at most 30 ids, which is the page size above.
     getDocs(query(collection(db, 'submissions'), where('removed', '==', false), where(documentId(), 'in', list)))
-      .then((snap) => {
+      .then(async (snap) => {
         const byId = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() } as Submission]));
-        setSubmissions(list.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
+        const subs = list.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+        setSubmissions(subs);
+        const pointIds = [...new Set(subs.flatMap((s) => [...s.matchedPointIds, ...s.addedPointIds]))];
+        const counts = new Map<string, number>();
+        for (let i = 0; i < pointIds.length; i += 30) {
+          const points = await getDocs(query(collection(db, 'points'), where(documentId(), 'in', pointIds.slice(i, i + 30))));
+          for (const p of points.docs) counts.set(p.id, (p.get('supportCount') as number | undefined) ?? 0);
+        }
+        setSupport(counts);
       })
       .catch(() => setSubmissions([]));
   }, [ids]);
@@ -190,6 +188,9 @@ export default function MeScreen() {
       about: s.subjectNames.join(' · '),
       at: s.createdAt?.toMillis() ?? 0,
       href: `/submission/${s.id}` as Href,
+      people: Math.max(0, ...[...s.matchedPointIds, ...s.addedPointIds].map((id) => support.get(id) ?? 0)),
+      loves: s.loves ?? 0,
+      easy: s.easy ?? 0,
     })),
     ...threads.items.map((t) => ({
       key: `t:${t.id}`,
@@ -253,6 +254,7 @@ export default function MeScreen() {
                 </Row>
                 <T numberOfLines={3}>{c.text}</T>
                 {c.about ? <T variant="small">{c.about}</T> : null}
+                {!c.isPrivate && <Gathered people={c.people ?? 0} loves={c.loves ?? 0} easy={c.easy ?? 0} />}
               </Card>
             </View>
           );
@@ -272,7 +274,6 @@ export default function MeScreen() {
         detail={unread.items.length ? `${unread.items.length} new` : undefined}
         href="/notifications"
       />
-      <PushSwitch on={!!profile?.pushOn} />
       <AppearancePicker />
       <Link
         icon="briefcase-outline"
@@ -303,8 +304,8 @@ export default function MeScreen() {
           onPress={() => signOut(auth).catch((e) => showAlert("Couldn't sign out", errorText(e)))}
         />
       )}
-      {/* Everything about the app, and deleting an account, is one tap further in. */}
-      <Link icon="information-circle-outline" label="About" href="/more" />
+      {/* Help, which notifications to get, the rules, and deleting an account: one tap further in. */}
+      <Link icon="settings-outline" label="Settings" href="/more" />
     </Screen>
   );
 }

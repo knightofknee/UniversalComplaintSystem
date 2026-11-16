@@ -15,6 +15,8 @@ export type Profile = {
   termsAcceptedAt?: unknown;
   /** Phone notifications on for this account. */
   pushOn?: boolean;
+  /** Kinds of notification turned off (Me > Settings; NOTICE_KINDS in functions/src/common.ts). */
+  notifyOff?: string[];
   banned?: boolean;
 };
 

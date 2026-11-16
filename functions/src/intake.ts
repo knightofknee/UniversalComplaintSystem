@@ -17,6 +17,7 @@
 import { FieldValue as AdminFieldValue, type Firestore } from 'firebase-admin/firestore';
 
 type VectorValue = { toArray(): number[] };
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
@@ -130,16 +131,70 @@ function cosineDistance(a: number[], b: number[]) {
   return 1 - dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 
+/**
+ * Search by what complaints say. Each public complaint's vector lives at
+ * `complaintVectors/{submissionId}`, server-only (no rule lets a client read
+ * it): kept off the submission so no list downloads 768 numbers per row, and
+ * so a vector of words that were later taken out never sits on a public
+ * document. Written when it is posted or edited (from the vector the
+ * analysis already made, so it costs nothing extra), dropped when the
+ * complaint is deleted or removed (`forgetComplaintVector`).
+ */
+export async function saveComplaintVector(submissionId: string, vector: number[]) {
+  await db.doc(`complaintVectors/${submissionId}`).set({ embedding: AdminFieldValue.vector(vector) });
+}
+
+export const forgetComplaintVector = onDocumentUpdated('submissions/{id}', async (event) => {
+  const after = event.data?.after.data();
+  if (!after || (after.removed !== true && after.text !== '[deleted]')) return;
+  await db.doc(`complaintVectors/${event.params.id}`).delete();
+});
+
+/** Complaints whose words are closest to a search, people's before public records. */
+async function nearestComplaints(vector: number[], max: number) {
+  const snap = await db
+    .collection('complaintVectors')
+    .findNearest({
+      vectorField: 'embedding',
+      queryVector: AdminFieldValue.vector(vector),
+      limit: max * 2,
+      distanceMeasure: 'COSINE',
+      distanceResultField: 'distance',
+    })
+    .get();
+  const close = snap.docs.filter((d) => (d.get('distance') as number) < 0.5);
+  if (close.length === 0) return [];
+  const subs = await db.getAll(...close.map((d) => db.doc(`submissions/${d.id}`)));
+  return subs
+    .map((s, i) => ({ s, distance: close[i].get('distance') as number }))
+    .filter(({ s }) => s.exists && s.get('removed') === false)
+    .sort((a, b) => Number(!!a.s.get('source')) - Number(!!b.s.get('source')) || a.distance - b.distance)
+    .slice(0, max)
+    .map(({ s }) => ({
+      id: s.id,
+      text: s.get('text') as string,
+      authorName: s.get('authorName') as string,
+      subjectNames: (s.get('subjectNames') as string[] | undefined) ?? [],
+      createdAt: (s.get('createdAt') as Timestamp | undefined)?.toMillis() ?? null,
+      loves: (s.get('loves') as number | undefined) ?? 0,
+      easy: (s.get('easy') as number | undefined) ?? 0,
+      source: (s.get('source.shortName') as string | undefined) ?? null,
+    }));
+}
+
 /** Live "is this what you mean?" while someone types, or the search box. */
 export const searchPoints = onCall(CALLABLE, async (req) => {
   uidOf(req);
   const query = cleanText(req.data?.query, 1000, 'Search');
   await rateLimit(req, 'search');
   const [vector] = await embed([query], 'search');
-  const [points, subjects, privateOnly] = await Promise.all([
+  // Complaints only when asked (the search box), not for the live hint while typing.
+  const wantComplaints = req.data?.complaints === true;
+  const [points, subjects, privateOnly, complaints] = await Promise.all([
     nearest<PointDoc>(db, 'points', vector, 10),
     nearest<SubjectDoc>(db, 'subjects', vector, 5),
     nearestPrivateOnly(vector),
+    wantComplaints ? nearestComplaints(vector, 8).catch(() => []) : [],
   ]);
   // Cosine distance: 0 is identical. Past ~0.45 results stop being related.
   const close = points.filter((p) => p.distance < 0.45);
@@ -152,6 +207,8 @@ export const searchPoints = onCall(CALLABLE, async (req) => {
     subjects: subjects
       .filter((s) => s.distance < 0.4)
       .map((s) => ({ id: s.id, name: s.name, kind: s.kind, description: s.description })),
+    // What people said: public complaints only, as anyone can read them.
+    complaints,
   };
 });
 
@@ -309,6 +366,8 @@ export async function analyzeText(input: {
     photoPaths: photos.map((p) => p.path),
     result,
     vectors: vectorByPoint,
+    // The complaint's own vector, kept so posting it can make it searchable for free.
+    textVector: vector,
     privateMatches,
     response,
     queued: !!input.queued,
@@ -682,6 +741,8 @@ export type DraftData = {
   photoPaths: string[];
   result: IntakeResult;
   vectors?: Record<string, number[]>;
+  /** The embedding of `text` as analyzed (see `complaintVectors`). */
+  textVector?: number[];
   privateMatches?: (string | null)[];
 };
 
@@ -760,7 +821,16 @@ export async function recordPublic(args: {
 
   // Wording of matched points, to compare against their headlines.
   const matchedIdx = keptIdx.filter((i) => result.points[i].matchedPointId);
-  const matchedVectors = await embed(matchedIdx.map((i) => result.points[i].statement));
+  // The posted words, for search (complaintVectors). Reused from the analysis
+  // when they are what was analyzed; otherwise (rewrite, personal data taken
+  // out) embedded here, in the same call as the statements.
+  const reuseText = finalText === text && draft.textVector?.length ? draft.textVector : null;
+  const statementAndText = await embed([
+    ...matchedIdx.map((i) => result.points[i].statement),
+    ...(reuseText ? [] : [finalText]),
+  ]);
+  const matchedVectors = statementAndText.slice(0, matchedIdx.length);
+  const textVector = reuseText ?? statementAndText[matchedIdx.length];
   const missing = keptIdx.filter((i) => !result.points[i].matchedPointId && !draft.vectors?.[String(i)]);
   const missingVectors = await embed(missing.map((i) => result.points[i].statement));
   const vectorOf = (i: number) => draft.vectors?.[String(i)] ?? missingVectors[missing.indexOf(i)];
@@ -928,6 +998,8 @@ export async function recordPublic(args: {
   // Who wrote it stays server-side: for deleting an account and for
   // suspending an abusive one, never shown.
   await db.doc(`authors/${submission.id}`).set({ uid });
+  // So Search finds it by what it says (an edit replaces the vector).
+  if (textVector?.length) await saveComplaintVector(submission.id, textVector);
   await writeStatements({
     submissionId: submission.id,
     authorId: authorIdOf(uid),

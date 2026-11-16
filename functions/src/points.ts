@@ -266,4 +266,77 @@ export const recountRising = onSchedule('every 6 hours', async () => {
     }
     await batch.commit();
   }
+  await rankHot();
 });
+
+/** Ten times the engagement is worth this many seconds of being newer (10 hours). */
+const HOT_DECAY_S = 36_000;
+/** A person's complaint always ranks above every imported record. */
+const HOT_PERSON = 1_000_000;
+
+/**
+ * How hot a complaint is: what people did with it (Best rant and Easy peasy
+ * votes, and how many real people have the issues it raises) against how
+ * new it is. The time part uses when it was posted, not "now", so a rank
+ * only changes when the engagement does: this pass rewrites little.
+ * Mirrored on the app (`hotRankOf` in src/app/(tabs)/browse.tsx) for
+ * complaints posted since the last pass.
+ */
+export function hotRankOf(s: { person: boolean; loves: number; easy: number; issuePeople: number; createdAtMs: number }) {
+  const engagement = s.loves * 10 + s.easy * 5 + s.issuePeople;
+  return (s.person ? HOT_PERSON : 0) + Math.log10(1 + engagement) + s.createdAtMs / 1000 / HOT_DECAY_S;
+}
+
+/**
+ * Hot, for complaints (`submissions.hotRank`, 0 = not listed): every
+ * complaint from the last 7 days gets a rank, the rest drop out. Runs with
+ * recountRising every 6 hours (and `npm run migrate hot`).
+ */
+export async function rankHot() {
+  const cutoff = Timestamp.fromMillis(Date.now() - RISING_WINDOW_MS);
+  const recent = await db
+    .collection('submissions')
+    .where('createdAt', '>=', cutoff)
+    .select('source', 'loves', 'easy', 'matchedPointIds', 'addedPointIds', 'createdAt', 'removed', 'hotRank')
+    .get();
+  const pointIds = new Set<string>();
+  for (const s of recent.docs) {
+    for (const id of [...((s.get('matchedPointIds') as string[]) ?? []), ...((s.get('addedPointIds') as string[]) ?? [])]) {
+      pointIds.add(id);
+    }
+  }
+  const people = new Map<string, number>();
+  const refs = [...pointIds].map((id) => db.doc(`points/${id}`));
+  for (let i = 0; i < refs.length; i += 300) {
+    const snaps = await db.getAll(...refs.slice(i, i + 300), { fieldMask: ['people'] });
+    for (const p of snaps) people.set(p.id, (p.get('people') as number | undefined) ?? 0);
+  }
+  const ranks = new Map<string, number>();
+  for (const s of recent.docs) {
+    if (s.get('removed')) continue;
+    const ids = [...((s.get('matchedPointIds') as string[]) ?? []), ...((s.get('addedPointIds') as string[]) ?? [])];
+    ranks.set(
+      s.id,
+      hotRankOf({
+        person: !s.get('source'),
+        loves: (s.get('loves') as number | undefined) ?? 0,
+        easy: (s.get('easy') as number | undefined) ?? 0,
+        issuePeople: Math.max(0, ...ids.map((id) => people.get(id) ?? 0)),
+        createdAtMs: (s.get('createdAt') as Timestamp).toMillis(),
+      }),
+    );
+  }
+  const writer = db.bulkWriter();
+  const same = (a: unknown, b: number) => typeof a === 'number' && Math.abs(a - b) < 1e-9;
+  for (const s of recent.docs) {
+    const rank = ranks.get(s.id) ?? 0;
+    if (!same(s.get('hotRank'), rank)) void writer.update(s.ref, { hotRank: rank });
+  }
+  // Older than the window (or removed since): off the Hot list.
+  const listed = await db.collection('submissions').where('hotRank', '>', 0).select().get();
+  const seen = new Set(recent.docs.map((s) => s.id));
+  for (const s of listed.docs) {
+    if (!seen.has(s.id)) void writer.update(s.ref, { hotRank: 0 });
+  }
+  await writer.close();
+}

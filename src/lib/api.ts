@@ -11,13 +11,30 @@ function call<In, Out>(name: string) {
 /** Sent with a person's first post: they ticked the terms agreement. */
 type Terms = { acceptTerms?: boolean };
 
+/** A public complaint found by what it says. */
+export type ComplaintHit = {
+  id: string;
+  text: string;
+  authorName: string;
+  subjectNames: string[];
+  /** Milliseconds. */
+  createdAt: number | null;
+  loves: number;
+  easy: number;
+  /** Short name of the public record it came from, if imported. */
+  source: string | null;
+};
+
 export const searchPoints = call<
-  { query: string },
+  /** `complaints`: also find complaints by their words (the search box). */
+  { query: string; complaints?: boolean },
   {
     points: PointHit[];
     subjects: { id: string; name: string; kind: string; description: string }[];
     /** Something like this was raised privately (never how many times). */
     raisedPrivately: boolean;
+    /** Present when `complaints` was asked for. */
+    complaints?: ComplaintHit[];
   }
 >('searchPoints');
 
@@ -128,6 +145,7 @@ export const report = call<
   { ok: boolean }
 >('report');
 
+export const setNotify = call<{ kind: string; on: boolean }, { kind: string; on: boolean }>('setNotify');
 export const setPush = call<{ on: boolean; token?: string; platform?: string }, { on: boolean }>('setPush');
 
 // Operator queue.

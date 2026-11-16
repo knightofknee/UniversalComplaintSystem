@@ -112,22 +112,23 @@ export const RUDY_CHEERS = [
   'Spicy and published. Chef’s kiss.',
 ];
 
-/** His take on the model's verdict, one line on the review. */
+/**
+ * His take on the review, one line. He backs the person and never grades
+ * the complaint (no "clear", no "fixable"): we support complaints, we don't
+ * judge them. The line itself is judged only where it's crossed, and that
+ * has its own honest screen.
+ */
 export function rudyVerdict(r: {
   tone?: string;
   spice?: number;
   rantScore?: number | null;
-  actionability?: number;
   missing?: string[];
 }): string {
-  const fixable = (r.actionability ?? 0) >= 40;
-  if (!fixable && (r.missing ?? []).length > 0)
-    return 'Good start! A detail or two from below would make it hit harder.';
-  if (r.tone === 'rant' && (r.rantScore ?? 0) >= 7) return "Ooh. This one's getting read out loud.";
-  if (r.tone === 'rant' && (r.spice ?? 1) >= 4) return 'Extra hot and it still makes sense. Respect.';
-  if (r.tone === 'rant') return 'A rant with a point. My favorite kind.';
-  if (r.tone === 'constructive') return "Clear and fixable. Chef's kiss.";
-  return 'Just the facts. Very professional.';
+  if ((r.missing ?? []).length > 0) return "I'm with you. If you know any of the details below, they help it reach the right people.";
+  if (r.tone === 'rant' && (r.rantScore ?? 0) >= 7) return "Ooh. I'm reading this one out loud.";
+  if (r.tone === 'rant' && (r.spice ?? 1) >= 4) return "Now that's my kind of heat.";
+  if (r.tone === 'rant') return "Say it louder. I'm right behind you.";
+  return "I've got your back on this one.";
 }
 
 export const pick = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];

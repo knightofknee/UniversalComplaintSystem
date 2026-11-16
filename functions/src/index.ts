@@ -5,7 +5,7 @@ import { db, Timestamp } from './common';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 20 });
 
-export { analyzeComplaint, getDraft, processQueue, searchPoints, submitComplaint } from './intake';
+export { analyzeComplaint, forgetComplaintVector, getDraft, processQueue, searchPoints, submitComplaint } from './intake';
 export { flushNotices, recountRising, supportPoint, voteFix } from './points';
 export { loveRant } from './rants';
 export { easyFix } from './easy';
@@ -18,7 +18,7 @@ export { resolveDuplicate } from './duplicates';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveReport } from './moderation';
-export { setPush } from './push';
+export { setNotify, setPush } from './push';
 export { deleteAccount, deleteComplaint } from './account';
 export { mergeAccount } from './merge';
 

@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { CALLABLE, db, FieldPath, FieldValue, rateLimit, uidOf } from './common';
+import { CALLABLE, db, FieldPath, FieldValue, NOTICE_KINDS, rateLimit, uidOf } from './common';
 
 export const setPush = onCall(CALLABLE, async (req) => {
   const uid = uidOf(req);
@@ -41,4 +41,19 @@ export const setPush = onCall(CALLABLE, async (req) => {
     if (token) await user.update(new FieldPath('pushTokens', token), FieldValue.delete()).catch(() => {});
   }
   return { on };
+});
+
+/** One kind of notification on or off (Me > Settings); see NOTICE_KINDS in common.ts. */
+export const setNotify = onCall(CALLABLE, async (req) => {
+  const uid = uidOf(req);
+  await rateLimit(req, 'settings');
+  const kind = req.data?.kind;
+  if (typeof kind !== 'string' || !(NOTICE_KINDS as readonly string[]).includes(kind)) {
+    throw new HttpsError('invalid-argument', 'Which notifications?');
+  }
+  const on = req.data?.on !== false;
+  await db
+    .doc(`users/${uid}`)
+    .set({ notifyOff: on ? FieldValue.arrayRemove(kind) : FieldValue.arrayUnion(kind) }, { merge: true });
+  return { kind, on };
 });
