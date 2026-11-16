@@ -780,10 +780,8 @@ export function Composer({ home }: { home?: boolean }) {
                 />
               </Pressable>
             )}
-            {read.words > 0 && !read.quiet && !read.overLine && (
-              <Goals goals={goals} />
-            )}
-            {((read.words > 0 && !read.quiet) || busy || !!modelLine) && (
+            {!read.quiet && !read.overLine && <Goals goals={goals} />}
+            {(!read.quiet || busy || !!modelLine) && (
               <View style={styles.live} accessibilityLiveRegion="polite">
                 {/* Rudy: his face follows the peppers, beaming at one, crying
                     at five. While the model reads it, he dances. */}

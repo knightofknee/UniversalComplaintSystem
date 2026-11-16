@@ -18,7 +18,10 @@ export type Read = {
   spiceLabel: string;
   /** Name-calling spotted on the device. The model has the final say. */
   overLine: boolean;
-  /** False only when the target is clearly missing ("they", "my bank"). */
+  /**
+   * Something says who or what it is about: a name, "the"/"my" + a thing, or
+   * a topic it opens on ("Daylight saving time ..."). Never just assumed.
+   */
   who: boolean;
   /** A thing they own with no make or model on it ("my laptop"); null when named or not about one. */
   product: string | null;
@@ -73,6 +76,8 @@ const MAKE_OR_MODEL =
 /** A person with no name on them: "my friend", "the coach". A first name is all it takes. */
 const PERSON_KIND =
   /\b(?:my|our|this|that|the)\s+(friend|buddy|roommate|coworker|co-worker|boss|manager|neighbou?r|brother|sister|husband|wife|boyfriend|girlfriend|partner|teammate|kid|son|daughter|dad|mom|mum|teacher|coach|landlord|tenant|ex)\b/i;
+/** "the line", "my landlord's app", "this airline": a thing it is about. */
+const THING = /\b(?:the|my|our|your|this|that|these|those|their|his|her|its)\s+[a-z]{3,}/i;
 /** Opens on someone unnamed: "They charged me twice", "I hate them". */
 const VAGUE_LEAD = /^(?:\W*[\w'’]+\W+){0,2}(?:they|them|their|theirs|he|she|him)\b/i;
 /** Capitalized only because they start a sentence. */
@@ -144,7 +149,10 @@ export function readComplaint(raw: string): Read {
   const kind = named ? null : (ORG_KIND.exec(text)?.[1].toLowerCase() ?? null);
   const person = named || kind ? null : (PERSON_KIND.exec(text)?.[1].toLowerCase() ?? null);
   const vague = !named && !kind && !person && VAGUE_LEAD.test(text);
-  const who = !kind && !vague && !person;
+  // Opens on what it is about: "Daylight saving time is pointless".
+  const first = (text.split(/\s+/)[0] ?? '').toLowerCase().replace(/[^a-z'’-]/g, '');
+  const topicLead = words >= 3 && first.length >= 3 && !COMMON.has(first.replace(/['’].*$/, ''));
+  const who = !kind && !vague && !person && (named || THING.test(text) || topicLead);
   // Their own product with nothing saying which one. Recommended, never required.
   const product = named || MAKE_OR_MODEL.test(text) ? null : (PRODUCT.exec(text)?.[1].toLowerCase() ?? null);
   // Enough said to ask the next question: a finished sentence, or eight words. Never mid-thought.
@@ -160,6 +168,7 @@ export function readComplaint(raw: string): Read {
   let nudge: string;
   if (overLine) nudge = 'Swear all you want. Calling people names gets it sent back.';
   else if (CARD.test(text)) nudge = 'If that is a card number, take it out. It would be removed anyway.';
+  else if (words === 0) nudge = "Tell me who's involved, what happened, and what would be better.";
   else if (words < MIN_WORDS) nudge = 'Keep going';
   else if (kind)
     nudge = hotHeaded
@@ -167,6 +176,7 @@ export function readComplaint(raw: string): Read {
       : `Which ${kind}? Name it so it lands with the people who can fix it.`;
   else if (person) nudge = `Which ${person}? A first name is fine, and people who know them will know.`;
   else if (vague) nudge = 'Name the target of your complaint: the company, the place or the person, so it lands somewhere.';
+  else if (!who) nudge = 'Who or what is this about? Name the company, the place, the person or the thing.';
   else if (!what) nudge = 'Keep going, tell me what happened';
   else if (!fix && hotHeaded) nudge = 'Love the fire. Now aim it: what should they change?';
   else if (!fix) nudge = 'What would make it right? That part is what gets things fixed.';

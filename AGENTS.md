@@ -136,7 +136,11 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   GOALS (2026-11-15, the user's direction: "set tangible goals for making
   anything into something with the minimal structure needed"): above
   Rudy's line, three goals tick off as they type: Who, What happened,
-  Better how (`read.goals`). Rudy's line asks for the next one missing,
+  Better how (`read.goals`), VISIBLE BEFORE TYPING with Rudy and the
+  peppers ("Tell me who's involved, what happened, and what would be
+  better."), so people know what's expected before they start. Who ticks
+  only on evidence (a name, "the/my" + a thing, or a topic it opens on),
+  never by default. Rudy's line asks for the next one missing,
   including "Which friend? A first name is fine." for an unnamed person.
   "Keep going" has no period. EVERY COMPLAINT IS TAKEN SERIOUSLY AND AT ITS
   WORD, a friend's shot on goal included: the issue is what the author said

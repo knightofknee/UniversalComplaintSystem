@@ -84,6 +84,11 @@ const CHECKS: Check[] = [
   { text: 'the coach benched Maria for no reason, she should play.', want: (r) => r.goals.who, why: 'named, so the coach needs no name' },
   { text: 'Comcast charged me twice this month.', want: (r) => r.goals.who && r.goals.what && !r.goals.better, why: 'goals tick separately' },
   { text: 'a b', want: (r) => r.nudge === 'Keep going', why: 'no period after Keep going' },
+  { text: 't', want: (r) => !r.goals.who, why: 'one letter names nobody' },
+  { text: '', want: (r) => !r.goals.who && !r.goals.what && !r.goals.better && /who's involved/.test(r.nudge), why: 'before typing: every goal open, Rudy says what is expected' },
+  { text: 'it keeps breaking and nobody cares at all', want: (r) => !r.goals.who && /Who or what is this about/.test(r.nudge), why: 'no one named' },
+  { text: 'Daylight saving time is pointless and should end.', want: (r) => r.goals.who, why: 'a topic it opens on' },
+  { text: 'waiting forever at the dmv again, they should hire more people', want: (r) => r.goals.who, why: '"the dmv"' },
   // Next waits for all three goals, so "what would be better" has to be heard in its common forms.
   { text: "Comcast's app logs me out every day, I'd love it to remember me.", want: (r) => r.goals.better, why: "I'd love" },
   { text: 'The bus is late every morning. The route needs more drivers.', want: (r) => r.goals.better, why: 'needs more' },
