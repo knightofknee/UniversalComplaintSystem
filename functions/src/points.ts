@@ -297,7 +297,7 @@ export async function rankHot() {
   const recent = await db
     .collection('submissions')
     .where('createdAt', '>=', cutoff)
-    .select('source', 'loves', 'easy', 'matchedPointIds', 'addedPointIds', 'createdAt', 'removed', 'hotRank')
+    .select('source', 'loves', 'easy', 'matchedPointIds', 'addedPointIds', 'createdAt', 'removed', 'hotRank', 'text')
     .get();
   const pointIds = new Set<string>();
   for (const s of recent.docs) {
@@ -313,7 +313,8 @@ export async function rankHot() {
   }
   const ranks = new Map<string, number>();
   for (const s of recent.docs) {
-    if (s.get('removed')) continue;
+    // Gone, or kept without its words after its author deleted their account: not listed.
+    if (s.get('removed') || s.get('text') === '[deleted]') continue;
     const ids = [...((s.get('matchedPointIds') as string[]) ?? []), ...((s.get('addedPointIds') as string[]) ?? [])];
     ranks.set(
       s.id,

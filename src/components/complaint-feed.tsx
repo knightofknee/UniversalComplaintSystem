@@ -37,6 +37,9 @@ function base(subjectId?: string): QueryConstraint[] {
 }
 
 /** Hot: ranked by what people did with them against how new they are (the last 7 days). */
+/** A complaint kept without its words (its author deleted their account) isn't listed: there is nothing to read. */
+const hasWords = (s: Submission) => s.text !== '[deleted]';
+
 export function useHotComplaints(subjectId: string | undefined, count: number, on = true) {
   const subs = collection(db, 'submissions');
   // When the list was opened: what counts as the last 7 days.
@@ -56,11 +59,17 @@ export function useHotComplaints(subjectId: string | undefined, count: number, o
     const recent = now - (s.createdAt?.toMillis() ?? now) < WEEK_MS;
     if (!byId.has(s.id) && !(s.hotRank ?? 0) && recent) byId.set(s.id, { s, rank: hotRankOf(s, now) });
   }
-  let items = [...byId.values()].sort((a, b) => b.rank - a.rank).map((x) => x.s);
+  let items = [...byId.values()]
+    .sort((a, b) => b.rank - a.rank)
+    .map((x) => x.s)
+    .filter(hasWords);
   // Never empty while anyone has written something: top up with the newest people wrote.
   if (items.length < ENOUGH) {
     const have = new Set(items.map((s) => s.id));
-    items = [...items, ...fresh.items.filter((s) => !have.has(s.id))].slice(0, Math.max(items.length, ENOUGH));
+    items = [...items, ...fresh.items.filter((s) => !have.has(s.id) && hasWords(s))].slice(
+      0,
+      Math.max(items.length, ENOUGH),
+    );
   }
   return { items, loading: ranked.loading || fresh.loading, more: ranked.items.length >= count };
 }
@@ -77,7 +86,7 @@ export function useNewComplaints(subjectId: string | undefined, count: number, o
     needAll ? query(subs, ...base(subjectId), orderBy('createdAt', 'desc'), limit(count)) : null,
     `new-all:${subjectId ?? ''}:${count}`,
   );
-  const items = [...people.items, ...all.items.filter((s) => !!s.source)];
+  const items = [...people.items, ...all.items.filter((s) => !!s.source)].filter(hasWords);
   return {
     items,
     loading: people.loading || (needAll && all.loading),
