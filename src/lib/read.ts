@@ -106,7 +106,9 @@ const IMPERATIVE =
 /** What would make it right: a wish, a "should", or an instruction to them. */
 const FIX = new RegExp(
   "\\b(?:should|shouldn['’]?t|ought|needs? to|has to|have to|must|want|wish|i['’]?d like|would like|please|expect|instead|bring back|put back|refund|replace|fix|" +
-    'would be (?:nice|better|great|good)|could(?: have|[\'’]ve) been better|could be better|better if|why (?:can[\'’]?t|not|don[\'’]?t|doesn[\'’]?t)|how about|they could|let (?:me|us|people)|give (?:me|us) back|my money back)\\b|' +
+    'would be (?:nice|better|great|good)|could(?: have|[\'’]ve) been better|could be better|' +
+    "(?:would|i['’]?d) (?:love|prefer|rather|appreciate)|hope (?:they|you|it|someone)|needs? (?:a|an|more|better|fewer|less)|" +
+    'it would help|make it (?:easier|clearer|cheaper|faster|work)|better if|why (?:can[\'’]?t|not|don[\'’]?t|doesn[\'’]?t)|how about|they could|let (?:me|us|people)|give (?:me|us) back|my money back)\\b|' +
     // An instruction opening a clause: "Refund it.", "..., show the full price up front".
     `(?:^|[.,;:!?]\\s+)(?:just\\s+|please\\s+|and\\s+)?(?:${IMPERATIVE})\\b`,
   'i',

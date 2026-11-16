@@ -143,6 +143,12 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   could be better, never a bigger cause they gestured at; a person's first
   name may stay in the issue statement ("Brian's shots on goal could be
   more accurate", every Brian pooled), never as a subject.
+  NEXT WAITS FOR ALL THREE GOALS (2026-11-15): who (or the page it was
+  opened from), what happened, better how; text that isn't English isn't
+  held. When the model finds nothing to record (not a complaint, or
+  unsafe) there is NO dead-end page: the box stays, Rudy says why and what
+  would make it one (worried face), and Next waits until the words change.
+  Over-the-line still goes to its review, for the alternatives.
   RUDY DANCES while Next is working (rocks and bobs, beaming).
   BACK (2026-11-15): every move through the flow (Next, Edit, Edit it
   first, using an alternative) is remembered; a Back pill beside the menu

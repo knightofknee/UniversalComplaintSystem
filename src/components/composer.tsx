@@ -215,6 +215,13 @@ export function Composer({ home }: { home?: boolean }) {
   // makes of them, and return to what you first wrote, its check included,
   // with no new model call (each check keeps its own draft on the server).
   const [history, setHistory] = useState<Snapshot[]>([]);
+  // When the model finds nothing it can record (not a complaint yet, or
+  // something that can't go up), there is no dead-end page: the box stays,
+  // and Rudy says what it needs, until the words change.
+  const [modelSaid, setModelSaid] = useState<{
+    text: string;
+    line: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removePII, setRemovePII] = useState(true);
@@ -377,6 +384,17 @@ export function Composer({ home }: { home?: boolean }) {
       if (res.queued) {
         setStep({ kind: "queued" });
         void offerPush("posted", !!profile?.pushOn);
+        return;
+      }
+      if (res.result.safety?.unsafe || !res.result.isComplaint) {
+        setModelSaid({
+          text,
+          line: res.result.safety?.unsafe
+            ? `That one can't go up: ${res.result.safety.reason ?? "it breaks the terms of use."} Anger at organizations is welcome; threats, hate and going after private people aren't.`
+            : res.result.notComplaintReason
+              ? `${res.result.notComplaintReason.trim().replace(/[.!]?$/, ".")} What's wrong, and what would be better?`
+              : "I couldn't find something wrong in there yet. Who's involved, what happened, and what would be better?",
+        });
         return;
       }
       remember();
@@ -611,7 +629,19 @@ export function Composer({ home }: { home?: boolean }) {
   const privateName =
     isPrivate && analysis ? analysis.subjects[privateTo!].name : "";
   const keptCount = result ? result.points.length - dropped.size : 0;
-  const ready = read.words >= MIN_WORDS && !photos.some((p) => !p.path);
+  // The least a complaint needs before the model reads it: who is involved,
+  // what happened, what could be better. Until then Next waits and Rudy says
+  // what is missing. Text that isn't English can't be read here, so it isn't held.
+  const goals = { ...read.goals, who: read.goals.who || !!params.subjectId };
+  const goalsMet = read.quiet || (goals.who && goals.what && goals.better);
+  // What the model said about exactly these words; any edit clears it.
+  const modelLine =
+    modelSaid && modelSaid.text === text ? modelSaid.line : null;
+  const ready =
+    read.words >= MIN_WORDS &&
+    goalsMet &&
+    !modelLine &&
+    !photos.some((p) => !p.path);
 
   const bar = reviewing ? (
     blocked ? (
@@ -751,24 +781,28 @@ export function Composer({ home }: { home?: boolean }) {
               </Pressable>
             )}
             {read.words > 0 && !read.quiet && !read.overLine && (
-              <Goals goals={read.goals} />
+              <Goals goals={goals} />
             )}
-            {((read.words > 0 && !read.quiet) || busy) && (
+            {((read.words > 0 && !read.quiet) || busy || !!modelLine) && (
               <View style={styles.live} accessibilityLiveRegion="polite">
                 {/* Rudy: his face follows the peppers, beaming at one, crying
                     at five. While the model reads it, he dances. */}
-                <Rudy spice={read.spice} dancing={busy} />
+                <Rudy spice={modelLine ? 4 : read.spice} dancing={busy} />
                 <Peppers n={read.spice} size={13} />
                 <Text
-                  numberOfLines={3}
+                  numberOfLines={modelLine ? 5 : 3}
                   style={{
                     flex: 1,
                     fontSize: 13,
                     lineHeight: 17,
-                    color: read.overLine ? theme.danger : theme.textSecondary,
+                    color: read.overLine
+                      ? theme.danger
+                      : modelLine
+                        ? theme.text
+                        : theme.textSecondary,
                   }}
                 >
-                  {read.nudge}
+                  {modelLine ?? read.nudge}
                 </Text>
               </View>
             )}

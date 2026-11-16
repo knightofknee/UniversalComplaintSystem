@@ -84,6 +84,10 @@ const CHECKS: Check[] = [
   { text: 'the coach benched Maria for no reason, she should play.', want: (r) => r.goals.who, why: 'named, so the coach needs no name' },
   { text: 'Comcast charged me twice this month.', want: (r) => r.goals.who && r.goals.what && !r.goals.better, why: 'goals tick separately' },
   { text: 'a b', want: (r) => r.nudge === 'Keep going', why: 'no period after Keep going' },
+  // Next waits for all three goals, so "what would be better" has to be heard in its common forms.
+  { text: "Comcast's app logs me out every day, I'd love it to remember me.", want: (r) => r.goals.better, why: "I'd love" },
+  { text: 'The bus is late every morning. The route needs more drivers.', want: (r) => r.goals.better, why: 'needs more' },
+  { text: 'Delta lost my bag twice this year.', want: (r) => !r.goals.better, why: 'no fix said yet' },
   { text: 'Comcast charged me twice this month', want: says(/^Keep going/), why: 'never interrupts mid-sentence' },
   { text: 'Comcast charged me twice this month.', want: says(/make it right/), why: 'a finished sentence gets the next question' },
   { text: 'Mi banco me cobró una comisión que nadie me explicó', want: (r) => r.quiet, why: 'not English: say nothing' },
