@@ -332,11 +332,31 @@ export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?
   return <View style={[styles.notice, { backgroundColor: bg }]}>{children}</View>;
 }
 
+/**
+ * Something went wrong, said where it happened. Inside a pop-up (a Modal) or
+ * a sheet use this, never a toast: on iOS those cover the root view, and a
+ * toast drawn there sits hidden behind them.
+ */
+export function Problem({ text }: { text: string | null }) {
+  const theme = useTheme();
+  if (!text) return null;
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      style={[styles.problem, { backgroundColor: theme.warningSoft }]}>
+      <Ionicons name="alert-circle" size={20} color={theme.danger} />
+      <T style={{ flex: 1 }}>{text}</T>
+    </View>
+  );
+}
+
 export function Row({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
+  problem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, padding: 12 },
   screen: { paddingHorizontal: 16, gap: 14, width: '100%', maxWidth: 720, alignSelf: 'center' },
   display: { fontFamily: Fonts.display, fontSize: 40, lineHeight: 42, letterSpacing: -1 },
   title: { fontFamily: Fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6 },

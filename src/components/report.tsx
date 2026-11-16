@@ -2,9 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
-import { showAlert } from '@/components/point-card';
 import { showToast } from '@/components/toast';
-import { Button, Field, T } from '@/components/ui';
+import { Button, Field, Problem, T } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { errorText, report, type ReportKind, type ReportReason } from '@/lib/api';
 
@@ -40,14 +39,18 @@ export function ReportButton({
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  // Said inside the pop-up: a toast would be hidden behind it on iOS.
+  const [problem, setProblem] = useState<string | null>(null);
   const close = () => {
     setOpen(false);
+    setProblem(null);
     setReason(null);
     setNote('');
   };
   const send = async () => {
     if (!reason) return;
     setBusy(true);
+    setProblem(null);
     try {
       await report({ ...target, reason, ...(note.trim() ? { note: note.trim() } : {}) });
       close();
@@ -57,7 +60,7 @@ export function ReportButton({
         'info',
       );
     } catch (e) {
-      showAlert("Couldn't send the report", errorText(e));
+      setProblem(`Couldn't send the report. ${errorText(e)}`);
     } finally {
       setBusy(false);
     }
@@ -115,6 +118,7 @@ export function ReportButton({
               placeholder="Anything we should know? (optional)"
               maxLength={500}
             />
+            <Problem text={problem} />
             <Button label="Send report" onPress={send} busy={busy} disabled={!reason} />
             <Button label="Cancel" kind="quiet" onPress={close} />
           </Pressable>

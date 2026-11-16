@@ -269,6 +269,10 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   To check motion, record the simulator and read the frames (stills hide
   it). What is typed in the
   main box survives leaving it (`kept.draft` in composer.tsx).
+- A FAILURE INSIDE A POP-UP OR SHEET IS SAID INSIDE IT (`Problem` in ui.tsx),
+  never only as a toast: on iOS a Modal or sheet covers the root Toaster,
+  so the message was invisible (2026-11-16: failed sign-ins, reports and
+  name changes showed nothing).
 - Pop-ups (name change, report, the sign-in nudge after posting, the
   operator's reason prompt) sit on the theme's `scrim` (a 72% dim)
   with their own surface and border, so their words never run into the
