@@ -369,7 +369,7 @@ never delete or edit what you wrote.
 • Complain in seconds, in any language, no account needed.
 • See if others already said it, and add your support with one tap.
 • Starts full: complaints from public government records (CFPB, NHTSA,
-  FCC) are already on it, labelled by source.
+  FCC) are already on it, labelled by source, each linked to its original.
 • Your complaint is read for the issues it raises and joined with everyone
   who has the same issue, so a hundred people saying the same thing become
   one issue backed by a hundred people.
@@ -381,5 +381,19 @@ never delete or edit what you wrote.
   organization can read it, and they can reply to you.
 
 Rants welcome. Specifics get things fixed.
+
+Not a government app: UCS isn't affiliated with, endorsed by, or acting for
+any government or government agency, and posting here doesn't file a
+complaint with one. The public records come from:
+• CFPB consumer complaint database:
+  https://www.consumerfinance.gov/data-research/consumer-complaints/
+• NHTSA vehicle safety complaints:
+  https://www.nhtsa.gov/report-a-safety-problem
+• FCC consumer complaints data:
+  https://opendata.fcc.gov/Consumer/CGB-Consumer-Complaints-Data/3xyp-aqkj
+
+(Google Play rejected the listing without that last paragraph, 2026-11-16:
+"Missing Source Link for Government Information". Keep it in both stores.
+The same sources and disclaimer are in the app, under How UCS works.)
 
 Keywords (Apple, 100): complaint,feedback,customer service,review,report,consumer,support,fix,problem,voice

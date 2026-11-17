@@ -1,4 +1,20 @@
+import { Linking } from 'react-native';
+
 import { Screen, T } from '@/components/ui';
+import { useTheme } from '@/hooks/use-theme';
+
+/** The government records UCS was seeded from; Google Play requires the original sources to be linked. */
+const RECORD_SOURCES = [
+  {
+    name: 'Consumer Financial Protection Bureau (CFPB) complaint database',
+    url: 'https://www.consumerfinance.gov/data-research/consumer-complaints/',
+  },
+  { name: 'NHTSA vehicle safety complaints', url: 'https://www.nhtsa.gov/report-a-safety-problem' },
+  {
+    name: 'FCC consumer complaints data',
+    url: 'https://opendata.fcc.gov/Consumer/CGB-Consumer-Complaints-Data/3xyp-aqkj',
+  },
+];
 
 const RULES = [
   'Organizations can respond. They can never remove, hide, reorder, or edit what people wrote.',
@@ -9,12 +25,17 @@ const RULES = [
 ];
 
 export default function AboutScreen() {
+  const theme = useTheme();
   return (
     <Screen>
       <T variant="title">How UCS works</T>
       <T>
         The Universal Complaint System is an independent public record of what&apos;s wrong, about anything: a company,
         a product, a public service, or something nobody owns. It isn&apos;t run by any of them.
+      </T>
+      <T>
+        UCS is not a government app. It isn&apos;t affiliated with, endorsed by, or acting for any government or
+        government agency.
       </T>
       <T variant="heading">What we promise</T>
       <T>
@@ -32,6 +53,20 @@ export default function AboutScreen() {
       <T>
         Anyone with a verified email at an organization&apos;s domain can respond for it. Each organization&apos;s page
         shows how many issues it has, and what share it has seen, answered, and fixed.
+      </T>
+      <T variant="heading">Public records</T>
+      <T>
+        To start with, some complaints come from public government records, labelled with their source. Each one links
+        to where it came from. The originals:
+      </T>
+      {RECORD_SOURCES.map((r) => (
+        <T key={r.url} color={theme.primary} onPress={() => Linking.openURL(r.url)}>
+          • {r.name}: {r.url}
+        </T>
+      ))}
+      <T>
+        To file a complaint with one of these agencies, use its own site. Posting on UCS doesn&apos;t file anything with
+        them.
       </T>
       <T variant="heading">The rules</T>
       {RULES.map((r) => (
