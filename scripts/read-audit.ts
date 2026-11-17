@@ -48,7 +48,13 @@ for (const sample of SAMPLES) {
   }
 }
 
-type Check = { text: string; want: (r: ReturnType<typeof readComplaint>) => boolean; why: string };
+type Check = {
+  text: string;
+  /** The composer's own state, e.g. the Not sure button. */
+  opts?: { notSure?: boolean };
+  want: (r: ReturnType<typeof readComplaint>) => boolean;
+  why: string;
+};
 const says = (re: RegExp) => (r: ReturnType<typeof readComplaint>) => re.test(r.nudge);
 const CHECKS: Check[] = [
   // A topic nobody owns has a target. Never ask for one.
@@ -85,7 +91,7 @@ const CHECKS: Check[] = [
   { text: 'Comcast charged me twice this month.', want: (r) => r.goals.who && r.goals.what && !r.goals.better, why: 'goals tick separately' },
   { text: 'a b', want: (r) => r.nudge === 'Keep going', why: 'no period after Keep going' },
   { text: 't', want: (r) => !r.goals.who, why: 'one letter names nobody' },
-  { text: '', want: (r) => !r.goals.who && !r.goals.what && !r.goals.better && /who's involved/.test(r.nudge), why: 'before typing: every goal open, Rudy says what is expected' },
+  { text: '', want: (r) => !r.goals.who && !r.goals.what && !r.goals.better && /who it's about, how it is, and how it should be/.test(r.nudge), why: 'before typing: every goal open, Rudy says what is expected' },
   { text: 'it keeps breaking and nobody cares at all', want: (r) => !r.goals.who && /Who or what is this about/.test(r.nudge), why: 'no one named' },
   { text: 'Daylight saving time is pointless and should end.', want: (r) => r.goals.who, why: 'a topic it opens on' },
   { text: 'waiting forever at the dmv again, they should hire more people', want: (r) => r.goals.who, why: '"the dmv"' },
@@ -93,8 +99,17 @@ const CHECKS: Check[] = [
   { text: "Comcast's app logs me out every day, I'd love it to remember me.", want: (r) => r.goals.better, why: "I'd love" },
   { text: 'The bus is late every morning. The route needs more drivers.', want: (r) => r.goals.better, why: 'needs more' },
   { text: 'Delta lost my bag twice this year.', want: (r) => !r.goals.better, why: 'no fix said yet' },
+  // How it should be: "I don't know" is an answer too; how to get there is a bonus.
+  { text: "The crosswalk paint on Main St gets slippery when it rains. I don't know how to fix it.", want: (r) => r.goals.better && r.notSure && /Seeing it is enough/.test(r.nudge), why: "not knowing the fix still meets the goal" },
+  { text: 'The bus on Route 9 is late every morning.', want: (r) => !r.goals.better && /Not sure is fine too/.test(r.nudge), why: 'Rudy offers the out' },
+  { text: 'The bus on Route 9 is late every morning.', opts: { notSure: true }, want: (r) => r.goals.better, why: 'the Not sure button meets the goal' },
+  { text: 'The bus on Route 9 is late every morning. It should be on time.', want: (r) => r.goals.better && !r.goals.how && /Bonus/.test(r.nudge), why: 'ideal said, no way there yet: the bonus is offered, Next is not held' },
+  { text: 'The bus on Route 9 is late every morning. They should hire more drivers.', want: (r) => r.goals.better && r.goals.how, why: 'a way to get there ticks the bonus' },
+  { text: 'The crosswalk paint on Main St gets slippery when it rains. They should repaint it with grippy paint.', want: (r) => r.goals.better && r.goals.how, why: '"should repaint"' },
+  { text: 'Parking downtown is a nightmare, it would be better if they built a garage by adding a level to the lot.', want: (r) => r.goals.how, why: '"by adding"' },
+  { text: 'Delta lost my bag twice this year and I have no idea how they could fix their baggage system.', want: (r) => r.goals.better, why: '"no idea how"' },
   { text: 'Comcast charged me twice this month', want: says(/^Keep going/), why: 'never interrupts mid-sentence' },
-  { text: 'Comcast charged me twice this month.', want: says(/make it right/), why: 'a finished sentence gets the next question' },
+  { text: 'Comcast charged me twice this month.', want: says(/How should it be instead/), why: 'a finished sentence gets the next question' },
   { text: 'Mi banco me cobró una comisión que nadie me explicó', want: (r) => r.quiet, why: 'not English: say nothing' },
   { text: 'printer ink costs more than the printer does', want: (r) => !r.quiet, why: 'English stays on' },
   { text: 'you bitch', want: says(/names/), why: 'the line comes first, even at two words' },
@@ -102,7 +117,7 @@ const CHECKS: Check[] = [
   { text: 'call me on 415 555 0134 about my order please', want: (r) => !/card number/.test(r.nudge), why: 'a phone number is not a card' },
   // Products: ask for the make and model only of a thing they own that has none on it.
   { text: 'my laptop overheats every day, they should fix the fan', want: says(/Which laptop\? The make and model/), why: 'an unnamed laptop' },
-  { text: 'my laptop overheats every day and burns my legs', want: says(/make it right/), why: 'the fix is asked before the model' },
+  { text: 'my laptop overheats every day and burns my legs', want: says(/How should it be instead/), why: 'how it should be is asked before the model' },
   { text: 'my Dell laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a named make' },
   { text: 'my dell laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a lowercase make' },
   { text: 'my xps13 laptop overheats every day, they should fix the fan', want: (r) => r.product === null, why: 'a model number' },
@@ -116,7 +131,7 @@ const CHECKS: Check[] = [
 let failed = 0;
 console.log('\nChecks');
 for (const c of CHECKS) {
-  const r = readComplaint(c.text);
+  const r = readComplaint(c.text, c.opts);
   const ok = c.want(r);
   if (!ok) failed++;
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${c.why}: "${c.text}" -> ${'🌶'.repeat(r.spice)} ${r.nudge}`);

@@ -39,7 +39,8 @@ export const searchPoints = call<
 >('searchPoints');
 
 export const analyzeComplaint = call<
-  { text: string; photoPaths: string[]; subjectId?: string },
+  /** `notSure`: they tapped Not sure for how it should be, so it never asks them for a fix. */
+  { text: string; photoPaths: string[]; subjectId?: string; notSure?: boolean },
   | ({ queued: false } & Analysis)
   /** The day's AI budget is used up: it's saved and checked as soon as there's room. */
   | { queued: true; queueId: string }
@@ -151,6 +152,12 @@ export const sendFeedback = call<
   { topic: FeedbackTopic; message: string; email?: string; platform?: string; appVersion?: string },
   { ok: boolean }
 >('sendFeedback');
+
+/** A crash the app caught, for the daily check. Never throws. */
+export const reportCrash = call<
+  { message: string; stack?: string; where?: string; platform?: string; appVersion?: string },
+  { ok: boolean }
+>('reportCrash');
 
 export const setNotify = call<{ kind: string; on: boolean }, { kind: string; on: boolean }>('setNotify');
 export const setPush = call<{ on: boolean; token?: string; platform?: string }, { on: boolean }>('setPush');

@@ -157,11 +157,19 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   face truncate). Next runs the model and the review replaces the box on
   the same route; nothing posts until "Post it".
   GOALS (2026-11-15, the user's direction: "set tangible goals for making
-  anything into something with the minimal structure needed"): above
-  Rudy's line, three goals tick off as they type: Who, What happened,
-  Better how (`read.goals`), VISIBLE BEFORE TYPING with Rudy and the
-  peppers ("Tell me who's involved, what happened, and what would be
-  better."), so people know what's expected before they start. Who ticks
+  anything into something with the minimal structure needed"; reworded
+  2026-11-17: "something doesn't need to happen for a complaint to be
+  deserved"): above Rudy's line, three goals tick off as they type: Who,
+  How it is, How it should be, then "Bonus: how to get there" (a star,
+  never required; Rudy hops for it too) (`read.goals`), VISIBLE BEFORE
+  TYPING with Rudy and the peppers ("Tell me who it's about, how it is,
+  and how it should be."), so people know what's expected before they
+  start. NOT SURE IS AN ANSWER: someone who sees what's wrong without
+  knowing what better looks like taps "Not sure?" beside the goals (offered
+  once it's the goal missing) or says so ("I don't know how to fix it",
+  `NOT_SURE` in read.ts); either meets How it should be, Rudy says seeing it
+  is enough, and the model is told (`notSure` on analyzeComplaint) so it
+  never lists a fix as missing. Typing a fix after all clears it. Who ticks
   only on evidence (a name, "the/my" + a thing, or a topic it opens on),
   never by default. Rudy's line asks for the next one missing,
   including "Which friend? A first name is fine." for an unnamed person.
@@ -171,7 +179,7 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
   name may stay in the issue statement ("Brian's shots on goal could be
   more accurate", every Brian pooled), never as a subject.
   NEXT WAITS FOR ALL THREE GOALS (2026-11-15): who (or the page it was
-  opened from), what happened, better how; text that isn't English isn't
+  opened from), how it is, how it should be (or Not sure); text that isn't English isn't
   held. When the model finds nothing to record (not a complaint, or
   unsafe) there is NO dead-end page: the box stays, Rudy says why and what
   would make it one (worried face), and Next waits until the words change.
@@ -542,6 +550,14 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     what should change) and keeps the author's words, swearing and heat;
     if the only change would be tone or word choice it is null. Over-the-
     line alternatives change only the words that crossed the line.
+- CRASH SCREEN AND OFFLINE (2026-11-17): the root layout exports
+  `ErrorBoundary` (src/components/crash-screen.tsx): Rudy crying, "Something
+  broke", Try again and Back to the start, never a blank screen; each crash
+  goes to `reportCrash` (functions/src/crashes.ts, `crashes/`, server only)
+  and the daily report check lists the last 24 hours. While the phone has no
+  connection a small "You're offline" pill sits at the top between the
+  corner buttons (src/components/offline-banner.tsx, expo-network), letting
+  taps through. Both native modules need a build made after 2026-11-17.
 - WRITE TO US (2026-11-17, from direct-democracy's feedback form): Settings
   and Help open /feedback, a sheet (own Toaster, `Problem` inline) where
   anyone, signed in or not, writes to the operator: a topic (not working,

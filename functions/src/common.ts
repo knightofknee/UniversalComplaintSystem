@@ -116,6 +116,7 @@ export const LIMITS = {
   solution: { max: 10, windowMs: 24 * 3600_000 },
   rename: { max: 10, windowMs: 24 * 3600_000 },
   feedback: { max: 5, windowMs: 24 * 3600_000 },
+  crash: { max: 20, windowMs: 24 * 3600_000 },
 } as const;
 
 /**
@@ -136,6 +137,7 @@ const IP_LIMITS: Record<keyof typeof LIMITS, { max: number; windowMs: number }> 
   solution: { max: 40, windowMs: 24 * 3600_000 },
   rename: { max: 40, windowMs: 24 * 3600_000 },
   feedback: { max: 20, windowMs: 24 * 3600_000 },
+  crash: { max: 60, windowMs: 24 * 3600_000 },
 };
 
 /** A one-way hash of the caller's address: we never store the address itself. */

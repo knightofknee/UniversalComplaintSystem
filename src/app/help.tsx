@@ -15,9 +15,10 @@ export default function HelpScreen() {
         takes you to the next step.
       </T>
       <T>
-        At the bottom of the box are three goals that tick off as you type: who&apos;s involved, what happened, and what
-        would be better. Next waits for all three. Rudy, the pepper beside them, says what is still missing, and the
-        peppers beside him show how spicy it reads. Tap Rudy if you want; he&apos;s a bit of a show-off.
+        At the bottom of the box are three goals that tick off as you type: who it&apos;s about, how it is, and how it
+        should be. Next waits for all three. Don&apos;t know how it should be? Tap Not sure: seeing what&apos;s wrong is
+        enough. How to get there is a bonus, never required. Rudy, the pepper beside them, says what is still missing,
+        and the peppers beside him show how spicy it reads. Tap Rudy if you want; he&apos;s a bit of a show-off.
       </T>
 
       <T variant="heading">Spice</T>

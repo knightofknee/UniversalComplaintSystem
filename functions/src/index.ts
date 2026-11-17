@@ -18,6 +18,7 @@ export { resolveDuplicate } from './duplicates';
 export { checkClaims, markSeen, requestAccess, respondToPoint } from './company';
 export { markThreadRead, sendMessage, setOrgSettings, setThreadStatus } from './private';
 export { blockThread, operatorClaim, report, resolveFeedback, resolveReport, sendFeedback } from './moderation';
+export { reportCrash } from './crashes';
 export { setNotify, setPush } from './push';
 export { deleteAccount, deleteComplaint } from './account';
 export { mergeAccount } from './merge';

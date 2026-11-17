@@ -217,7 +217,12 @@ export function Composer({ home }: { home?: boolean }) {
   const setText = (next: string) => {
     if (home) keepDraft(next);
     setTextState(next);
+    // Starting over clears "Not sure" with the words.
+    if (!next.trim()) setNotSure(false);
   };
+  // "Not sure" on the how-it-should-be goal: they see what's wrong and don't
+  // know what better looks like. That is enough to go on.
+  const [notSure, setNotSure] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -252,14 +257,19 @@ export function Composer({ home }: { home?: boolean }) {
     frozen: leaving,
   });
   const navigation = useNavigation();
-  const read = readComplaint(text);
+  const read = readComplaint(text, { notSure });
+  // Once they say how it should be after all, "Not sure" steps aside.
+  useEffect(() => {
+    if (notSure && read.fix) setNotSure(false);
+  }, [notSure, read.fix]);
   // Hot the whole time for minutes: Rudy says one kind thing (a hidden extra).
   const rudy = useRudy(read.words > 0 && read.spice >= 3);
-  // Rudy hops each time a goal ticks.
+  // Rudy hops each time a goal (or the bonus) ticks.
   const goalCount =
     Number(read.goals.who || !!params.subjectId) +
     Number(read.goals.what) +
-    Number(read.goals.better);
+    Number(read.goals.better) +
+    Number(read.goals.how);
   const [hops, setHops] = useState(0);
   const lastGoals = useRef(goalCount);
   useEffect(() => {
@@ -446,6 +456,7 @@ export function Composer({ home }: { home?: boolean }) {
         text: text.trim(),
         photoPaths: photos.flatMap((p) => (p.path ? [p.path] : [])),
         ...(params.subjectId ? { subjectId: params.subjectId } : {}),
+        ...(notSure ? { notSure: true } : {}),
       });
       if (res.queued) {
         setStep({ kind: "queued" });
@@ -458,8 +469,8 @@ export function Composer({ home }: { home?: boolean }) {
           line: res.result.safety?.unsafe
             ? `That one can't go up: ${res.result.safety.reason ?? "it breaks the terms of use."} Anger at organizations is welcome; threats, hate and going after private people aren't.`
             : res.result.notComplaintReason
-              ? `${res.result.notComplaintReason.trim().replace(/[.!]?$/, ".")} What's wrong, and what would be better?`
-              : "I couldn't find something wrong in there yet. Who's involved, what happened, and what would be better?",
+              ? `${res.result.notComplaintReason.trim().replace(/[.!]?$/, ".")} How is it, and how should it be?`
+              : "I couldn't find something wrong in there yet. Who's it about, how is it, and how should it be?",
         });
         return;
       }
@@ -725,9 +736,10 @@ export function Composer({ home }: { home?: boolean }) {
   const privateName =
     isPrivate && analysis ? analysis.subjects[privateTo!].name : "";
   const keptCount = result ? result.points.length - dropped.size : 0;
-  // The least a complaint needs before the model reads it: who is involved,
-  // what happened, what could be better. Until then Next waits and Rudy says
-  // what is missing. Text that isn't English can't be read here, so it isn't held.
+  // The least a complaint needs before the model reads it: who it's about,
+  // how it is, how it should be (or "Not sure"). Until then Next waits and
+  // Rudy says what is missing; how to get there is a bonus that holds
+  // nothing. Text that isn't English can't be read here, so it isn't held.
   const goals = { ...read.goals, who: read.goals.who || !!params.subjectId };
   const goalsMet = read.quiet || (goals.who && goals.what && goals.better);
   // What the model said about exactly these words; any edit clears it.
@@ -865,7 +877,16 @@ export function Composer({ home }: { home?: boolean }) {
                 ))}
               </Row>
             )}
-            {!read.quiet && !read.overLine && <Goals goals={goals} />}
+            {!read.quiet && !read.overLine && (
+              <Goals
+                goals={goals}
+                notSure={read.notSure}
+                // The out is offered once it's the goal still missing, and
+                // taken back with the same button (only one they tapped).
+                offerNotSure={!read.fix && (notSure || (goals.who && goals.what && !goals.better))}
+                onNotSure={() => setNotSure((v) => !v)}
+              />
+            )}
             {(quip || (rudy.line && read.words > 0 && !read.quiet)) && (
               <Pressable
                 onPress={() => {
@@ -1080,44 +1101,67 @@ export function Composer({ home }: { home?: boolean }) {
 }
 
 /**
- * The least a complaint needs, as goals that tick off while typing: who is
- * involved, what happened, and what could be better. Rudy's line asks for
- * the next one missing.
+ * The least a complaint needs, as goals that tick off while typing: who
+ * it's about, how it is, and how it should be. Rudy's line asks for the next
+ * one missing. "Not sure" meets the last one for someone who sees what's
+ * wrong without knowing what better looks like; how to get there is a bonus.
  */
 function Goals({
   goals,
+  notSure,
+  offerNotSure,
+  onNotSure,
 }: {
-  goals: { who: boolean; what: boolean; better: boolean };
+  goals: { who: boolean; what: boolean; better: boolean; how: boolean };
+  notSure: boolean;
+  offerNotSure: boolean;
+  onNotSure: () => void;
 }) {
   const theme = useTheme();
   const items: [boolean, string][] = [
     [goals.who, "Who"],
-    [goals.what, "What happened"],
-    [goals.better, "Better how"],
+    [goals.what, "How it is"],
+    [goals.better, "How it should be"],
   ];
-  return (
+  const label = (done: boolean, text: string, bonus?: boolean) => (
     <View
-      style={styles.goals}
+      key={text}
+      style={styles.goal}
       accessible
-      accessibilityLabel={`Goals: ${items.map(([done, label]) => `${label} ${done ? "done" : "still to say"}`).join(", ")}`}
+      accessibilityLabel={`${text}: ${done ? "done" : bonus ? "optional" : "still to say"}`}
     >
-      {items.map(([done, label]) => (
-        <View key={label} style={styles.goal}>
-          <Ionicons
-            name={done ? "checkmark-circle" : "ellipse-outline"}
-            size={15}
-            color={done ? theme.good : theme.textSecondary}
-          />
-          <Text
-            style={[
-              styles.goalText,
-              { color: done ? theme.text : theme.textSecondary },
-            ]}
-          >
-            {label}
+      <Ionicons
+        name={done ? (bonus ? "star" : "checkmark-circle") : bonus ? "star-outline" : "ellipse-outline"}
+        size={15}
+        color={done ? (bonus ? theme.rant : theme.good) : theme.textSecondary}
+      />
+      <Text style={[styles.goalText, { color: done ? theme.text : theme.textSecondary }]}>{text}</Text>
+    </View>
+  );
+  return (
+    <View style={styles.goals}>
+      {items.map(([done, text]) => label(done, text))}
+      {offerNotSure && (
+        <Pressable
+          onPress={onNotSure}
+          accessibilityRole="button"
+          accessibilityState={{ selected: notSure }}
+          accessibilityLabel={notSure ? "Not sure how it should be. Tap to take it back." : "I'm not sure how it should be"}
+          hitSlop={6}
+          style={[
+            styles.notSure,
+            {
+              borderColor: notSure ? theme.good : theme.border,
+              backgroundColor: notSure ? theme.goodSoft : "transparent",
+            },
+          ]}
+        >
+          <Text style={[styles.goalText, { color: notSure ? theme.good : theme.textSecondary }]}>
+            {notSure ? "✓ Not sure" : "Not sure?"}
           </Text>
-        </View>
-      ))}
+        </Pressable>
+      )}
+      {label(goals.how, "Bonus: how to get there", true)}
     </View>
   );
 }
@@ -1690,6 +1734,7 @@ const styles = StyleSheet.create({
   goals: { flexDirection: "row", flexWrap: "wrap", columnGap: 12, rowGap: 4 },
   goal: { flexDirection: "row", alignItems: "center", gap: 4 },
   goalText: { fontSize: 13, fontWeight: "600" },
+  notSure: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
   bubble: {
     flexDirection: "row",
     alignItems: "center",

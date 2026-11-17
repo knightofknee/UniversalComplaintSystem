@@ -259,6 +259,8 @@ export async function analyzeText(input: {
   text: string;
   photoPaths: string[];
   hintId: string | null;
+  /** They tapped "Not sure" for how it should be: never ask them for a fix. */
+  notSure?: boolean;
   queued?: boolean;
 }) {
   const { uid, text } = input;
@@ -287,6 +289,7 @@ export async function analyzeText(input: {
     candidateSubjects,
     candidatePoints: points.map((p) => ({ id: p.id, text: p.text, subjects: p.subjectNames, supportCount: p.supportCount })),
     photos: shownPhotos,
+    notSure: !!input.notSure,
   });
 
   // The model may only point at candidates it was shown, and new subject
@@ -391,8 +394,9 @@ export const analyzeComplaint = onCall(
       throw new HttpsError('invalid-argument', 'Bad photo.');
     }
     const hintId = typeof req.data?.subjectId === 'string' ? req.data.subjectId : null;
+    const notSure = req.data?.notSure === true;
     await rateLimit(req, 'analyze');
-    const input = { uid, text, photoPaths: photoPaths as string[], hintId };
+    const input = { uid, text, photoPaths: photoPaths as string[], hintId, notSure };
     if (!(await budgetLeft())) return queueComplaint(input);
     try {
       return { queued: false, ...(await analyzeText(input)) };
@@ -404,7 +408,13 @@ export const analyzeComplaint = onCall(
 );
 
 /** Out of budget for today: keep it (photos too) and check it when there's room. */
-async function queueComplaint(input: { uid: string; text: string; photoPaths: string[]; hintId: string | null }) {
+async function queueComplaint(input: {
+  uid: string;
+  text: string;
+  photoPaths: string[];
+  hintId: string | null;
+  notSure: boolean;
+}) {
   const ref = db.collection('queue').doc();
   const kept: string[] = [];
   for (const [i, p] of input.photoPaths.entries()) {
@@ -418,6 +428,7 @@ async function queueComplaint(input: { uid: string; text: string; photoPaths: st
     text: input.text,
     photoPaths: kept,
     hintId: input.hintId,
+    notSure: input.notSure,
     status: 'waiting',
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -431,9 +442,15 @@ export const processQueue = onSchedule(
     const waiting = await db.collection('queue').where('status', '==', 'waiting').orderBy('createdAt').limit(25).get();
     for (const q of waiting.docs) {
       if (!(await budgetLeft())) return;
-      const { uid, text, photoPaths, hintId } = q.data() as { uid: string; text: string; photoPaths: string[]; hintId: string | null };
+      const { uid, text, photoPaths, hintId, notSure } = q.data() as {
+        uid: string;
+        text: string;
+        photoPaths: string[];
+        hintId: string | null;
+        notSure?: boolean;
+      };
       try {
-        const { draftId } = await analyzeText({ uid, text, photoPaths, hintId, queued: true });
+        const { draftId } = await analyzeText({ uid, text, photoPaths, hintId, notSure, queued: true });
         await q.ref.update({ status: 'ready', draftId, checkedAt: FieldValue.serverTimestamp() });
         await notify([uid], {
           type: 'draft',

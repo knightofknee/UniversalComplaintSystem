@@ -13,6 +13,7 @@ import { Platform, Pressable } from "react-native";
 
 import { Colors, Fonts } from "@/constants/theme";
 import { VerifiedNotice } from "@/components/email-status";
+import { OfflineBanner } from "@/components/offline-banner";
 import { Toaster } from "@/components/toast";
 import { UpdateModal } from "@/components/update-modal";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -21,6 +22,9 @@ import { loadAppearance, useScheme } from "@/lib/appearance";
 import { usePush } from "@/lib/push";
 
 SplashScreen.preventAutoHideAsync();
+
+/** A crash anywhere below draws Rudy saying sorry with Try again, never a blank screen. */
+export { CrashScreen as ErrorBoundary } from "@/components/crash-screen";
 
 /** The tabs sit under the complaint box, so its menu button always has somewhere to go back to. */
 export const unstable_settings = { initialRouteName: "(tabs)" };
@@ -165,6 +169,7 @@ export default function RootLayout() {
         )}
         <VerifiedNotice />
         <UpdateModal />
+        <OfflineBanner />
         <Toaster />
       </AuthProvider>
     </ThemeProvider>
