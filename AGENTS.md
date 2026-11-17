@@ -542,6 +542,20 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     what should change) and keeps the author's words, swearing and heat;
     if the only change would be tone or word choice it is null. Over-the-
     line alternatives change only the words that crossed the line.
+- UPDATE PROMPT (2026-11-17, same design as the user's other apps): Rudy
+  asks for the update when the store has a newer release than the running
+  build (src/lib/app-update.ts, src/components/update-modal.tsx, mounted in
+  the root layout; checked at launch and on returning to the app, at most
+  every 30 minutes). Source of truth is `config/app` (world-readable, written
+  only by `npm run set-latest-version`), never the store's lookup API. iOS
+  compares the version (`latestVersion` warns, `minVersion` blocks); Android
+  the versionCode (`androidLatestBuild` / `androidMinBuild`). Maybe later
+  snoozes a day; below a floor there is no way past it. A platform with no
+  store link (`iosUrl` / `androidUrl`) never prompts. AFTER EVERY RELEASE
+  THAT REACHES A STORE, flip that store's dial (closed testing counts on
+  Play). The built-in words name no feature (they live in the binary
+  forever); `--message` gives a release its own line, cleared on the next
+  flip. Only builds made after 2026-11-17 have the prompt.
 - Appearance (2026-11-06): DARK is the default, chosen by the app, not the
   phone (src/lib/appearance.ts; Me > Appearance: Dark / Light / Match phone,
   saved per device). Native: `Appearance.setColorScheme`, so the tab bar,

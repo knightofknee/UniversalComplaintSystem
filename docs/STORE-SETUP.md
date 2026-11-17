@@ -107,6 +107,28 @@ from Firebase console → Project settings → Service accounts → **Generate n
 private key** (project `universal-complaint-system`). Delete the downloaded
 JSON afterwards; EAS keeps it. Without this, Android phones get no push.
 
+**After each release goes live** (Claude does this when told a store is
+serving a build): flip the update prompt so older builds ask for it.
+
+```bash
+npm run set-latest-version -- 1.0.5
+```
+
+```bash
+npm run set-latest-version -- --android-latest 4
+```
+
+Once each, at that store's first public release, its listing link (no link,
+no prompt on that platform):
+
+```bash
+npm run set-latest-version -- --ios-url https://apps.apple.com/app/id<number>
+```
+
+```bash
+npm run set-latest-version -- --android-url "https://play.google.com/store/apps/details?id=com.waldgrave.ucs"
+```
+
 ---
 
 ## 1. Apple

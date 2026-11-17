@@ -124,6 +124,11 @@ service cloud.firestore {
     match /config/{id} {
       allow read: if isOperator();
     }
+    // The update prompt's dials and store links (src/lib/app-update.ts): read
+    // before sign-in, written only by scripts/set-latest-version.ts.
+    match /config/app {
+      allow read: if true;
+    }
 
     // drafts, queue, rateLimits, authors, restricted, imports, pushTokenOwners: server only.
   }

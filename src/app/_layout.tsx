@@ -14,6 +14,7 @@ import { Platform, Pressable } from "react-native";
 import { Colors, Fonts } from "@/constants/theme";
 import { VerifiedNotice } from "@/components/email-status";
 import { Toaster } from "@/components/toast";
+import { UpdateModal } from "@/components/update-modal";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { loadAppearance, useScheme } from "@/lib/appearance";
@@ -159,6 +160,7 @@ export default function RootLayout() {
           </Stack>
         )}
         <VerifiedNotice />
+        <UpdateModal />
         <Toaster />
       </AuthProvider>
     </ThemeProvider>
