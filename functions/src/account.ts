@@ -8,7 +8,8 @@
  *   withdrawn and the counts drop; fixes they proposed are deleted;
  * - organization access, requests, queued complaints, blocks, notifications,
  *   phone notification tokens, limits and the sign-in itself are removed;
- *   reports they sent stay (they're about others' posts) without their name.
+ *   reports they sent stay (they're about others' posts) without their name;
+ *   messages they wrote to us (feedback) are deleted.
  */
 import { getAuth } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
@@ -156,6 +157,9 @@ export const deleteAccount = onCall({ ...CALLABLE, timeoutSeconds: 300 }, async 
   await Promise.all(authored.docs.map((d) => d.ref.delete()));
   const reported = await db.collection('reports').where('reporterUid', '==', uid).get();
   await Promise.all(reported.docs.map((d) => d.ref.update({ reporterUid: null })));
+  // Messages they wrote to us, with the email they left for an answer.
+  const wrote = await db.collection('feedback').where('uid', '==', uid).get();
+  await Promise.all(wrote.docs.map((d) => d.ref.delete()));
 
   await db.doc(`rateLimits/${uid}`).delete();
   await bucket().deleteFiles({ prefix: `uploads/${uid}/` });

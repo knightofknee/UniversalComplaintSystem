@@ -15,6 +15,7 @@ type Link = { icon: ComponentProps<typeof Ionicons>['name']; label: string; href
 const HELP: Link[] = [
   { icon: 'information-circle-outline', label: 'How UCS works', href: '/about' },
   { icon: 'help-circle-outline', label: 'Help', href: '/help' },
+  { icon: 'mail-outline', label: 'Write to us', href: '/feedback' },
 ];
 
 const REST: Link[] = [
@@ -116,7 +117,7 @@ function KindSwitches() {
 }
 
 /**
- * Me > Settings: help first, then which notifications to get, then the
+ * Me > Settings: help (and writing to us) first, then which notifications to get, then the
  * app's rules and (last, on purpose) deleting an account, so "Delete
  * account" is never one stray tap away.
  */

@@ -1,13 +1,13 @@
 import { useRouter, type Href } from 'expo-router';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet } from 'react-native';
 
 import { showAlert } from '@/components/point-card';
 import { Button, Card, Chip, Empty, Field, Row, Screen, T, Tabs } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
-import { errorText, operatorClaim, resolveDuplicate, resolveReport } from '@/lib/api';
+import { errorText, operatorClaim, resolveDuplicate, resolveFeedback, resolveReport } from '@/lib/api';
 import { db } from '@/lib/firebase';
 import { timeAgo, useCollection, useDoc } from '@/lib/hooks';
 import { isOperator } from '@/lib/operator';
@@ -111,7 +111,7 @@ function AskHost() {
  */
 export default function OperatorScreen() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<'claims' | 'reports' | 'duplicates' | 'spend'>('claims');
+  const [tab, setTab] = useState<'claims' | 'reports' | 'feedback' | 'duplicates' | 'spend'>('claims');
   const op = isOperator(user);
   const claims = useCollection<Claim>(
     op
@@ -129,6 +129,13 @@ export default function OperatorScreen() {
       ? query(collection(db, 'reports'), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(100))
       : null,
     'op:reports',
+  );
+  // Messages written to us (sendFeedback, Settings > Write to us).
+  const feedback = useCollection<Feedback>(
+    op
+      ? query(collection(db, 'feedback'), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(100))
+      : null,
+    'op:feedback',
   );
   // Pairs of points that may say the same thing (functions/src/duplicates.ts).
   const duplicates = useCollection<Duplicate>(
@@ -149,6 +156,7 @@ export default function OperatorScreen() {
         options={[
           { key: 'claims', label: `Organizations · ${claims.items.length}` },
           { key: 'reports', label: `Reports · ${reports.items.length}` },
+          { key: 'feedback', label: `Messages · ${feedback.items.length}` },
           { key: 'duplicates', label: `Duplicates · ${duplicates.items.length}` },
           { key: 'spend', label: 'AI spend' },
         ]}
@@ -167,6 +175,12 @@ export default function OperatorScreen() {
         ) : (
           reports.items.map((r) => <ReportCard key={r.id} r={r} />)
         ))}
+      {tab === 'feedback' &&
+        (feedback.items.length === 0 ? (
+          <Empty loading={feedback.loading} text="No messages waiting." />
+        ) : (
+          feedback.items.map((f) => <FeedbackCard key={f.id} f={f} />)
+        ))}
       {tab === 'duplicates' &&
         (duplicates.items.length === 0 ? (
           <Empty loading={duplicates.loading} text="No likely duplicates." />
@@ -175,6 +189,70 @@ export default function OperatorScreen() {
         ))}
       {tab === 'spend' && <Spend />}
     </Screen>
+  );
+}
+
+type Feedback = {
+  id: string;
+  topic: string;
+  message: string;
+  email: string | null;
+  platform: string | null;
+  appVersion: string | null;
+  createdAt?: { toMillis(): number };
+};
+
+const TOPIC: Record<string, string> = {
+  problem: 'Not working',
+  idea: 'Idea',
+  account: 'Account',
+  organization: 'Organization',
+  child_safety: 'Child safety',
+  other: 'Other',
+};
+
+/** A message to us. Answer by email (it opens your mail app), then mark it done. */
+function FeedbackCard({ f }: { f: Feedback }) {
+  const theme = useTheme();
+  const [busy, setBusy] = useState(false);
+  const done = async () => {
+    setBusy(true);
+    try {
+      await resolveFeedback({ id: f.id });
+    } catch (e) {
+      showAlert("Couldn't do that", errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const safety = f.topic === 'child_safety';
+  return (
+    <Card>
+      <Row style={{ flexWrap: 'wrap' }}>
+        <Chip
+          label={TOPIC[f.topic] ?? f.topic}
+          color={safety ? theme.danger : theme.primary}
+          bg={safety ? theme.dangerSoft : theme.primarySoft}
+        />
+        <T variant="small">
+          {timeAgo(f.createdAt?.toMillis())}
+          {f.platform ? ` · ${f.platform}` : ''}
+          {f.appVersion ? ` ${f.appVersion}` : ''}
+        </T>
+      </Row>
+      <T>{f.message}</T>
+      <T variant="small">{f.email ?? 'No email: no way to answer.'}</T>
+      <Row style={{ flexWrap: 'wrap' }}>
+        {f.email && (
+          <Button
+            label="Answer by email"
+            kind="secondary"
+            onPress={() => Linking.openURL(`mailto:${f.email}?subject=${encodeURIComponent('Your message to UCS')}`)}
+          />
+        )}
+        <Button label="Done" kind="quiet" onPress={done} disabled={busy} />
+      </Row>
+    </Card>
   );
 }
 

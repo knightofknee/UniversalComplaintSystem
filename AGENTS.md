@@ -542,6 +542,16 @@ Product spec: docs/SPEC.md. Same stack and conventions as ../direct-democracy.
     what should change) and keeps the author's words, swearing and heat;
     if the only change would be tone or word choice it is null. Over-the-
     line alternatives change only the words that crossed the line.
+- WRITE TO US (2026-11-17, from direct-democracy's feedback form): Settings
+  and Help open /feedback, a sheet (own Toaster, `Problem` inline) where
+  anyone, signed in or not, writes to the operator: a topic (not working,
+  idea, account, organization, child safety, other), the message, an
+  optional email for an answer. `sendFeedback` (moderation.ts, 5 a day per
+  account, 20 per network address) stores `feedback/{id}` status open; child
+  safety alerts the operator at once. The operator queue's Messages tab
+  answers by email and marks Done (`resolveFeedback`); the daily report
+  check (~/repos/ops/check-reports.py) lists open ones as "UCS messages".
+  Deleting an account deletes its messages (privacy pages say so).
 - UPDATE PROMPT (2026-11-17, same design as the user's other apps): Rudy
   asks for the update when the store has a newer release than the running
   build (src/lib/app-update.ts, src/components/update-modal.tsx, mounted in

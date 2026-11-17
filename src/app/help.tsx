@@ -96,6 +96,14 @@ export default function HelpScreen() {
         between you and them, and nothing of it is public.
       </T>
 
+      <T variant="heading">Still stuck?</T>
+      <T>
+        Write to the people who run UCS. We read every message, and answer by email if you leave one.
+      </T>
+      <T color={theme.primary} style={{ fontWeight: '700' }} onPress={() => router.push('/feedback')}>
+        Write to us
+      </T>
+
       <T variant="heading">Rules</T>
       <T>No threats, hate, harassment, sexual content, or complaints aimed at private people.</T>
       <T color={theme.primary} style={{ fontWeight: '700' }} onPress={() => router.push('/about')}>

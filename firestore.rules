@@ -114,6 +114,10 @@ service cloud.firestore {
     match /reports/{id} {
       allow read: if isOperator();
     }
+    // Messages to the operator (sendFeedback): only the operator reads them.
+    match /feedback/{id} {
+      allow read: if isOperator();
+    }
     // Pairs of points that may say the same thing, for the operator to merge.
     match /duplicates/{id} {
       allow read: if isOperator();

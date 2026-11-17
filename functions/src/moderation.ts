@@ -183,6 +183,56 @@ export const report = onCall(CALLABLE, async (req) => {
   return { ok: true };
 });
 
+// ── Feedback ────────────────────────────────────────────────────────────
+
+/** What a message to us is about (mirrored in src/app/feedback.tsx). */
+const FEEDBACK_TOPICS = ['problem', 'idea', 'account', 'organization', 'child_safety', 'other'];
+
+/**
+ * A message to the people who run UCS, from Settings or Help, signed in or
+ * not (everyone has an account, anonymous or not). Items on the record are
+ * reported with their flag; this is for everything else. Stored in
+ * `feedback` for the operator queue and the daily report check; a child
+ * safety message alerts at once. Suspended accounts can still write (an
+ * appeal goes here).
+ */
+export const sendFeedback = onCall(CALLABLE, async (req) => {
+  const uid = uidOf(req);
+  const topic = FEEDBACK_TOPICS.includes(req.data?.topic) ? (req.data.topic as string) : null;
+  if (!topic) throw new HttpsError('invalid-argument', 'Pick what this is about.');
+  const message = cleanText(req.data?.message, 4000, 'Your message');
+  if (message.length < 10) throw new HttpsError('invalid-argument', 'Say a little more: at least 10 characters.');
+  const typed = typeof req.data?.email === 'string' ? req.data.email.trim() : '';
+  if (typed && (typed.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed))) {
+    throw new HttpsError('invalid-argument', "That email doesn't look right. Check it, or leave it empty.");
+  }
+  await rateLimit(req, 'feedback');
+  const short = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : null);
+  await db.collection('feedback').add({
+    topic,
+    message,
+    uid,
+    // Where an answer goes: what they typed, else their account's email.
+    email: typed || ((req.auth?.token.email as string | undefined) ?? null),
+    platform: short(req.data?.platform, 20),
+    appVersion: short(req.data?.appVersion, 20),
+    status: 'open',
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  if (topic === 'child_safety') await notifyOperator('Child safety message: read it now.', 'child', 0);
+  else await notifyOperator('A new message is waiting for you.', 'feedback');
+  return { ok: true };
+});
+
+/** Operator: a message has been dealt with (answered by email, or nothing to do). */
+export const resolveFeedback = onCall(CALLABLE, async (req) => {
+  requireOperator(req);
+  const ref = db.doc(`feedback/${str(req.data?.id)}`);
+  if (!(await ref.get()).exists) throw new HttpsError('not-found', 'No such message.');
+  await ref.update({ status: 'done', decidedAt: FieldValue.serverTimestamp() });
+  return { ok: true };
+});
+
 /**
  * Takes something off the record (or out of a conversation). Public items
  * are hidden, not deleted, and logged in the public removal log; private

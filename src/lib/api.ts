@@ -145,6 +145,13 @@ export const report = call<
   { ok: boolean }
 >('report');
 
+export type FeedbackTopic = 'problem' | 'idea' | 'account' | 'organization' | 'child_safety' | 'other';
+/** A message to the people who run UCS (Settings and Help). */
+export const sendFeedback = call<
+  { topic: FeedbackTopic; message: string; email?: string; platform?: string; appVersion?: string },
+  { ok: boolean }
+>('sendFeedback');
+
 export const setNotify = call<{ kind: string; on: boolean }, { kind: string; on: boolean }>('setNotify');
 export const setPush = call<{ on: boolean; token?: string; platform?: string }, { on: boolean }>('setPush');
 
@@ -157,6 +164,8 @@ export const operatorClaim = call<
 export const resolveDuplicate = call<{ id: string; action: 'merge' | 'dismiss' }, { merged: string | null }>(
   'resolveDuplicate',
 );
+/** Operator: a message has been dealt with. */
+export const resolveFeedback = call<{ id: string }, { ok: boolean }>('resolveFeedback');
 export const resolveReport = call<
   { reportId: string; action: 'remove' | 'dismiss' | 'suspend'; reason?: string },
   { ok: boolean }
