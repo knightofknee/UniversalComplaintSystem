@@ -23,13 +23,6 @@
   "submit": {
     "production": {
       "android": {
-        "track": "production",
-        "releaseStatus": "completed",
-        "changesNotSentForReview": false
-      }
-    },
-    "alpha": {
-      "android": {
         "track": "alpha",
         "releaseStatus": "completed",
         "changesNotSentForReview": false
