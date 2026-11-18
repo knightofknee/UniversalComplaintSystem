@@ -107,6 +107,18 @@ from Firebase console → Project settings → Service accounts → **Generate n
 private key** (project `universal-complaint-system`). Delete the downloaded
 JSON afterwards; EAS keeps it. Without this, Android phones get no push.
 
+**Android while it's in closed testing** (a personal account needs 14 days
+and 12 testers before production): build, then submit to the Alpha track,
+not production:
+
+```bash
+eas build -p android --profile production
+```
+
+```bash
+eas submit -p android --profile alpha --latest
+```
+
 **After each release goes live** (Claude does this when told a store is
 serving a build): flip the update prompt so older builds ask for it.
 
